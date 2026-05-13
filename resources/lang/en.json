@@ -21,7 +21,11 @@
         "payment_type_label": "Payment Type",
         "receipt_label": "Receipt",
         "receipt_view": "View Receipt",
-        "escrow_confirm_button": "Confirm Purchase"
+        "escrow_confirm_button": "Confirm Purchase",
+        "tax_breakdown_title": "Tax Breakdown",
+        "supply_amount": "Supply Amount",
+        "vat_amount": "VAT",
+        "tax_free_amount": "Tax-Free Amount"
     },
     "admin": {
         "test_mode_badge": "Test Payment",

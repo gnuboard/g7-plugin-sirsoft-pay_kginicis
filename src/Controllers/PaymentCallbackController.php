@@ -6,10 +6,13 @@ namespace Plugins\Sirsoft\PayKginicis\Controllers;
 
 use App\Extension\HookManager;
 use App\Services\PluginSettingsService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Exceptions\PaymentAmountMismatchException;
+use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\AuthCallbackRequest;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\MobileVbankNotifyRequest;
@@ -148,6 +151,13 @@ class PaymentCallbackController
 
             $tid = $pgResponse['tid'] ?? '';
 
+            // 가상계좌: completePayment 없이 계좌 정보만 저장 (입금 통보 시 completePayment)
+            if (($pgResponse['payMethod'] ?? '') === 'VBank') {
+                $this->handleVbankIssued($order, $pgResponse, $tid, $request);
+
+                return redirect($this->resolveSuccessUrl($moid));
+            }
+
             // TotPrice 가 콜백에 없으면 PG 승인 응답의 TotPrice 사용
             if ($totPrice === null) {
                 $totPrice = (int) ($pgResponse['TotPrice'] ?? $pgResponse['totPrice'] ?? 0);
@@ -156,8 +166,8 @@ class PaymentCallbackController
             $this->orderService->completePayment($order, [
                 'transaction_id' => $tid,
                 'card_approval_number' => $pgResponse['applNum'] ?? null,
-                'card_number_masked' => $pgResponse['cardNum'] ?? $pgResponse['vbankNum'] ?? null,
-                'card_name' => $pgResponse['cardName'] ?? $pgResponse['vbankName'] ?? null,
+                'card_number_masked' => $pgResponse['cardNum'] ?? null,
+                'card_name' => $pgResponse['cardName'] ?? null,
                 'card_installment_months' => (int) ($pgResponse['cardQuota'] ?? 0),
                 'is_interest_free' => false,
                 'embedded_pg_provider' => null,
@@ -166,13 +176,12 @@ class PaymentCallbackController
                     'result_code' => $pgResultCode,
                     'pay_method' => $pgResponse['payMethod'] ?? null,
                     'auth_date' => $pgResponse['applDate'] ?? null,
-                    'vbank_num' => $pgResponse['vbankNum'] ?? null,
-                    'vbank_name' => $pgResponse['vbankName'] ?? null,
-                    'vbank_exp_date' => $pgResponse['vbankExpDate'] ?? null,
                     'pg_raw_response' => $pgResponse,
                 ],
                 'payment_device' => $this->detectDevice($request),
             ], $totPrice);
+
+            $order->payment()->update(['pg_provider' => 'kginicis']);
 
             return redirect($this->resolveSuccessUrl($moid));
 
@@ -246,6 +255,8 @@ class PaymentCallbackController
                 ],
             ], $amt);
 
+            $order->payment()->update(['pg_provider' => 'kginicis']);
+
             Log::info('KG Inicis: PC vbank deposit confirmed', ['tid' => $tid, 'moid' => $moid, 'amt' => $amt]);
 
             return response('OK', 200)->header('Content-Type', 'text/plain');
@@ -317,6 +328,8 @@ class PaymentCallbackController
                 'payment_device' => 'mobile',
             ], $amt);
 
+            $order->payment()->update(['pg_provider' => 'kginicis']);
+
             Log::info('KG Inicis: mobile vbank deposit confirmed', ['tid' => $tid, 'moid' => $moid, 'amt' => $amt]);
 
             return response('OK', 200)->header('Content-Type', 'text/plain');
@@ -353,6 +366,53 @@ class PaymentCallbackController
         $separator = str_contains($baseUrl, '?') ? '&' : '?';
 
         return $baseUrl . $separator . $query;
+    }
+
+    /**
+     * 가상계좌 발급 처리 (completePayment 없이 계좌 정보만 저장)
+     *
+     * KG 이니시스 authCallback 에서 payMethod=VBank 로 판별된 경우 호출.
+     * 실제 결제 완료(completePayment)는 입금 통보(vbankNotify) 시점에 처리.
+     */
+    private function handleVbankIssued(Order $order, array $pgResponse, string $tid, Request $request): void
+    {
+        $vactDate = $pgResponse['VACT_Date'] ?? null;
+        $vactTime = $pgResponse['VACT_Time'] ?? '235959';
+        $vbankDueAt = null;
+
+        if ($vactDate && strlen($vactDate) === 8) {
+            try {
+                $vbankDueAt = Carbon::createFromFormat('YmdHis', $vactDate . $vactTime);
+            } catch (\Exception) {
+                $vbankDueAt = null;
+            }
+        }
+
+        $order->payment()->update(array_filter([
+            'pg_provider'     => 'kginicis',
+            'payment_status'  => PaymentStatusEnum::WAITING_DEPOSIT,
+            'transaction_id'  => $tid ?: null,
+            'vbank_name'      => $pgResponse['vactBankName'] ?? null,  // 입금은행명
+            'vbank_number'    => $pgResponse['VACT_Num'] ?? null,       // 가상계좌번호
+            'vbank_holder'    => $pgResponse['VACT_Name'] ?? null,      // 예금주명
+            'vbank_due_at'    => $vbankDueAt,
+            'vbank_issued_at' => now(),
+            'payment_device'  => $this->detectDevice($request),
+            'payment_meta'    => [
+                'result_code'     => '0000',
+                'pay_method'      => 'VBank',
+                'auth_date'       => $pgResponse['applDate'] ?? null,
+                'pg_raw_response' => $pgResponse,
+            ],
+        ], fn ($v) => $v !== null));
+
+        Log::info('KG Inicis: vbank account issued', [
+            'moid'         => $order->order_number,
+            'tid'          => $tid,
+            'vbank_name'   => $pgResponse['vactBankName'] ?? null,
+            'vbank_number' => $pgResponse['VACT_Num'] ?? null,
+            'vbank_due_at' => $vbankDueAt?->toDateTimeString(),
+        ]);
     }
 
     private function detectDevice(Request $request): string

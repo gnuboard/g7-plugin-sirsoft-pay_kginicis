@@ -40,6 +40,15 @@ interface OrderCreateResponseBody {
     };
 }
 
+function extractPaymentMethodFromBody(body: string): string | undefined {
+    try {
+        const parsed = JSON.parse(body) as Record<string, unknown>;
+        return parsed['payment_method'] as string | undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 function extractUrl(input: RequestInfo | URL): string {
     if (typeof input === 'string') return input;
     if (input instanceof URL) return input.toString();
@@ -104,14 +113,27 @@ export function installOrderResponseInterceptor(): void {
         input: RequestInfo | URL,
         init?: RequestInit
     ): Promise<Response> {
-        const response = await originalFetch(input, init);
-
         const url = extractUrl(input);
         const method = extractMethod(input, init);
 
         if (!isTargetEndpoint(url, method)) {
-            return response;
+            return originalFetch(input, init);
         }
+
+        // 요청 body에서 payment_method 추출 (vbank, bank, phone 등 비카드 결제수단 감지)
+        let paymentMethod: string | undefined;
+        if (init?.body && typeof init.body === 'string') {
+            paymentMethod = extractPaymentMethodFromBody(init.body);
+        }
+        // G7Core 로컬 상태 fallback
+        if (!paymentMethod) {
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                paymentMethod = ((window as any).G7Core)?.state?.getLocal?.()?.paymentMethod as string | undefined;
+            } catch { /* ignore */ }
+        }
+
+        const response = await originalFetch(input, init);
 
         // 본문은 한 번만 읽을 수 있으므로 클론
         let cloned: Response;
@@ -151,7 +173,7 @@ export function installOrderResponseInterceptor(): void {
         //    실패 시 requestPaymentHandler 내부에서 isSubmittingOrder=false 처리됨
         void requestPaymentHandler({
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            params: { pgPaymentData: pgPaymentData as any },
+            params: { pgPaymentData: pgPaymentData as any, paymentMethod },
         });
 
         // 2) 응답 mutate — 템플릿의 navigate fallback 을 무력화

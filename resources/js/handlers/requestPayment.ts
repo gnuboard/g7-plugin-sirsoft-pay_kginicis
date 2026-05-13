@@ -34,6 +34,8 @@ interface ClientConfig {
     japan_enabled: boolean;
     use_escrow: boolean;
     japan_mid: string;
+    enabled_easy_pays: string[];
+    use_credit_point: boolean;
 }
 
 interface SignatureResponse {
@@ -102,18 +104,23 @@ function submitForm(action: string, fields: Record<string, string>, charset = 'u
 
 // PC 결제수단 → INIStdPay gopaymethod 매핑
 const GOPAYMETHOD_MAP: Record<string, string> = {
-    card:  'Card',
-    vbank: 'VBank',
-    bank:  'DirectBank',
-    phone: 'HPP',
+    card:               'Card',
+    vbank:              'VBank',
+    bank:               'DirectBank',
+    phone:              'HPP',
+    kginicis_lpay:      'LPAY',
+    kginicis_kakaopay:  'KAKAOPAY',
 };
 
 // 모바일 결제수단 → P_INI_PAYMENT 매핑
 const MOBILE_PAYMETHOD_MAP: Record<string, string> = {
-    card:  'CARD',
-    vbank: 'VBANK',
-    bank:  'BANK',
-    phone: 'HPP',
+    card:                 'CARD',
+    vbank:                'VBANK',
+    bank:                 'BANK',
+    phone:                'HPP',
+    kginicis_samsung_pay: 'SAMSUNG',
+    kginicis_lpay:        'LPAY',
+    kginicis_kakaopay:    'KAKAOPAY',
 };
 
 /**
@@ -220,9 +227,10 @@ async function requestKoreanPayment(
         gopaymethod:  GOPAYMETHOD_MAP[paymentMethod] ?? 'Card',
         acceptmethod: (() => {
             const escrow = config.use_escrow ? 'useescrow:' : '';
+            const creditPoint = config.use_credit_point ? 'CREDITCARD(Y):' : '';
             return paymentMethod === 'phone'
-                ? `HPP(1):${escrow}centerCd(Y)`
-                : `${escrow}centerCd(Y)`;
+                ? `HPP(1):${escrow}${creditPoint}centerCd(Y)`
+                : `${escrow}${creditPoint}centerCd(Y)`;
         })(),
         payViewType:  'overlay',
         use_chkfake:  'Y',

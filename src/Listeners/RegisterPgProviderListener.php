@@ -61,8 +61,9 @@ class RegisterPgProviderListener implements HookListenerInterface
     {
         $providers[] = [
             'id' => 'kginicis',
-            'name_key' => 'sirsoft-pay_kginicis::provider.name',
-            'name' => localized_label(nameKey: 'sirsoft-pay_kginicis::provider.name'),
+            'name' => function_exists('localized_label')
+                ? localized_label(nameKey: 'sirsoft-pay_kginicis::provider.name')
+                : ['ko' => 'KG이니시스', 'en' => 'KG Inicis'],
             'icon' => 'credit-card',
             'supported_methods' => ['card', 'bank_transfer', 'virtual_account', 'mobile'],
         ];
@@ -111,12 +112,24 @@ class RegisterPgProviderListener implements HookListenerInterface
                 'mobile_signature' => '/plugins/sirsoft-pay_kginicis/payment/mobile/signature',
                 'mobile_callback'  => '/plugins/sirsoft-pay_kginicis/payment/mobile/callback',
             ],
-            'japan_enabled' => $settings['japan_enabled'] ?? false,
-            'use_escrow' => $settings['use_escrow'] ?? false,
-            'japan_mid' => $isTest
+            'japan_enabled'              => $settings['japan_enabled'] ?? false,
+            'use_escrow'                 => $settings['use_escrow'] ?? false,
+            'japan_mid'                  => $isTest
                 ? ($settings['test_japan_mid'] ?? '')
                 : ($settings['live_japan_mid'] ?? ''),
+            'enabled_easy_pays'          => $this->getEnabledEasyPays($settings),
+            'easy_pay_allow_with_other_pg' => (bool) ($settings['easy_pay_allow_with_other_pg'] ?? false),
+            'use_credit_point'           => (bool) ($settings['use_credit_point'] ?? false),
         ]);
+    }
+
+    private function getEnabledEasyPays(array $settings): array
+    {
+        $enabled = [];
+        if ($settings['easy_pay_samsung_pay'] ?? false) $enabled[] = 'SAMSUNG';
+        if ($settings['easy_pay_lpay'] ?? false)        $enabled[] = 'LPAY';
+        if ($settings['easy_pay_kakaopay'] ?? false)    $enabled[] = 'KAKAOPAY';
+        return $enabled;
     }
 
     private function buildLiveMid(string $suffix): string
