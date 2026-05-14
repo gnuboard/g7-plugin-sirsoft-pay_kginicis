@@ -144,9 +144,11 @@ async function requestMobileKoreanPayment(
 
     const { chkfake, mobile_payment_url: mobilePaymentUrl } = sigJson.data;
 
+    // 메뉴얼(STEP 2) 표준 응답에는 P_OID 가 없음 — 주문번호를 쿼리스트링으로 echo 받아 회수.
     const nextUrl =
         window.location.origin +
-        config.callback_urls.mobile_callback;
+        config.callback_urls.mobile_callback +
+        '?orderId=' + encodeURIComponent(pgPaymentData.order_number);
 
     submitForm(mobilePaymentUrl, {
         P_INI_PAYMENT: MOBILE_PAYMETHOD_MAP[paymentMethod] ?? 'CARD',

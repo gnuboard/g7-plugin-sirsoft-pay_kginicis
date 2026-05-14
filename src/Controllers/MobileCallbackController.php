@@ -44,20 +44,26 @@ class MobileCallbackController
         $validated = $request->validated();
 
         $pStatus   = $validated['P_STATUS'];
-        $moid      = $validated['P_OID'] ?? null;
+        // KG 이니시스 모바일 메뉴얼(STEP 2) 표준 응답에는 P_OID 가 없으므로 P_NEXT_URL 쿼리스트링의
+        // orderId 를 fallback 으로 사용한다. 일부 PG 환경에서 P_OID 를 echo 하면 우선 채택.
+        $moid      = $validated['P_OID'] ?? $request->query('orderId') ?? null;
         $pAmt      = $validated['P_AMT'] ?? null;
 
         Log::info('KG Inicis mobile: callback received', [
-            'P_OID'     => $moid,
+            'order_id'  => $moid,
             'P_STATUS'  => $pStatus,
             'idc_name'  => $validated['idc_name'] ?? null,
             'P_REQ_URL' => $validated['P_REQ_URL'] ?? null,
+            'input_keys' => array_keys($request->all()),
+            'query_keys' => array_keys($request->query()),
         ]);
 
         if (! $moid) {
-            Log::error('KG Inicis mobile: P_OID missing from callback');
+            Log::error('KG Inicis mobile: order id missing — neither P_OID nor query orderId present', [
+                'all_keys' => array_keys($request->all()),
+            ]);
 
-            return redirect('/');
+            return redirect($this->resolveFailUrl(['error' => 'order_id_missing']));
         }
 
         // 인증 실패
