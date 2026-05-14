@@ -37,8 +37,9 @@ Route::withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfTok
         ->middleware(InicisNotifyIpWhitelist::class)
         ->name('payment.escrow-notify');
 
-    // 모바일: KG 이니시스가 인증 후 GET 리다이렉트로 P_NEXT_URL 호출
-    Route::get('/payment/mobile/callback', [MobileCallbackController::class, 'handle'])
+    // 모바일: KG 이니시스가 인증 후 P_NEXT_URL 로 POST 콜백을 전송 (모바일 표준결제 표준).
+    // GET 도 허용해 일부 케이스(PG 자체 리다이렉트 패턴) 호환 — 인증/주문번호는 동일하게 P_OID 로 수신.
+    Route::match(['get', 'post'], '/payment/mobile/callback', [MobileCallbackController::class, 'handle'])
         ->name('payment.mobile.callback');
 
     // 에스크로 구매결정 결과 수신 (KG 이니시스 → 사용자 브라우저 POST)
