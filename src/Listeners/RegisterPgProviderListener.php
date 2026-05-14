@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Plugins\Sirsoft\PayKginicis\Listeners;
 
 use App\Contracts\Extension\HookListenerInterface;
+use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
 class RegisterPgProviderListener implements HookListenerInterface
 {
@@ -115,7 +116,7 @@ class RegisterPgProviderListener implements HookListenerInterface
             'japan_enabled'              => $settings['japan_enabled'] ?? false,
             'use_escrow'                 => $settings['use_escrow'] ?? false,
             'japan_mid'                  => $isTest
-                ? ($settings['test_japan_mid'] ?? '')
+                ? KgInicisApiService::JAPAN_TEST_MID
                 : ($settings['live_japan_mid'] ?? ''),
             'enabled_easy_pays'          => $this->getEnabledEasyPays($settings),
             'easy_pay_allow_with_other_pg' => (bool) ($settings['easy_pay_allow_with_other_pg'] ?? false),

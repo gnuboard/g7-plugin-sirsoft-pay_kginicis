@@ -4,6 +4,16 @@
 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)를 따르며,
 [Semantic Versioning](https://semver.org/lang/ko/)을 준수합니다.
 
+## [1.0.0-beta.2] - 2026-05-14
+
+### Removed
+
+- 일본 결제(CBT) 설정에서 "테스트 일본 MID" 입력 필드를 제거 — KG 이니시스 공식 테스트 MID는 고정값(`CBTTEST001`)이라 직접 입력할 필요가 없도록 정리
+
+### Changed
+
+- 일본 결제(CBT) 테스트 환경의 MID를 공식 고정값으로 자동 적용하도록 변경 — 설정 누락으로 인한 결제 실패 가능성 제거
+
 ## [1.0.0-beta.1] - 2026-04-22
 
 ### Changed

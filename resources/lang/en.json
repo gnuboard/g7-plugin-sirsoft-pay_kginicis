@@ -106,8 +106,6 @@
         "section_japan_hint": "Settings for Japanese Yen (JPY) payments via KG Inicis CBT (Cross Border Trade).",
         "japan_enabled": "Enable Japan Payment",
         "japan_enabled_hint": "Requires a separate CBT MID for Japanese Yen (JPY) payments.",
-        "test_japan_mid": "Test Japan MID",
-        "test_japan_mid_hint": "CBT test MID (e.g.: CBTTEST001)",
         "test_japan_cbt_key": "Test Japan CBT Hash Key",
         "test_japan_cbt_key_hint": "Test KEY used for CBT hash data generation.",
         "live_japan_mid": "Live Japan MID",

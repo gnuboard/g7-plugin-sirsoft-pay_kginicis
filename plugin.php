@@ -107,15 +107,6 @@ class Plugin extends AbstractPlugin
                     'en' => 'Requires a separate MID for Japanese Yen (JPY) payments.',
                 ],
             ],
-            'test_japan_mid' => [
-                'type' => 'string',
-                'default' => '',
-                'label' => ['ko' => '테스트 일본 MID', 'en' => 'Test Japan MID'],
-                'hint' => [
-                    'ko' => '일본 결제용 테스트 MID',
-                    'en' => 'Test MID for Japan payment',
-                ],
-            ],
             'test_japan_sign_key' => [
                 'type' => 'string',
                 'default' => '5AL5Djb1Ipualn0F',
@@ -175,7 +166,6 @@ class Plugin extends AbstractPlugin
             'live_iniapi_key' => '',
             'live_iniapi_iv' => '',
             'japan_enabled' => false,
-            'test_japan_mid' => '',
             'test_japan_sign_key' => '5AL5Djb1Ipualn0F',
             'live_japan_mid' => '',
             'live_japan_sign_key' => '',

@@ -71,6 +71,9 @@ class KgInicisApiService
 
     private const CBT_APPROVE_URL_LIVE = 'https://cbt.inicis.com/cbtapprove';
 
+    /** KG 이니시스 일본결제(CBT) 공식 테스트 MID — 고정값, 변경 불가 */
+    public const JAPAN_TEST_MID = 'CBTTEST001';
+
     private bool $isTest;
 
     private string $mid;
@@ -117,7 +120,7 @@ class KgInicisApiService
         $this->standardTestInapiIv = $settings['test_iniapi_iv'] ?? '2IgsAQSbMqHkAkj3';
         $this->japanEnabled = $settings['japan_enabled'] ?? false;
         $this->japanMid = $this->isTest
-            ? ($settings['test_japan_mid'] ?? '')
+            ? self::JAPAN_TEST_MID
             : ($settings['live_japan_mid'] ?? '');
         $this->japanCbtKey = $this->isTest
             ? ($settings['test_japan_sign_key'] ?? '')

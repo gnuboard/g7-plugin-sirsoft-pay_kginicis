@@ -119,8 +119,6 @@
         "section_japan_hint": "KG 이니시스 CBT(Cross Border Trade)를 통한 일본 엔(JPY) 결제 설정입니다.",
         "japan_enabled": "일본 결제 활성화",
         "japan_enabled_hint": "일본 엔(JPY) 결제를 위한 별도 CBT MID가 필요합니다.",
-        "test_japan_mid": "테스트 일본 MID",
-        "test_japan_mid_hint": "CBT 테스트용 MID (예: CBTTEST001)",
         "test_japan_cbt_key": "테스트 일본 CBT 해시키",
         "test_japan_cbt_key_hint": "CBT 해시 데이터 생성에 사용되는 테스트 KEY입니다.",
         "live_japan_mid": "라이브 일본 MID",
