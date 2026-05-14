@@ -255,13 +255,29 @@ async function requestKoreanPayment(
  *
  * 페이지 전환 방식: /cbtauth 로 POST 폼 전송 → KG 이니시스 인증 → returnUrl 로 리다이렉트 → 서버 승인
  */
+/**
+ * KG 이니시스 CBT 가 요구하는 timestamp 형식: yyyyMMddHHmmss (14 bytes)
+ * 매뉴얼: https://manual.inicis.com/jppay/cbtauth.html
+ */
+function formatCbtTimestamp(date: Date = new Date()): string {
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    return (
+        date.getFullYear().toString() +
+        pad(date.getMonth() + 1) +
+        pad(date.getDate()) +
+        pad(date.getHours()) +
+        pad(date.getMinutes()) +
+        pad(date.getSeconds())
+    );
+}
+
 async function requestCbtPayment(
     G7Core: any,
     config: ClientConfig,
     pgPaymentData: PgPaymentData,
 ): Promise<void> {
     const japanMid = config.japan_mid;
-    const timestamp = String(Math.floor(Date.now()));
+    const timestamp = formatCbtTimestamp();
 
     const hashResponse: { data: CbtHashDataResponse } = await G7Core.api.post(
         config.callback_urls.cbt_hash_data,
@@ -281,6 +297,7 @@ async function requestCbtPayment(
         timestamp,
         returnUrl,
         buyerName:   pgPaymentData.customer_name ?? '',
+        buyerTel:    pgPaymentData.customer_phone ?? '',
         buyerEmail:  pgPaymentData.customer_email ?? '',
         goodName:    pgPaymentData.order_name,
         amount:      String(pgPaymentData.amount),
