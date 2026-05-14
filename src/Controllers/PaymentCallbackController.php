@@ -12,6 +12,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Exceptions\PaymentAmountMismatchException;
+use Modules\Sirsoft\Ecommerce\Helpers\DeviceDetector;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\AuthCallbackRequest;
@@ -178,7 +179,7 @@ class PaymentCallbackController
                     'auth_date' => $pgResponse['applDate'] ?? null,
                     'pg_raw_response' => $pgResponse,
                 ],
-                'payment_device' => $this->detectDevice($request),
+                'payment_device' => DeviceDetector::detect($request),
             ], $totPrice);
 
             $order->payment()->update(['pg_provider' => 'kginicis']);
@@ -397,7 +398,7 @@ class PaymentCallbackController
             'vbank_holder'    => $pgResponse['VACT_Name'] ?? null,      // 예금주명
             'vbank_due_at'    => $vbankDueAt,
             'vbank_issued_at' => now(),
-            'payment_device'  => $this->detectDevice($request),
+            'payment_device'  => DeviceDetector::detect($request),
             'payment_meta'    => [
                 'result_code'     => '0000',
                 'pay_method'      => 'VBank',
@@ -415,17 +416,4 @@ class PaymentCallbackController
         ]);
     }
 
-    private function detectDevice(Request $request): string
-    {
-        $userAgent = $request->userAgent() ?? '';
-        $mobileKeywords = ['Mobile', 'Android', 'iPhone', 'iPad', 'iPod'];
-
-        foreach ($mobileKeywords as $keyword) {
-            if (stripos($userAgent, $keyword) !== false) {
-                return 'mobile';
-            }
-        }
-
-        return 'pc';
-    }
 }
