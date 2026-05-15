@@ -346,4 +346,31 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
         const fields = getLastSubmittedFormFields();
         expect(fields.P_INI_PAYMENT).toBe(expected);
     });
+
+    /**
+     * 회귀 — KG 이니시스 모바일 휴대폰결제 매뉴얼은 P_HPP_METHOD 가 필수
+     * (manual.inicis.com/pay/stdpay_m.html). 누락 시 PG 가 MX1006 으로 반려.
+     * 운영 검증으로 Playwright 재현 후 확인.
+     */
+    it("휴대폰결제 → P_HPP_METHOD='2' 필수 전송 (MX1006 회귀 차단)", async () => {
+        await requestPaymentHandler({
+            params: { pgPaymentData: PG_PAYMENT, paymentMethod: 'phone' },
+        });
+        const fields = getLastSubmittedFormFields();
+        expect(fields.P_INI_PAYMENT).toBe('MOBILE');
+        // 실물상품 코드 '2' (G7 이커머스는 배송 상품 중심)
+        expect(fields.P_HPP_METHOD).toBe('2');
+    });
+
+    it.each([
+        ['card'],
+        ['vbank'],
+        ['bank'],
+    ])("결제수단 %s → P_HPP_METHOD 미전송 (휴대폰결제 전용)", async (paymentMethod) => {
+        await requestPaymentHandler({
+            params: { pgPaymentData: PG_PAYMENT, paymentMethod },
+        });
+        const fields = getLastSubmittedFormFields();
+        expect(fields.P_HPP_METHOD).toBeUndefined();
+    });
 });

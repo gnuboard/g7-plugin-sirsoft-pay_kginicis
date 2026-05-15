@@ -151,8 +151,12 @@ async function requestMobileKoreanPayment(
         config.callback_urls.mobile_callback +
         '?orderId=' + encodeURIComponent(pgPaymentData.order_number);
 
-    submitForm(mobilePaymentUrl, {
-        P_INI_PAYMENT: MOBILE_PAYMETHOD_MAP[paymentMethod] ?? 'CARD',
+    const iniPayment = MOBILE_PAYMETHOD_MAP[paymentMethod] ?? 'CARD';
+
+    // 휴대폰결제(MOBILE) 는 P_HPP_METHOD 필수 — '1'=콘텐츠 / '2'=실물상품
+    // (manual.inicis.com/pay/stdpay_m.html). 누락 시 PG 가 MX1006 으로 반려.
+    const fields: Record<string, string> = {
+        P_INI_PAYMENT: iniPayment,
         P_MID:         config.mid,
         P_OID:         pgPaymentData.order_number,
         P_AMT:         String(pgPaymentData.amount),
@@ -168,7 +172,13 @@ async function requestMobileKoreanPayment(
         P_RESERVED:    config.use_escrow
             ? 'below1000=Y&vbank_receipt=Y&useescrow=Y&centerCd=Y&amt_hash=Y'
             : 'below1000=Y&vbank_receipt=Y&centerCd=Y&amt_hash=Y',
-    }, 'euc-kr');
+    };
+
+    if (iniPayment === 'MOBILE') {
+        fields.P_HPP_METHOD = '2';
+    }
+
+    submitForm(mobilePaymentUrl, fields, 'euc-kr');
 }
 
 /**
