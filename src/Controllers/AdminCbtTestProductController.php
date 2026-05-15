@@ -39,6 +39,8 @@ class AdminCbtTestProductController extends AdminBaseController
             // ProductService 가 currency_code 를 모듈 default_currency 로 자동 설정.
             // 운영 환경의 default_currency 가 JPY 이면 selling_price 가 JPY 로 해석됨.
             // name/description 은 AsUnicodeJson 캐스트 — 배열로 전달 (ko/en/ja 다국어)
+            // options 배열은 옵션 없는 상품도 default 1행 필수 — CartService 가 default option 을
+            // 못 찾으면 "존재하지 않는 옵션입니다" 예외를 던져 장바구니 담기가 실패한다.
             $product = $this->productService->create([
                 'name'           => [
                     'ko' => '[테스트] CBT 일본 결제',
@@ -57,6 +59,16 @@ class AdminCbtTestProductController extends AdminBaseController
                 ],
                 'sales_status'   => 'on_sale',
                 'display_status' => 'visible',
+                'options'        => [
+                    [
+                        'option_code'     => 'default',
+                        'option_values'   => [],
+                        'option_name'     => ['ko' => '기본', 'en' => 'Default', 'ja' => 'デフォルト'],
+                        'stock_quantity'  => 9999,
+                        'is_default'      => true,
+                        'is_active'       => true,
+                    ],
+                ],
             ]);
 
             Log::info('KG Inicis CBT: test product created', [
