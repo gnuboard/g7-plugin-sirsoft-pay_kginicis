@@ -11,6 +11,7 @@ use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Exceptions\PaymentAmountMismatchException;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
+use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\MobileCallbackRequest;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
@@ -25,6 +26,8 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
  */
 class MobileCallbackController
 {
+    use PreventsReplayCallback;
+
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
     // KG 이니시스 모바일 표준결제 — 사용자 결제창 닫기 시 P_RMESG1 에 포함되는 패턴.
@@ -157,6 +160,13 @@ class MobileCallbackController
             // 가상계좌: completePayment 없이 발급 정보만 저장 (입금 통보 시점에 completePayment)
             if (strcasecmp($payType, 'VBank') === 0) {
                 $this->handleVbankIssued($order, $result, $tid);
+
+                return redirect($this->resolveSuccessUrl($moid));
+            }
+
+            // Replay 가드: 동일 tid 가 이미 paid 상태면 중복 처리하지 않고 성공 페이지로 복귀
+            if ($this->wasAlreadyPaid($tid)) {
+                $this->logReplayDetected($tid, $moid, 'mobile authCallback (card)');
 
                 return redirect($this->resolveSuccessUrl($moid));
             }

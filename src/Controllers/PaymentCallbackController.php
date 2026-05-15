@@ -15,6 +15,7 @@ use Modules\Sirsoft\Ecommerce\Exceptions\PaymentAmountMismatchException;
 use Modules\Sirsoft\Ecommerce\Helpers\DeviceDetector;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
+use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\AuthCallbackRequest;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\MobileVbankNotifyRequest;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\VbankNotifyRequest;
@@ -29,6 +30,8 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
  */
 class PaymentCallbackController
 {
+    use PreventsReplayCallback;
+
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
     public function __construct(
@@ -159,6 +162,13 @@ class PaymentCallbackController
                 return redirect($this->resolveSuccessUrl($moid));
             }
 
+            // Replay 가드: 동일 tid 가 이미 paid 상태면 중복 처리하지 않고 성공 페이지로 복귀
+            if ($this->wasAlreadyPaid($tid)) {
+                $this->logReplayDetected($tid, $moid, 'PC authCallback (card)');
+
+                return redirect($this->resolveSuccessUrl($moid));
+            }
+
             // TotPrice 가 콜백에 없으면 PG 승인 응답의 TotPrice 사용
             if ($totPrice === null) {
                 $totPrice = (int) ($pgResponse['TotPrice'] ?? $pgResponse['totPrice'] ?? 0);
@@ -244,6 +254,12 @@ class PaymentCallbackController
                 return response('FAIL', 200)->header('Content-Type', 'text/plain');
             }
 
+            if ($this->wasAlreadyPaid($tid)) {
+                $this->logReplayDetected($tid, $moid, 'PC vbankNotify');
+
+                return response('OK', 200)->header('Content-Type', 'text/plain');
+            }
+
             $this->orderService->completePayment($order, [
                 'transaction_id' => $tid,
                 'payment_meta'   => [
@@ -315,6 +331,12 @@ class PaymentCallbackController
                 Log::error('KG Inicis: mobile vbank notify - order not found', ['moid' => $moid, 'tid' => $tid]);
 
                 return response('FAIL', 200)->header('Content-Type', 'text/plain');
+            }
+
+            if ($this->wasAlreadyPaid($tid)) {
+                $this->logReplayDetected($tid, $moid, 'mobile vbankNotify');
+
+                return response('OK', 200)->header('Content-Type', 'text/plain');
             }
 
             $this->orderService->completePayment($order, [

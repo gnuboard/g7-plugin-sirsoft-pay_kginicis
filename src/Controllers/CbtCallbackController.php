@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
+use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
 /**
@@ -22,6 +23,8 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
  */
 class CbtCallbackController
 {
+    use PreventsReplayCallback;
+
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
     public function __construct(
@@ -79,6 +82,13 @@ class CbtCallbackController
             }
 
             $tid = $pgResponse['tid'] ?? ($pgResponse['transactionId'] ?? '');
+
+            // Replay 가드: 동일 tid 가 이미 paid 상태면 중복 처리하지 않고 성공 페이지로 복귀
+            if ($this->wasAlreadyPaid($tid)) {
+                $this->logReplayDetected($tid, $oid, 'CBT authCallback');
+
+                return redirect($this->resolveSuccessUrl($oid));
+            }
 
             $this->orderService->completePayment($order, [
                 'transaction_id' => $tid,
