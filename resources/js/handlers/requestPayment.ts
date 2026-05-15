@@ -112,12 +112,13 @@ const GOPAYMETHOD_MAP: Record<string, string> = {
     kginicis_kakaopay:  'KAKAOPAY',
 };
 
-// 모바일 결제수단 → P_INI_PAYMENT 매핑
+// 모바일 결제수단 → P_INI_PAYMENT 매핑 (manual.inicis.com/pay/stdpay_m.html#popup_7)
+// 휴대폰결제 코드는 PC 의 'HPP' 가 아닌 'MOBILE' — 잘못된 P_INI_PAYMENT 응답 회귀 차단.
 const MOBILE_PAYMETHOD_MAP: Record<string, string> = {
     card:                 'CARD',
     vbank:                'VBANK',
     bank:                 'BANK',
-    phone:                'HPP',
+    phone:                'MOBILE',
     kginicis_samsung_pay: 'SAMSUNG',
     kginicis_lpay:        'LPAY',
     kginicis_kakaopay:    'KAKAOPAY',

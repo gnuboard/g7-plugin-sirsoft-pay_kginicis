@@ -236,3 +236,114 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         delete (window as Record<string, unknown>).INIStdPay;
     });
 });
+
+/**
+ * 모바일 P_INI_PAYMENT 매핑 회귀 테스트
+ *
+ * KG 이니시스 모바일 표준결제 매뉴얼(https://manual.inicis.com/pay/stdpay_m.html#popup_7) 의
+ * P_INI_PAYMENT 코드:
+ *   신용카드   → CARD
+ *   계좌이체   → BANK
+ *   가상계좌   → VBANK
+ *   휴대폰     → MOBILE   ← (PC 의 'HPP' 와 다름)
+ *   도서문화   → BCSH
+ *   비인증카드 → NOAUTHCARD
+ *
+ * 회귀: 휴대폰 결제수단의 P_INI_PAYMENT 값이 'HPP' 로 설정되어 PG 가
+ * "잘못된 P_INI_PAYMENT 입니다." 응답을 반환하던 문제를 차단한다.
+ */
+describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
+    const PG_PAYMENT = {
+        order_number: 'ORD-MOBILE-001',
+        order_name: 'Mobile Test',
+        amount: 1000,
+        customer_name: '홍길동',
+        customer_phone: '01012345678',
+        customer_email: 'test@test.com',
+    };
+
+    const CLIENT_CONFIG = {
+        data: {
+            mid: 'INIpayTest',
+            japan_enabled: false,
+            japan_mid: '',
+            callback_urls: {
+                mobile_signature: '/api/plugins/sirsoft-pay_kginicis/payment/mobile/signature',
+                mobile_callback: '/plugins/sirsoft-pay_kginicis/payment/mobile/callback',
+            },
+        },
+    };
+
+    let apiGet: ReturnType<typeof vi.fn>;
+    let apiPost: ReturnType<typeof vi.fn>;
+    let submitSpy: ReturnType<typeof vi.spyOn>;
+    let originalUserAgent: PropertyDescriptor | undefined;
+
+    function getLastSubmittedFormFields(): Record<string, string> {
+        const forms = document.body.querySelectorAll('form');
+        const form = forms[forms.length - 1];
+        if (!form) throw new Error('No form was submitted');
+        const fields: Record<string, string> = {};
+        form.querySelectorAll('input[type="hidden"]').forEach((el) => {
+            const input = el as HTMLInputElement;
+            fields[input.name] = input.value;
+        });
+        return fields;
+    }
+
+    beforeEach(() => {
+        apiGet = vi.fn().mockResolvedValue(CLIENT_CONFIG);
+        apiPost = vi.fn().mockResolvedValue({
+            data: { chkfake: 'chkfakestub', mobile_payment_url: 'https://mobile.inicis.com/smart/payment/' },
+        });
+        (window as Record<string, unknown>).G7Core = {
+            api: { get: apiGet, post: apiPost },
+            state: { setLocal: vi.fn() },
+            toast: { error: vi.fn() },
+        };
+        submitSpy = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(() => {});
+
+        // 모바일 UA 강제 (isMobileUserAgent → true)
+        originalUserAgent = Object.getOwnPropertyDescriptor(window.navigator, 'userAgent');
+        Object.defineProperty(window.navigator, 'userAgent', {
+            value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+            configurable: true,
+        });
+    });
+
+    afterEach(() => {
+        delete (window as Record<string, unknown>).G7Core;
+        document.body.innerHTML = '';
+        if (originalUserAgent) {
+            Object.defineProperty(window.navigator, 'userAgent', originalUserAgent);
+        }
+        vi.restoreAllMocks();
+    });
+
+    it("휴대폰 결제(phone) → P_INI_PAYMENT='MOBILE' (매뉴얼 표준)", async () => {
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: PG_PAYMENT,
+                paymentMethod: 'phone',
+            },
+        });
+
+        expect(submitSpy).toHaveBeenCalledTimes(1);
+        const fields = getLastSubmittedFormFields();
+        expect(fields.P_INI_PAYMENT).toBe('MOBILE');
+        // 회귀 차단: PC 의 HPP 값을 모바일에 잘못 매핑하지 않도록
+        expect(fields.P_INI_PAYMENT).not.toBe('HPP');
+    });
+
+    it.each([
+        ['card', 'CARD'],
+        ['vbank', 'VBANK'],
+        ['bank', 'BANK'],
+    ])("결제수단 %s → P_INI_PAYMENT='%s' (매뉴얼 표준 유지)", async (paymentMethod, expected) => {
+        await requestPaymentHandler({
+            params: { pgPaymentData: PG_PAYMENT, paymentMethod },
+        });
+        const fields = getLastSubmittedFormFields();
+        expect(fields.P_INI_PAYMENT).toBe(expected);
+    });
+});
