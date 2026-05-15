@@ -27,6 +27,10 @@ class MobileCallbackController
 {
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
+    // KG 이니시스 모바일 표준결제 — 사용자 결제창 닫기 시 P_RMESG1 에 포함되는 패턴.
+    // Playwright 운영 재현으로 확인 (P_STATUS=01 은 일반 실패와 공유되므로 메시지 기반 분기).
+    private const USER_CANCEL_MESSAGE_PATTERNS = ['사용자가 결제를 취소', '결제를 취소하셨'];
+
     public function __construct(
         private readonly OrderProcessingService $orderService,
         private readonly PluginSettingsService $pluginSettingsService,
@@ -68,15 +72,24 @@ class MobileCallbackController
 
         // 인증 실패
         if ($pStatus !== '00') {
-            Log::warning('KG Inicis mobile: auth failed', [
-                'P_OID'    => $moid,
-                'P_STATUS' => $pStatus,
-                'P_RMESG1' => $validated['P_RMESG1'] ?? '',
+            $pMesg = (string) ($validated['P_RMESG1'] ?? '');
+            $isUserCancel = $this->isUserCancelMessage($pMesg);
+
+            Log::info('KG Inicis mobile: auth not success', [
+                'P_OID'         => $moid,
+                'P_STATUS'      => $pStatus,
+                'P_RMESG1'      => $pMesg,
+                'is_user_cancel' => $isUserCancel,
             ]);
+
+            // 사용자가 결제창을 직접 닫은 취소는 오류 모달 없이 체크아웃으로 조용히 복귀
+            if ($isUserCancel) {
+                return redirect($this->resolveFailUrl());
+            }
 
             return redirect($this->resolveFailUrl([
                 'error'   => $pStatus,
-                'message' => $validated['P_RMESG1'] ?? '',
+                'message' => $pMesg,
                 'orderId' => $moid,
             ]));
         }
@@ -263,6 +276,27 @@ class MobileCallbackController
         $separator = str_contains($baseUrl, '?') ? '&' : '?';
 
         return $baseUrl . $separator . $query;
+    }
+
+    /**
+     * KG 이니시스 모바일 P_RMESG1 메시지가 사용자 직접 취소 패턴인지 판별.
+     *
+     * P_STATUS=01 은 일반 실패(예: MX1006)와 사용자 취소가 공유하므로, P_RMESG1
+     * 메시지의 한국어 문구로 분기. 시제/존대 변형을 흡수하기 위해 부분 일치.
+     */
+    private function isUserCancelMessage(string $message): bool
+    {
+        if ($message === '') {
+            return false;
+        }
+
+        foreach (self::USER_CANCEL_MESSAGE_PATTERNS as $pattern) {
+            if (str_contains($message, $pattern)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
