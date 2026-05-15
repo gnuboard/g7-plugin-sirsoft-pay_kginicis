@@ -270,6 +270,7 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
             callback_urls: {
                 mobile_signature: '/api/plugins/sirsoft-pay_kginicis/payment/mobile/signature',
                 mobile_callback: '/plugins/sirsoft-pay_kginicis/payment/mobile/callback',
+                mobile_vbank_notify: '/plugins/sirsoft-pay_kginicis/payment/mobile/vbank-notify',
             },
         },
     };
@@ -372,5 +373,34 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
         });
         const fields = getLastSubmittedFormFields();
         expect(fields.P_HPP_METHOD).toBeUndefined();
+    });
+
+    /**
+     * 회귀 — KG 이니시스 모바일 표준결제 매뉴얼은 가상계좌 결제 시 P_NOTI_URL 필수
+     * (manual.inicis.com/pay/stdpay_m.html). PC 가상계좌는 가맹점 어드민에 등록된
+     * URL 로 통보되지만, 모바일은 요청에 P_NOTI_URL 을 직접 명시해야 KG 이니시스가
+     * 입금 통보를 보낼 수 있다.
+     */
+    it("가상계좌(vbank) 결제 → P_NOTI_URL 필수 전송", async () => {
+        await requestPaymentHandler({
+            params: { pgPaymentData: PG_PAYMENT, paymentMethod: 'vbank' },
+        });
+        const fields = getLastSubmittedFormFields();
+        expect(fields.P_INI_PAYMENT).toBe('VBANK');
+        expect(fields.P_NOTI_URL).toBe(
+            `${window.location.origin}/plugins/sirsoft-pay_kginicis/payment/mobile/vbank-notify`,
+        );
+    });
+
+    it.each([
+        ['card'],
+        ['bank'],
+        ['phone'],
+    ])("결제수단 %s → P_NOTI_URL 미전송 (가상계좌 전용)", async (paymentMethod) => {
+        await requestPaymentHandler({
+            params: { pgPaymentData: PG_PAYMENT, paymentMethod },
+        });
+        const fields = getLastSubmittedFormFields();
+        expect(fields.P_NOTI_URL).toBeUndefined();
     });
 });

@@ -30,6 +30,7 @@ interface ClientConfig {
         cbt_auth_url: string;
         mobile_signature: string;
         mobile_callback: string;
+        mobile_vbank_notify: string;
     };
     japan_enabled: boolean;
     use_escrow: boolean;
@@ -176,6 +177,14 @@ async function requestMobileKoreanPayment(
 
     if (iniPayment === 'MOBILE') {
         fields.P_HPP_METHOD = '2';
+    }
+
+    // 가상계좌 결제 시 P_NOTI_URL 필수 (manual.inicis.com/pay/stdpay_m.html).
+    // PC 가상계좌는 KG 이니시스 가맹점 어드민의 등록 URL 로 통보되지만, 모바일은
+    // 요청에 P_NOTI_URL 을 명시해야 입금통보를 받을 수 있다.
+    if (iniPayment === 'VBANK') {
+        fields.P_NOTI_URL =
+            window.location.origin + config.callback_urls.mobile_vbank_notify;
     }
 
     submitForm(mobilePaymentUrl, fields, 'euc-kr');
