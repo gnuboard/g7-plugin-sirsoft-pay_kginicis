@@ -6,10 +6,13 @@ namespace Plugins\Sirsoft\PayKginicis\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Plugins\Sirsoft\PayKginicis\Concerns\ValidatesTimestampFreshness;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
 class CbtHashDataController
 {
+    use ValidatesTimestampFreshness;
+
     public function __construct(
         private readonly KgInicisApiService $apiService,
     ) {}
@@ -30,6 +33,13 @@ class CbtHashDataController
             return response()->json([
                 'success' => false,
                 'message' => 'Missing required parameters: oid, price, timestamp',
+            ], 422);
+        }
+
+        if (! $this->isTimestampFresh($timestamp)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Timestamp is stale or invalid (signature replay protection).',
             ], 422);
         }
 
