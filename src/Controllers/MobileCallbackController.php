@@ -218,6 +218,7 @@ class MobileCallbackController
             'pg_provider'     => 'kginicis',
             'payment_status'  => PaymentStatusEnum::WAITING_DEPOSIT,
             'transaction_id'  => $tid ?: null,
+            'vbank_code'      => $result['P_VACT_BANK_CODE'] ?? $result['P_FN_CD1'] ?? null,
             'vbank_name'      => $result['P_VACT_BANK_NAME'] ?? $result['P_FN_NM'] ?? null,
             'vbank_number'    => $result['P_VACT_NUM'] ?? null,
             'vbank_holder'    => $result['P_VACT_NAME'] ?? $result['P_RVACTNM'] ?? null,

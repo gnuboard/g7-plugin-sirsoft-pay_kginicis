@@ -413,6 +413,7 @@ class PaymentCallbackController
             'pg_provider'     => 'kginicis',
             'payment_status'  => PaymentStatusEnum::WAITING_DEPOSIT,
             'transaction_id'  => $tid ?: null,
+            'vbank_code'      => $pgResponse['VACT_BankCode'] ?? null,  // KG 이니시스 은행코드 (e.g. 89=케이뱅크)
             'vbank_name'      => $pgResponse['vactBankName'] ?? null,  // 입금은행명
             'vbank_number'    => $pgResponse['VACT_Num'] ?? null,       // 가상계좌번호
             'vbank_holder'    => $pgResponse['VACT_Name'] ?? null,      // 예금주명
