@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCashReceiptController;
+use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtTestProductController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminEscrowDeliveryController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminEscrowDenyConfirmController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminTransactionController;
@@ -71,4 +72,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
     // 에스크로 구매거절확인
     Route::post('/orders/{orderNumber}/escrow-deny-confirm', [AdminEscrowDenyConfirmController::class, 'confirm'])
         ->name('orders.escrow-deny-confirm');
+
+    // CBT (일본 결제) 테스트용 JPY 상품 자동 생성 — 운영자가 CBT 검증 시 진입 장벽 낮추기 위함
+    Route::post('/cbt-test-product', [AdminCbtTestProductController::class, 'create'])
+        ->name('cbt.test-product.create');
 });
