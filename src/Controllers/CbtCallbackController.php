@@ -51,6 +51,10 @@ class CbtCallbackController
             return redirect($this->resolveFailUrl(['error' => 'invalid_params', 'orderId' => $oid]));
         }
 
+        // Approve 성공 후 후속 처리 실패 시 PG 자동 cancel 추적 변수.
+        $approvedTid = null;
+        $approvedAmount = 0;
+
         try {
             $order = $this->orderService->findByOrderNumber($oid);
 
@@ -90,6 +94,10 @@ class CbtCallbackController
                 return redirect($this->resolveSuccessUrl($oid));
             }
 
+            // PG 측 승인이 확정된 시점 — 후속 처리 실패 시 cancel 알림 필요. catch 에서 참조.
+            $approvedTid = $tid;
+            $approvedAmount = $amount;
+
             $this->orderService->completePayment($order, [
                 'transaction_id' => $tid,
                 'payment_meta' => [
@@ -110,8 +118,39 @@ class CbtCallbackController
                 'error' => $e->getMessage(),
             ]);
 
+            $this->flagCbtManualReconciliation($approvedTid, $oid, $approvedAmount, $e->getMessage());
+
             return redirect($this->resolveFailUrl(['error' => 'cbt_failed', 'orderId' => $oid]));
         }
+    }
+
+    /**
+     * CBT 승인 후 후속 처리 실패 시 운영자 수동 정산을 위한 강한 신호 로깅.
+     *
+     * KG 이니시스 CBT 는 일본 결제 전용 MID 와 별도 API (cbtapprove/cbtcancel) 를
+     * 사용한다. 기존 cancelPayment() 는 한국 결제용 standard MID 기반이라 CBT TID
+     * 에는 적용 불가. 따라서 자동 cancel API 호출 대신 ERROR 로그로 운영자가
+     * KG 이니시스 가맹점 관리자(JP) 에서 수동 처리하도록 신호한다.
+     *
+     * 향후 KgInicisApiService::cancelCbtPayment() 가 추가되면 본 메서드를
+     * 자동 cancel 호출 흐름으로 전환 가능.
+     */
+    private function flagCbtManualReconciliation(
+        ?string $tid,
+        string $oid,
+        int $amount,
+        string $reason,
+    ): void {
+        if ($tid === null || $tid === '') {
+            return;
+        }
+
+        Log::error('KG Inicis CBT: post-approve failure — MANUAL CANCEL REQUIRED on KG Inicis JP merchant admin', [
+            'tid'    => $tid,
+            'oid'    => $oid,
+            'amount' => $amount,
+            'reason' => $reason,
+        ]);
     }
 
     private function resolveSuccessUrl(string $orderId): string

@@ -123,6 +123,12 @@ class MobileCallbackController
             return redirect($this->resolveFailUrl(['error' => 'req_url_invalid', 'orderId' => $moid]));
         }
 
+        // Approve 성공 후 후속 처리 실패 시 PG 측 자동 cancel 을 위한 추적 변수.
+        // catch 블록에서 set 되어 있으면 KG 이니시스 측 승인이 이미 발생한 상태이므로
+        // cancelPayment 를 호출해 PG 잔존 승인을 해제한다 (사용자 환불 보장).
+        $approvedTid = null;
+        $approvedTotPrice = 0;
+
         try {
             $order = $this->orderService->findByOrderNumber($moid);
 
@@ -171,6 +177,10 @@ class MobileCallbackController
                 return redirect($this->resolveSuccessUrl($moid));
             }
 
+            // PG 측 승인이 확정된 시점 — 후속 처리 실패 시 cancel 필요. catch 에서 참조.
+            $approvedTid = $tid;
+            $approvedTotPrice = $totPrice;
+
             $this->orderService->completePayment($order, [
                 'transaction_id'          => $tid,
                 'card_approval_number'    => $result['P_APPL_NUM'] ?? null,
@@ -200,6 +210,8 @@ class MobileCallbackController
                 'actual'   => $e->getActualAmount(),
             ]);
 
+            $this->autoCancelIfApproved($approvedTid, $moid, $approvedTotPrice, 'amount_mismatch');
+
             return redirect($this->resolveFailUrl(['error' => 'amount_mismatch', 'orderId' => $moid]));
 
         } catch (\Exception $e) {
@@ -208,11 +220,60 @@ class MobileCallbackController
                 'error' => $e->getMessage(),
             ]);
 
+            $this->autoCancelIfApproved($approvedTid, $moid, $approvedTotPrice, 'approve_failed');
+
             return redirect($this->resolveFailUrl([
                 'error'   => 'approve_failed',
                 'message' => $e->getMessage(),
                 'orderId' => $moid,
             ]));
+        }
+    }
+
+    /**
+     * Approve 가 이미 발생한 후 후속 처리 실패 시 KG 이니시스 측 cancel 을 시도.
+     *
+     * KG 이니시스 모바일 승인이 완료되었으나 우리 서버에서 completePayment 가
+     * 실패한 경우 사용자 카드는 PG 측에서 승인 상태로 잔존 → 환불 불가 위험.
+     * 본 메서드는 cancelPayment API (/v2/pg/refund) 로 PG 잔존 승인을 즉시 해제.
+     *
+     * cancel 자체가 실패해도 사용자 응답 흐름은 막지 않음 — 로깅만 수행하고
+     * 운영자가 KG 이니시스 가맹점 관리자에서 수동 처리하도록 신호.
+     */
+    private function autoCancelIfApproved(
+        ?string $tid,
+        string $moid,
+        int $totPrice,
+        string $reason,
+    ): void {
+        if ($tid === null || $tid === '') {
+            return;
+        }
+
+        try {
+            $result = $this->apiService->cancelPayment(
+                $tid,
+                'Card',
+                null,
+                'auto-cancel: ' . $reason,
+                $totPrice > 0 ? $totPrice : null,
+            );
+
+            Log::warning('KG Inicis mobile: auto-cancel after post-approve failure', [
+                'tid'      => $tid,
+                'P_OID'    => $moid,
+                'amount'   => $totPrice,
+                'reason'   => $reason,
+                'pg_result' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('KG Inicis mobile: auto-cancel FAILED — manual reconciliation required', [
+                'tid'    => $tid,
+                'P_OID'  => $moid,
+                'amount' => $totPrice,
+                'reason' => $reason,
+                'error'  => $e->getMessage(),
+            ]);
         }
     }
 
