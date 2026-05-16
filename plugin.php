@@ -150,6 +150,31 @@ class Plugin extends AbstractPlugin
                     'en' => 'Supports relative paths or full URLs. Error details are appended as query parameters.',
                 ],
             ],
+            'easy_pay_allow_with_other_pg' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => '타 PG와 사용가능함', 'en' => 'Allow with Other PG'],
+            ],
+            'easy_pay_samsung_pay' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => 'KG이니시스 삼성페이 사용', 'en' => 'Enable Samsung Pay (KG Inicis)'],
+            ],
+            'easy_pay_lpay' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => 'KG이니시스 L.pay 사용', 'en' => 'Enable L.pay (KG Inicis)'],
+            ],
+            'easy_pay_kakaopay' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => 'KG이니시스 카카오페이 사용', 'en' => 'Enable Kakao Pay (KG Inicis)'],
+            ],
+            'use_credit_point' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => '신용카드 포인트 사용', 'en' => 'Use Credit Card Points'],
+            ],
         ];
     }
 
@@ -171,6 +196,11 @@ class Plugin extends AbstractPlugin
             'live_japan_sign_key' => '',
             'redirect_success_url' => '/shop/orders/{orderId}/complete',
             'redirect_fail_url' => '/shop/checkout',
+            'easy_pay_allow_with_other_pg' => false,
+            'easy_pay_samsung_pay' => false,
+            'easy_pay_lpay' => false,
+            'easy_pay_kakaopay' => false,
+            'use_credit_point' => false,
         ];
     }
 
