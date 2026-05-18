@@ -34,6 +34,14 @@ class PaymentCallbackController
 
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
+    /**
+     * 사용자가 결제창을 X / '취소' 로 종료했을 때 KG 이니시스가 전달하는 resultCode 목록.
+     *
+     * 사용자 취소는 결제 실패가 아니라 의도된 중단이므로 에러 query 없이 체크아웃으로
+     * 조용히 복귀시킨다 (NHN KCP 의 CANCEL_RES_CODES 패턴과 동일).
+     */
+    private const CANCEL_RES_CODES = ['2001', '0021', '0022', ''];
+
     public function __construct(
         private readonly OrderProcessingService $orderService,
         private readonly PluginSettingsService $pluginSettingsService,
@@ -72,17 +80,32 @@ class PaymentCallbackController
             return redirect('/');
         }
 
-        // 결제 실패인 경우: authToken/authUrl 없이 올 수 있으므로 먼저 처리
+        // 결제 실패/취소인 경우: authToken/authUrl 없이 올 수 있으므로 먼저 처리
         if ($resultCode !== '0000') {
-            Log::warning('KG Inicis: auth result failed', [
-                'moid'        => $moid,
-                'result_code' => $resultCode,
-                'result_msg'  => $validated['resultMsg'] ?? '',
+            $resultMsg = (string) ($validated['resultMsg'] ?? '');
+
+            // 사용자 취소는 결제 실패가 아니라 의도된 중단 — 에러 query 없이 조용히 복귀.
+            //  1) resultCode 가 KG 이니시스 표준 cancel 코드 목록에 포함되거나
+            //  2) resultMsg 에 '취소' 또는 '사용자' 키워드가 포함된 경우 (버전별 코드 차이 대응)
+            $isUserCancel = in_array($resultCode, self::CANCEL_RES_CODES, true)
+                || str_contains($resultMsg, '취소')
+                || str_contains($resultMsg, '사용자');
+
+            Log::info('KG Inicis: auth result non-success', [
+                'moid'           => $moid,
+                'result_code'    => $resultCode,
+                'result_msg'     => $resultMsg,
+                'is_user_cancel' => $isUserCancel,
             ]);
+
+            if ($isUserCancel) {
+                // 에러 query 미부착 → 체크아웃 페이지가 toast/error 분기를 타지 않음
+                return redirect($this->resolveFailUrl());
+            }
 
             return redirect($this->resolveFailUrl([
                 'error'   => $resultCode,
-                'message' => $validated['resultMsg'] ?? '',
+                'message' => $resultMsg,
                 'orderId' => $moid,
             ]));
         }

@@ -140,19 +140,57 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $this->assertEquals('APP12345', $payment->card_approval_number);
     }
 
-    public function test_auth_callback_redirects_to_fail_on_result_code_not_0000(): void
+    public function test_auth_callback_user_cancel_2001_redirects_without_error_query(): void
     {
+        // 사용자가 결제창을 X 또는 '취소' 버튼으로 종료한 경우 — 에러 토스트 노출 X.
+        // NHN KCP 의 CANCEL_RES_CODES 패턴과 동일하게 조용히 체크아웃으로 복귀.
         $this->mockPluginSettings();
 
         $params = $this->makeCallbackParams('ORD-TEST-99999', 50000, [
             'resultCode' => '2001',
-            'resultMsg' => '사용자 취소',
+            'resultMsg' => '사용자가 취소를 요청하였습니다.',
         ]);
 
         $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/callback', $params);
 
         $response->assertRedirect();
-        $this->assertStringContainsString('error=2001', $response->headers->get('Location'));
+        $location = $response->headers->get('Location');
+        $this->assertStringNotContainsString('error=', $location, 'user cancel must not append error query');
+        $this->assertStringNotContainsString('message=', $location, 'user cancel must not append message query');
+    }
+
+    public function test_auth_callback_user_cancel_message_keyword_redirects_without_error_query(): void
+    {
+        // resultCode 가 표준 cancel 코드가 아니지만 resultMsg 에 '취소' 키워드가
+        // 포함된 경우도 사용자 취소로 간주 (KG 이니시스 버전별 코드 차이 대응).
+        $this->mockPluginSettings();
+
+        $params = $this->makeCallbackParams('ORD-TEST-99999', 50000, [
+            'resultCode' => '9998',
+            'resultMsg' => '사용자가 결제를 취소하였습니다.',
+        ]);
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/callback', $params);
+
+        $response->assertRedirect();
+        $this->assertStringNotContainsString('error=', $response->headers->get('Location'));
+    }
+
+    public function test_auth_callback_real_failure_still_redirects_with_error_query(): void
+    {
+        // 사용자 취소가 아닌 실제 결제 실패는 기존대로 error query 포함하여
+        // 사용자에게 에러 토스트 노출.
+        $this->mockPluginSettings();
+
+        $params = $this->makeCallbackParams('ORD-TEST-99999', 50000, [
+            'resultCode' => '9999',
+            'resultMsg' => 'PG 시스템 오류',
+        ]);
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/callback', $params);
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('error=9999', $response->headers->get('Location'));
     }
 
     public function test_auth_callback_redirects_to_fail_on_order_not_found(): void
