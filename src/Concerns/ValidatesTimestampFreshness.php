@@ -26,6 +26,17 @@ trait ValidatesTimestampFreshness
     private const FRESHNESS_WINDOW_SECONDS = 300;
 
     /**
+     * 14자리 yyyyMMddHHmmss 파싱 시 사용할 timezone.
+     *
+     * 클라이언트(JS Date) 는 getHours() 등으로 로컬 시각을 14자리로 생성하며,
+     * gnuboard5 PHP 의 date('YmdHis') 도 서버 로컬(보통 Asia/Seoul) 시각이다.
+     * Laravel 의 app.timezone=UTC 환경에서 Carbon::createFromFormat 기본 TZ 가
+     * UTC 로 설정되어 KST 클라이언트 timestamp 를 9시간 어긋난 UTC 로 잘못 파싱
+     * 하던 회귀를 차단하기 위해 명시적으로 Asia/Seoul 로 파싱.
+     */
+    private const PARSE_TIMEZONE = 'Asia/Seoul';
+
+    /**
      * timestamp 가 현재 시각 ±300초 윈도우 내에 있는지 검증.
      *
      * 14자리 yyyyMMddHHmmss 또는 13자리 epoch ms 모두 허용. 그 외 포맷은 거부.
@@ -62,9 +73,9 @@ trait ValidatesTimestampFreshness
             return (int) floor((int) $timestamp / 1000);
         }
 
-        // 14자리: yyyyMMddHHmmss → Carbon 으로 파싱
+        // 14자리: yyyyMMddHHmmss → Asia/Seoul 기준으로 파싱
         try {
-            return Carbon::createFromFormat('YmdHis', $timestamp)->getTimestamp();
+            return Carbon::createFromFormat('YmdHis', $timestamp, self::PARSE_TIMEZONE)->getTimestamp();
         } catch (\Exception) {
             return null;
         }
