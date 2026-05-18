@@ -276,8 +276,13 @@ async function requestKoreanPayment(
     }
 
     const callbackUrl = window.location.origin + config.callback_urls.callback;
-    const shopBase = (window as any).G7Core?.state?.get?.('templateSettings')?.shopBase ?? '/shop';
-    const orderCloseUrl = window.location.origin + shopBase + '/checkout';
+    // closeUrl 비우기 — KG 이니시스 결제창 X / 취소 클릭 시 SPA 페이지가
+    // location.href = closeUrl 로 전체 새로고침되어 체크아웃 폼 입력 상태
+    // (배송지/연락처/옵션 선택) 가 모두 휘발하는 UX 회귀 회피.
+    // 빈 문자열일 때 INIStdPay 는 자체 fallback 으로 팝업만 닫고 부모
+    // 페이지는 유지하는 동작을 기대 (PG 매뉴얼 상 옵션 필드).
+    // 미동작 시 옵션 A 로 현재 URL 을 closeUrl 로 두는 fallback 가능.
+    const orderCloseUrl = '';
     const formId = 'kginicis_pay_form_' + Date.now();
 
     const form = document.createElement('form');
