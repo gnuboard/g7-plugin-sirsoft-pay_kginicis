@@ -10,6 +10,10 @@
             "authorize_failed": "결제 승인에 실패했습니다.",
             "signature_mismatch": "서명 검증에 실패했습니다.",
             "cbt_failed": "일본 결제(CBT) 승인에 실패했습니다."
+        },
+        "cbt_connectivity": {
+            "checked": "CBT 호스트 연결 진단을 완료했습니다.",
+            "check_failed": "연결 진단 중 오류가 발생했습니다."
         }
     },
     "payment_error": {
@@ -133,6 +137,21 @@
         "cbt_helper_create_error": "테스트 상품 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.",
         "cbt_helper_admin_edit_link": "관리자 상품 편집",
         "cbt_helper_shop_link": "사이트(일본어)로 열기",
+        "cbt_connectivity_title": "CBT 서버 연결 진단",
+        "cbt_connectivity_description": "KG 이니시스 CBT 호스트 (devcbt.inicis.com / cbt.inicis.com) 는 머천트 서버 egress IP 가 사전에 KG 이니시스 측 화이트리스트에 등록되어 있어야 TCP 443 으로 접근 가능합니다. 등록 요청 시 아래 'Egress IP' 를 KG 이니시스 영업/기술 담당자에게 전달하세요. 등록 후 본 진단을 다시 실행하여 도달성 여부를 확인할 수 있습니다.",
+        "cbt_connectivity_check_button": "연결 진단 실행",
+        "cbt_connectivity_egress_ip_label": "Egress IP (KG 측 등록 대상)",
+        "cbt_connectivity_server_ip_label": "Server Address",
+        "cbt_connectivity_unknown": "확인 실패",
+        "cbt_connectivity_dns_label": "DNS",
+        "cbt_connectivity_tcp_label": "TCP 443",
+        "cbt_connectivity_reachable": "도달 가능",
+        "cbt_connectivity_unreachable": "도달 불가",
+        "cbt_connectivity_env_test": "개발계 (테스트 모드)",
+        "cbt_connectivity_env_live": "운영계 (라이브 모드)",
+        "cbt_connectivity_check_error": "연결 진단에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        "cbt_connectivity_hint_egress": "방화벽 / 프록시 외부로 나가는 IP. 서버가 NAT 뒤에 있다면 Server Address 와 다를 수 있습니다.",
+        "cbt_connectivity_hint_whitelist": "devcbt 는 IP 화이트리스트 등록이 필수입니다. cbt (운영) 도 가맹점별로 등록이 필요할 수 있습니다.",
         "section_escrow": "에스크로 결제",
         "section_escrow_hint": "에스크로 결제는 구매자가 상품을 받은 후 판매자에게 대금이 지급되는 안전 결제 방식입니다.",
         "use_escrow": "에스크로 결제 활성화",

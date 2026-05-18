@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCashReceiptController;
+use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtConnectivityCheckController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtTestProductController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminEscrowDeliveryController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminEscrowDenyConfirmController;
@@ -76,4 +77,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
     // CBT (일본 결제) 테스트용 JPY 상품 자동 생성 — 운영자가 CBT 검증 시 진입 장벽 낮추기 위함
     Route::post('/cbt-test-product', [AdminCbtTestProductController::class, 'create'])
         ->name('cbt.test-product.create');
+
+    // CBT 호스트 연결 진단 — 서버 egress IP + devcbt.inicis.com / cbt.inicis.com 의 TCP 443 도달성
+    // (devcbt 는 KG 이니시스 측 IP 화이트리스트 등록 필요)
+    Route::get('/cbt-connectivity-check', [AdminCbtConnectivityCheckController::class, 'check'])
+        ->name('cbt.connectivity.check');
 });
