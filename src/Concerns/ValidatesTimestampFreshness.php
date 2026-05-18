@@ -26,15 +26,18 @@ trait ValidatesTimestampFreshness
     private const FRESHNESS_WINDOW_SECONDS = 300;
 
     /**
-     * 14자리 yyyyMMddHHmmss 파싱 시 사용할 timezone.
+     * 14자리 yyyyMMddHHmmss 파싱 시 시도할 timezone 후보 목록.
      *
-     * 클라이언트(JS Date) 는 getHours() 등으로 로컬 시각을 14자리로 생성하며,
-     * gnuboard5 PHP 의 date('YmdHis') 도 서버 로컬(보통 Asia/Seoul) 시각이다.
-     * Laravel 의 app.timezone=UTC 환경에서 Carbon::createFromFormat 기본 TZ 가
-     * UTC 로 설정되어 KST 클라이언트 timestamp 를 9시간 어긋난 UTC 로 잘못 파싱
-     * 하던 회귀를 차단하기 위해 명시적으로 Asia/Seoul 로 파싱.
+     * 클라이언트의 환경에 따라 timestamp 가 어느 timezone 인지 결정적으로 알 수
+     * 없다 (JS Date.getHours() 는 브라우저 로컬, gnuboard5 PHP date('YmdHis')
+     * 는 서버 로컬, 일부 SDK 는 UTC). 따라서 후보 목록을 순회하며 현재 시각과의
+     * 차이가 ±300s 윈도우에 들어오는 해석을 발견하면 fresh 로 판정.
+     *
+     *  - Asia/Seoul: gnuboard5 + 한국 머천트 표준 (대다수 케이스)
+     *  - UTC:       Laravel app.timezone=UTC 환경에서 PHP Carbon::now() 출력 또는
+     *               UTC 기반 클라이언트
      */
-    private const PARSE_TIMEZONE = 'Asia/Seoul';
+    private const PARSE_TIMEZONES = ['Asia/Seoul', 'UTC'];
 
     /**
      * timestamp 가 현재 시각 ±300초 윈도우 내에 있는지 검증.
@@ -46,38 +49,43 @@ trait ValidatesTimestampFreshness
      */
     protected function isTimestampFresh(string $timestamp): bool
     {
-        $parsed = $this->parseTimestamp($timestamp);
-        if ($parsed === null) {
+        if (! preg_match('/^\d{13,14}$/', $timestamp)) {
             return false;
         }
 
-        $diffSeconds = abs(time() - $parsed);
+        // 13자리: epoch ms — timezone 무관
+        if (strlen($timestamp) === 13) {
+            $parsed = (int) floor((int) $timestamp / 1000);
+            return abs(time() - $parsed) <= self::FRESHNESS_WINDOW_SECONDS;
+        }
 
-        return $diffSeconds <= self::FRESHNESS_WINDOW_SECONDS;
+        // 14자리: 후보 timezone 순회 — 하나라도 윈도우 내면 fresh.
+        $now = time();
+        foreach (self::PARSE_TIMEZONES as $tz) {
+            $parsed = $this->parseYmdHisAsTimezone($timestamp, $tz);
+            if ($parsed === null) {
+                continue;
+            }
+            if (abs($now - $parsed) <= self::FRESHNESS_WINDOW_SECONDS) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
-     * timestamp 문자열을 Unix epoch (초) 로 파싱.
+     * 14자리 yyyyMMddHHmmss 를 지정 timezone 으로 파싱.
      *
-     * @param  string  $timestamp  14자리 yyyyMMddHHmmss 또는 13자리 epoch ms
-     * @return int|null Unix epoch (초), 파싱 실패 시 null
+     * @return int|null Unix epoch, 파싱 실패 시 null
      */
-    private function parseTimestamp(string $timestamp): ?int
+    private function parseYmdHisAsTimezone(string $timestamp, string $timezone): ?int
     {
-        if (! preg_match('/^\d{13,14}$/', $timestamp)) {
-            return null;
-        }
-
-        // 13자리: epoch ms → 초로 변환
-        if (strlen($timestamp) === 13) {
-            return (int) floor((int) $timestamp / 1000);
-        }
-
-        // 14자리: yyyyMMddHHmmss → Asia/Seoul 기준으로 파싱
         try {
-            return Carbon::createFromFormat('YmdHis', $timestamp, self::PARSE_TIMEZONE)->getTimestamp();
+            return Carbon::createFromFormat('YmdHis', $timestamp, $timezone)->getTimestamp();
         } catch (\Exception) {
             return null;
         }
     }
+
 }

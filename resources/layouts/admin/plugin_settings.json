@@ -1223,7 +1223,7 @@
                                                                 "name": "Div",
                                                                 "props": { "className": "space-y-2" },
                                                                 "iteration": {
-                                                                    "items": "{{_local.cbtConnCheckResult?.hosts ?? []}}",
+                                                                    "source": "{{_local.cbtConnCheckResult?.hosts ?? []}}",
                                                                     "item_var": "host",
                                                                     "index_var": "idx"
                                                                 },

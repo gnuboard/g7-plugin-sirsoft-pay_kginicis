@@ -103,7 +103,10 @@ class PaymentCallbackControllerTest extends PluginTestCase
             'resultCode' => '0000',
             'resultMsg' => '성공',
             'authToken' => 'AUTH_TOKEN_' . uniqid(),
-            'authUrl' => 'https://stginiapi.inicis.com/api/v1/auth',
+            'authUrl' => 'https://fcstdpay.inicis.com/api/payAuth',
+            // idc_name 은 KG 이니시스가 success 콜백에 항상 포함시키는 IDC 식별자.
+            // 컨트롤러가 isValidIdcAuthUrl 화이트리스트 검증에 사용 (SSRF 방어).
+            'idc_name' => 'fc',
             'netCancelUrl' => 'https://stginiapi.inicis.com/api/v1/netcancel',
             'MOID' => $moid,
             'TotPrice' => $totPrice,
@@ -121,7 +124,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams($order->order_number, 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response(
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(
                 $this->makeAuthorizeResponse($tid, $order->order_number, 50000),
                 200
             ),
@@ -200,7 +203,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams('NON_EXISTENT_ORDER', 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response(
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(
                 $this->makeAuthorizeResponse('TID_NONE', 'NON_EXISTENT_ORDER', 50000),
                 200
             ),
@@ -220,7 +223,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams($order->order_number, 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response([
+            'fcstdpay.inicis.com/api/payAuth' => Http::response([
                 'resultCode' => '9999',
                 'resultMsg' => '승인 실패',
             ], 200),
@@ -240,7 +243,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams($order->order_number, 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response(null, 500),
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(null, 500),
             'stginiapi.inicis.com/api/v1/netcancel' => Http::response('OK', 200),
         ]);
 
@@ -271,7 +274,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams($order->order_number, 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response(
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(
                 $this->makeAuthorizeResponse($tid, $order->order_number, 50000),
                 200
             ),
@@ -290,7 +293,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams($order->order_number, 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response(
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(
                 $this->makeAuthorizeResponse('TID_MOBILE', $order->order_number, 50000),
                 200
             ),
