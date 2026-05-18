@@ -303,17 +303,21 @@ async function requestKoreanPayment(
         closeUrl:     orderCloseUrl,
         gopaymethod:  GOPAYMETHOD_MAP[paymentMethod] ?? 'Card',
         acceptmethod: (() => {
-            // 간편결제 (LPAY / 카카오페이) 는 KG 이니시스 표준결제창 매뉴얼에 따라
-            // acceptmethod = 'cardonly' 로 신용카드 흐름에 고정. gnuboard5
-            // shop/inicis/lpay_order.script.php 의 patternin과 일치.
-            if (paymentMethod === 'kginicis_lpay' || paymentMethod === 'kginicis_kakaopay') {
-                return 'cardonly';
-            }
+            // 기본 acceptmethod 토큰 (일반 결제수단 옵션)
             const escrow = config.use_escrow ? 'useescrow:' : '';
             const creditPoint = config.use_credit_point ? 'CREDITCARD(Y):' : '';
-            return paymentMethod === 'phone'
+            const base = paymentMethod === 'phone'
                 ? `HPP(1):${escrow}${creditPoint}centerCd(Y)`
                 : `${escrow}${creditPoint}centerCd(Y)`;
+
+            // 간편결제 (LPAY / 카카오페이) 는 base 뒤에 ':cardonly' 를 append.
+            // gnuboard5 orderform.4.php 의
+            //   f.acceptmethod.value = f.acceptmethod.value + ":cardonly"
+            // 와 일치 — 에스크로 옵션 등 base 를 보존하고 cardonly 만 추가.
+            if (paymentMethod === 'kginicis_lpay' || paymentMethod === 'kginicis_kakaopay') {
+                return base ? `${base}:cardonly` : 'cardonly';
+            }
+            return base;
         })(),
         payViewType:  'overlay',
         use_chkfake:  'Y',
