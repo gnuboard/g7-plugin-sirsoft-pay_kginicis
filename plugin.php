@@ -98,6 +98,27 @@ class Plugin extends AbstractPlugin
                 'sensitive' => true,
                 'label' => ['ko' => '라이브 INIAPI IV', 'en' => 'Live INIAPI IV'],
             ],
+            'test_mobile_hash_key' => [
+                'type' => 'string',
+                'default' => '3CB8183A4BE283555ACC8363C0360223',
+                'sensitive' => true,
+                'label' => ['ko' => '테스트 모바일 해시키', 'en' => 'Test Mobile Hash Key'],
+            ],
+            'live_mobile_hash_key' => [
+                'type' => 'string',
+                'default' => '',
+                'sensitive' => true,
+                'label' => ['ko' => '라이브 모바일 해시키', 'en' => 'Live Mobile Hash Key'],
+            ],
+            'use_escrow' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => '에스크로 결제 활성화', 'en' => 'Enable Escrow Payment'],
+                'hint' => [
+                    'ko' => '활성화 시 PC는 acceptmethod 에 useescrow 가 추가되고, 모바일은 P_RESERVED 에 useescrow=Y 가 추가됩니다.',
+                    'en' => 'When enabled, acceptmethod adds useescrow on PC and P_RESERVED adds useescrow=Y on mobile.',
+                ],
+            ],
             'japan_enabled' => [
                 'type' => 'boolean',
                 'default' => false,
@@ -190,6 +211,9 @@ class Plugin extends AbstractPlugin
             'live_sign_key' => '',
             'live_iniapi_key' => '',
             'live_iniapi_iv' => '',
+            'test_mobile_hash_key' => '3CB8183A4BE283555ACC8363C0360223',
+            'live_mobile_hash_key' => '',
+            'use_escrow' => false,
             'japan_enabled' => false,
             'test_japan_sign_key' => '5AL5Djb1Ipualn0F',
             'live_japan_mid' => '',
