@@ -1248,7 +1248,7 @@
                                                                                         "type": "basic",
                                                                                         "name": "Span",
                                                                                         "props": { "className": "text-[10px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300" },
-                                                                                        "text": "{{host.env === 'test' ? '$t:sirsoft-pay_kginicis.settings.cbt_connectivity_env_test' : '$t:sirsoft-pay_kginicis.settings.cbt_connectivity_env_live'}}"
+                                                                                        "text": "$t:sirsoft-pay_kginicis.settings.cbt_connectivity_env_test"
                                                                                     }
                                                                                 ]
                                                                             },

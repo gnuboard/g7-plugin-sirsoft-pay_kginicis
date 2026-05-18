@@ -10,16 +10,17 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 
 /**
- * KG 이니시스 일본 결제 (CBT) 호스트 연결 진단 컨트롤러
+ * KG 이니시스 일본 결제 (DEVCBT, 테스트 모드) 호스트 연결 진단 컨트롤러
  *
  * 진단 대상:
- *   - devcbt.inicis.com  (개발계 / 테스트 모드)  — KG 이니시스가 별도로 머천트 서버 IP 를 화이트리스트 등록해야 접근 가능
- *   - cbt.inicis.com     (운영계 / live 모드)
+ *   - devcbt.inicis.com (개발계 / 테스트 모드) — KG 이니시스가 별도로 머천트
+ *     서버 IP 를 화이트리스트 등록해야 접근 가능
+ *
+ * 운영계 cbt.inicis.com 은 IP 화이트리스트 제약이 없어 진단 대상에서 제외.
  *
  * 반환 정보:
  *   - 서버 egress IP (외부 통신 시 사용되는 IP, 화이트리스트 등록 대상)
- *   - 각 호스트의 DNS 해석 결과
- *   - 각 호스트의 TCP 443 연결 가능 여부 (3초 timeout)
+ *   - DNS 해석 결과 + TCP 443 연결 가능 여부 (3초 timeout)
  *
  * 운영자가 KG 이니시스 측에 IP 등록 요청 시 어느 IP 를 알려줘야 하는지,
  * 그리고 등록 후 실제로 통신이 가능해졌는지 확인하는 셀프 진단 도구.
@@ -32,10 +33,14 @@ class AdminCbtConnectivityCheckController extends AdminBaseController
     /** Egress IP 조회 외부 서비스 timeout */
     private const EGRESS_LOOKUP_TIMEOUT = 3;
 
-    /** 진단 대상 호스트 목록 */
+    /**
+     * 진단 대상 호스트 목록 — devcbt 만 포함.
+     *
+     * cbt.inicis.com (운영계) 은 IP 화이트리스트 제약이 없어 화이트리스트
+     * 진단의 의미가 없음. 운영계 도달성은 일반 결제 흐름 자체로 검증됨.
+     */
     private const TARGET_HOSTS = [
         ['name' => 'devcbt.inicis.com', 'env' => 'test'],
-        ['name' => 'cbt.inicis.com',    'env' => 'live'],
     ];
 
     /** Egress IP 조회용 외부 서비스 (순차 시도) */
