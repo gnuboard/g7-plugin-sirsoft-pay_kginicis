@@ -11,7 +11,7 @@
  *   1. POST /api/modules/sirsoft-ecommerce/user/orders 응답을 가로챈다
  *   2. data.pg_provider === 'sirsoft-kginicis' 이면 requestPayment 핸들러를 직접 호출하여 결제창 띄움
  *   3. data.redirect_url 을 현재 URL로 교체하고 requires_pg_payment를 false로 변경
- *      → 템플릿 fallback 분기의 navigate 가 navigate-to-self 가 되어 실질적 이동 없음
+ *   4. 템플릿 fallback 분기의 navigate-to-self 1회를 차단해 체크아웃 입력 상태 보존
  *
  * 결과: 체크아웃 페이지에 머문 채 PG 팝업이 뜨고, PG 콜백이 정식 complete 페이지로 redirect.
  */
@@ -21,6 +21,7 @@ import { requestPaymentHandler } from './handlers/requestPayment';
 const ORDER_CREATE_PATH = '/api/modules/sirsoft-ecommerce/user/orders';
 const TARGET_PG_PROVIDER = 'sirsoft-kginicis';
 const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
+const NAVIGATE_SUPPRESSOR_KEY = '__sirsoftKginicisNavigateSuppressor';
 
 const logger = {
     info: (...args: unknown[]) => console.info(`[${PLUGIN_IDENTIFIER}]`, ...args),
@@ -38,6 +39,15 @@ interface OrderCreateResponseBody {
         pg_provider?: string;
         pg_payment_data?: Record<string, unknown>;
     };
+}
+
+interface RouterLike {
+    navigate: (path: string, options?: unknown) => unknown;
+}
+
+interface NavigateSuppressorState {
+    restore: () => void;
+    timer: number;
 }
 
 function extractPaymentMethodFromBody(body: string): string | undefined {
@@ -98,8 +108,76 @@ function isTargetEndpoint(url: string, method: string): boolean {
 }
 
 function buildNoOpRedirectUrl(): string {
-    // 현재 페이지 URL — navigate-to-self 는 React Router에서 사실상 no-op
     return window.location.pathname + window.location.search + window.location.hash;
+}
+
+function normalizePath(path: string): string {
+    try {
+        const url = new URL(path, window.location.origin);
+        return url.pathname + url.search + url.hash;
+    } catch {
+        return path;
+    }
+}
+
+/**
+ * 체크아웃 템플릿은 KG 결제창을 띄운 뒤에도 fallback navigate 를 실행한다.
+ * 현재 라우터는 같은 경로로 이동해도 route 를 다시 렌더링하므로 shipping/orderer
+ * local state 가 초기화될 수 있다. 코어/템플릿을 건드리지 않고 이 플러그인에서
+ * 현재 경로로 향하는 다음 navigate 1회만 소모한다.
+ */
+function suppressNextSamePathNavigate(targetPath: string): void {
+    const w = window as unknown as Record<string, unknown>;
+    const templateApp = w['__templateApp'] as { getRouter?: () => unknown } | undefined;
+    const router = templateApp?.getRouter?.() as RouterLike | undefined;
+
+    if (!router || typeof router.navigate !== 'function') {
+        return;
+    }
+
+    const existing = w[NAVIGATE_SUPPRESSOR_KEY] as NavigateSuppressorState | undefined;
+    existing?.restore();
+
+    const originalNavigate = router.navigate.bind(router);
+    const normalizedTarget = normalizePath(targetPath);
+    let restored = false;
+    let consumed = false;
+    let timer = 0;
+
+    const restore = (): void => {
+        if (restored) {
+            return;
+        }
+
+        restored = true;
+        if (router.navigate === patchedNavigate) {
+            router.navigate = originalNavigate;
+        }
+        window.clearTimeout(timer);
+
+        const current = w[NAVIGATE_SUPPRESSOR_KEY] as NavigateSuppressorState | undefined;
+        if (current?.restore === restore) {
+            delete w[NAVIGATE_SUPPRESSOR_KEY];
+        }
+    };
+
+    const patchedNavigate: RouterLike['navigate'] = (path, options) => {
+        const normalizedPath = normalizePath(path);
+
+        if (!consumed && normalizedPath === normalizedTarget) {
+            consumed = true;
+            logger.info('suppressed checkout self-navigation after PG popup', { path: normalizedPath });
+            restore();
+            return;
+        }
+
+        restore();
+        return originalNavigate(path, options);
+    };
+
+    timer = window.setTimeout(restore, 3000);
+    router.navigate = patchedNavigate;
+    w[NAVIGATE_SUPPRESSOR_KEY] = { restore, timer };
 }
 
 /**
@@ -213,13 +291,16 @@ export function installOrderResponseInterceptor(): void {
 
         // 2) 응답 mutate — 템플릿의 navigate fallback 을 무력화
         //    - requires_pg_payment: false  (혹시 다른 곳에서 참조해도 안전)
-        //    - redirect_url: 현재 URL       (navigate-to-self → 실질적 이동 없음)
+        //    - redirect_url: 현재 URL       (다음 navigate-to-self 1회는 플러그인에서 차단)
+        const redirectUrl = buildNoOpRedirectUrl();
+        suppressNextSamePathNavigate(redirectUrl);
+
         const mutatedBody: OrderCreateResponseBody = {
             ...body,
             data: {
                 ...data,
                 requires_pg_payment: false,
-                redirect_url: buildNoOpRedirectUrl(),
+                redirect_url: redirectUrl,
             },
         };
 
