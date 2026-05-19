@@ -317,16 +317,12 @@ class PaymentCallbackControllerTest extends PluginTestCase
     public function test_vbank_notify_returns_ok_on_successful_deposit(): void
     {
         $order = $this->createTestOrder(30000);
+        $this->mockPluginSettings();
 
-        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', [
-            'tid' => 'VBANK_TID_001',
-            'MOID' => $order->order_number,
-            'TotPrice' => 30000,
-            'resultCode' => '0000',
-            'vbankNum' => '1234567890',
-            'vbankName' => '국민은행',
-            'vbankExpDate' => now()->addDays(3)->format('Ymd'),
-        ]);
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $this->makeVbankNotifyPayload([
+            'no_oid' => $order->order_number,
+            'amt_input' => '30000',
+        ]));
 
         $response->assertOk();
         $this->assertEquals('OK', $response->getContent());
@@ -335,29 +331,61 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $this->assertEquals(OrderStatusEnum::PAYMENT_COMPLETE, $order->order_status);
     }
 
-    public function test_vbank_notify_returns_ok_on_cancelled_deposit(): void
+    /**
+     * 동일 TID 가 두 번 통보되어도 중복 결제 처리하지 않고 OK 반환 (replay 방어).
+     */
+    public function test_vbank_notify_is_idempotent_on_duplicate_tid(): void
     {
-        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', [
-            'tid' => 'VBANK_TID_002',
-            'MOID' => 'ORD-TEST-CANCEL',
-            'TotPrice' => 30000,
-            'resultCode' => '9999',
+        $order = $this->createTestOrder(30000);
+        $this->mockPluginSettings();
+
+        $payload = $this->makeVbankNotifyPayload([
+            'no_tid' => 'VBANK_TID_DUP',
+            'no_oid' => $order->order_number,
+            'amt_input' => '30000',
         ]);
 
+        $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $payload)->assertOk();
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $payload);
+
         $response->assertOk();
-        $this->assertEquals('OK', $response->getContent());
+        $this->assertEquals('OK', $response->getContent(), '재처리 요청도 OK 반환 (replay 방어)');
     }
 
     public function test_vbank_notify_returns_fail_on_order_not_found(): void
     {
-        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', [
-            'tid' => 'VBANK_TID_003',
-            'MOID' => 'NON_EXISTENT_ORDER',
-            'TotPrice' => 30000,
-            'resultCode' => '0000',
-        ]);
+        $this->mockPluginSettings();
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $this->makeVbankNotifyPayload([
+            'no_oid' => 'NON_EXISTENT_ORDER',
+        ]));
 
         $response->assertOk();
         $this->assertEquals('FAIL', $response->getContent());
+    }
+
+    /**
+     * KG 이니시스 PC 가상계좌 입금통보 페이로드 빌더.
+     *
+     * 공식 매뉴얼 https://manual.inicis.com/pay/etc-noti.html#pc 의 필드명을 사용한다.
+     * 테스트마다 일부 필드만 override 하기 위한 헬퍼.
+     *
+     * @param  array  $overrides  필드 override
+     * @return array 입금통보 페이로드
+     */
+    private function makeVbankNotifyPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'no_tid'       => 'VBANK_TID_' . uniqid(),
+            'no_oid'       => 'ORD-TEST-VBANK',
+            'id_merchant'  => 'INIpayTest',
+            'dt_trans'     => now()->format('Ymd'),
+            'tm_trans'     => now()->format('His'),
+            'cd_bank'      => '04',
+            'no_vacct'     => '1234567890',
+            'amt_input'    => '30000',
+            'nm_inputbank' => '국민은행',
+            'nm_input'     => '홍길동',
+        ], $overrides);
     }
 }

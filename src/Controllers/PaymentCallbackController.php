@@ -77,7 +77,7 @@ class PaymentCallbackController
         if (! $moid) {
             Log::error('KG Inicis: order number missing from callback', ['input' => array_keys($request->all())]);
 
-            return redirect('/');
+            return redirect($this->resolveFailUrl(['error' => 'invalid_params']));
         }
 
         // 결제 실패/취소인 경우: authToken/authUrl 없이 올 수 있으므로 먼저 처리
@@ -210,6 +210,8 @@ class PaymentCallbackController
                     'result_code' => $pgResultCode,
                     'pay_method' => $pgResponse['payMethod'] ?? null,
                     'auth_date' => $pgResponse['applDate'] ?? null,
+                    'mid' => $this->apiService->getMid(),
+                    'is_test_mode' => $this->apiService->isTestMode(),
                     'pg_raw_response' => $pgResponse,
                 ],
                 'payment_device' => DeviceDetector::detect($request),
@@ -291,6 +293,8 @@ class PaymentCallbackController
                     'depositor_name'  => $validated['nm_input'] ?? null,
                     'deposit_date'    => ($validated['dt_trans'] ?? '') . ($validated['tm_trans'] ?? ''),
                     'bank_code'       => $validated['cd_bank'] ?? null,
+                    'mid'             => $this->apiService->getMid(),
+                    'is_test_mode'    => $this->apiService->isTestMode(),
                     'pg_raw_response' => $validated,
                 ],
             ], $amt);
@@ -369,6 +373,8 @@ class PaymentCallbackController
                     'depositor_name'  => $validated['P_UNAME'] ?? null,
                     'deposit_date'    => $validated['P_AUTH_DT'] ?? null,
                     'bank_code'       => $validated['P_FN_CD1'] ?? null,
+                    'mid'             => $this->apiService->getMid(),
+                    'is_test_mode'    => $this->apiService->isTestMode(),
                     'pg_raw_response' => $validated,
                 ],
                 'payment_device' => 'mobile',
@@ -469,6 +475,8 @@ class PaymentCallbackController
                 'result_code'     => '0000',
                 'pay_method'      => 'VBank',
                 'auth_date'       => $pgResponse['applDate'] ?? null,
+                'mid'             => $this->apiService->getMid(),
+                'is_test_mode'    => $this->apiService->isTestMode(),
                 'pg_raw_response' => $pgResponse,
             ],
         ], fn ($v) => $v !== null));

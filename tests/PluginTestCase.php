@@ -44,6 +44,47 @@ abstract class PluginTestCase extends TestCase
 
         $this->registerModuleRoutes();
         $this->registerPluginRoutes();
+
+        // SettingsServiceProvider 가 storage/app/settings/general.json 의 site_url 로
+        // app.url 을 override 하면 Laravel 의 assertRedirect (APP_URL 기반) 와 mismatch.
+        // 테스트 환경에서는 APP_URL 그대로 사용하도록 명시 리셋.
+        \Illuminate\Support\Facades\Config::set('app.url', env('APP_URL', 'http://localhost'));
+
+        // BaseModuleServiceProvider::registerStorageBindings 가 ModuleManager 에서
+        // 모듈 인스턴스를 조회해 StorageInterface 를 바인딩하는데, 테스트 환경의
+        // ModuleManager 는 _bundled 스캔에서 sirsoft-ecommerce 를 자동 등록하지 못함.
+        // 명시 등록으로 storage 의존 컨트롤러(상품/이미지 서비스 등)가 500 없이 동작.
+        $this->registerEcommerceModuleInManager();
+    }
+
+    /**
+     * 테스트 환경에서 sirsoft-ecommerce 모듈을 ModuleManager 에 명시 등록.
+     */
+    protected function registerEcommerceModuleInManager(): void
+    {
+        try {
+            $moduleClass = '\\Modules\\Sirsoft\\Ecommerce\\Module';
+            if (! class_exists($moduleClass)) {
+                $moduleFile = base_path('modules/sirsoft-ecommerce/module.php');
+                if (file_exists($moduleFile)) {
+                    require_once $moduleFile;
+                }
+            }
+            if (! class_exists($moduleClass)) {
+                return;
+            }
+            $manager = $this->app->make(\App\Extension\ModuleManager::class);
+            $ref = new \ReflectionClass($manager);
+            $prop = $ref->getProperty('modules');
+            $prop->setAccessible(true);
+            $modules = $prop->getValue($manager);
+            if (! isset($modules['sirsoft-ecommerce'])) {
+                $modules['sirsoft-ecommerce'] = new $moduleClass;
+                $prop->setValue($manager, $modules);
+            }
+        } catch (\Throwable $e) {
+            // ModuleManager 미바인딩 등 — 테스트 자체는 진행. 의존 컨트롤러만 영향.
+        }
     }
 
     protected function registerModuleAutoload(): void
@@ -114,6 +155,15 @@ abstract class PluginTestCase extends TestCase
                 ->name('plugins.sirsoft-pay_kginicis.')
                 ->middleware('web')
                 ->group($webRoutesFile);
+        }
+
+        $apiRoutesFile = base_path('plugins/sirsoft-pay_kginicis/src/routes/api.php');
+
+        if (file_exists($apiRoutesFile)) {
+            \Illuminate\Support\Facades\Route::prefix('api/plugins/sirsoft-pay_kginicis')
+                ->name('api.plugins.sirsoft-pay_kginicis.')
+                ->middleware('api')
+                ->group($apiRoutesFile);
         }
     }
 

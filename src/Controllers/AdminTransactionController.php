@@ -20,18 +20,12 @@ class AdminTransactionController extends AdminBaseController
         parent::__construct();
     }
 
-/**
-
- * query
-
- *
-
- * @param  Request  $request
-
- * @return JsonResponse
-
- */
-
+    /**
+     * TID 직접 조회
+     *
+     * @param  Request  $request
+     * @return JsonResponse
+     */
     public function query(Request $request): JsonResponse
     {
         $tid = trim((string) $request->input('tid', ''));
@@ -43,18 +37,12 @@ class AdminTransactionController extends AdminBaseController
         return $this->queryByTid($tid);
     }
 
-/**
-
- * queryByOrder
-
- *
-
- * @param  string  $orderNumber
-
- * @return JsonResponse
-
- */
-
+    /**
+     * 주문번호로 거래 조회
+     *
+     * @param  string  $orderNumber
+     * @return JsonResponse
+     */
     public function queryByOrder(string $orderNumber): JsonResponse
     {
         $payment = DB::table('ecommerce_order_payments')
@@ -78,23 +66,36 @@ class AdminTransactionController extends AdminBaseController
         try {
             $localPayment = DB::table('ecommerce_order_payments')
                 ->where('transaction_id', $tid)
-                ->select(['is_escrow', 'payment_meta'])
+                ->select(['is_escrow', 'payment_meta', 'vbank_due_at'])
                 ->first();
 
-            $this->apiService->useEscrowCredentials((bool) ($localPayment?->is_escrow ?? false));
-
-            $result = $this->apiService->queryTransaction($tid);
-
-            $result['_is_test_mode'] = $this->apiService->isTestMode();
-            $result['_local_is_escrow'] = (bool) ($localPayment?->is_escrow ?? false);
-
+            $localMeta = [];
+            $localRaw = [];
             if ($localPayment?->payment_meta) {
-                $meta = json_decode($localPayment->payment_meta, true);
-                $rawResponse = $meta['pg_raw_response'] ?? [];
-                $result['_auth_code'] = $rawResponse['applNum'] ?? $rawResponse['authCode'] ?? null;
-                $result['_pay_method'] = $rawResponse['payMethod'] ?? null;
-                $result['_auth_date'] = $rawResponse['applDate'] ?? null;
+                $localMeta = json_decode($localPayment->payment_meta, true) ?: [];
+                $localRaw = $localMeta['pg_raw_response'] ?? [];
             }
+
+            $paymentMid = $this->resolvePaymentMid($localMeta, $localRaw, $tid);
+
+            // 결제 시점 모드(payment_meta.is_test_mode) 가 있으면 그 모드의 inapi 자격증명으로 조회.
+            // 누락 시 MID prefix 로 추정 ('SIR' = live, 그 외 = test).
+            if ($paymentMid !== null) {
+                $isTestMode = $localMeta['is_test_mode']
+                    ?? ! str_starts_with($paymentMid, 'SIR');
+                $this->apiService->useStoredCredentials((bool) $isTestMode, $paymentMid);
+            } else {
+                $this->apiService->useEscrowCredentials((bool) ($localPayment?->is_escrow ?? false));
+            }
+
+            $result = $this->apiService->queryTransaction($tid, $paymentMid);
+
+            $result = $this->enrichResult(
+                $result,
+                $localRaw,
+                (bool) ($localPayment?->is_escrow ?? false),
+                $localPayment?->vbank_due_at,
+            );
 
             return ResponseHelper::success('messages.success', $result);
         } catch (\Exception $e) {
@@ -105,5 +106,309 @@ class AdminTransactionController extends AdminBaseController
 
             return ResponseHelper::error('messages.failed', 502, null);
         }
+    }
+
+    /**
+     * 결제 시점에 사용된 가맹점 ID(MID) 를 해결한다.
+     *
+     * 해결 우선순위:
+     *   1) payment_meta.mid (콜백에서 명시 저장된 MID — 신규 주문 표준 경로)
+     *   2) payment_meta.pg_raw_response.mid 또는 .MID (예전 콜백 응답 raw 값)
+     *   3) TID 의 char 10–20 추출 (KG 이니시스 TID 포맷: prefix(10) + MID(10) + timestamp/seq)
+     *   4) null 반환 → 호출자가 fallback 으로 현재 설정 MID 사용
+     *
+     * @param  array  $localMeta  payment_meta 전체
+     * @param  array  $localRaw  payment_meta.pg_raw_response
+     * @param  string  $tid  거래번호
+     * @return string|null 해결된 MID 또는 null
+     */
+    private function resolvePaymentMid(array $localMeta, array $localRaw, string $tid): ?string
+    {
+        if (! empty($localMeta['mid']) && is_string($localMeta['mid'])) {
+            return $localMeta['mid'];
+        }
+
+        foreach (['mid', 'MID'] as $key) {
+            if (! empty($localRaw[$key]) && is_string($localRaw[$key])) {
+                return $localRaw[$key];
+            }
+        }
+
+        // KG 이니시스 TID 포맷: 10자 prefix (INIMX_CARD / StdpayCARD / ININPGVBNK 등)
+        // + 10자 MID + timestamp/sequence.
+        if (strlen($tid) >= 20) {
+            $candidate = substr($tid, 10, 10);
+            // MID 후보 검증: 영숫자만 (KG 이니시스 MID 명세)
+            if (preg_match('/^[A-Za-z0-9]{10}$/', $candidate) === 1) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * inquiry 응답을 화면 표시용 필드로 보강한다.
+     *
+     * 우선순위: inquiry 응답값 → 로컬 콜백 응답 fallback → null
+     *
+     * @param  array  $result  inquiry API 응답
+     * @param  array  $localRaw  결제 콜백 시 저장한 raw 응답
+     * @param  bool  $isEscrow  로컬 결제 레코드의 에스크로 여부
+     * @param  string|null  $localVbankDueAt  로컬 DB 의 vbank_due_at (정확한 cutoff timestamp)
+     * @return array 보강된 응답
+     */
+    private function enrichResult(array $result, array $localRaw, bool $isEscrow, ?string $localVbankDueAt = null): array
+    {
+        $cardInfo = is_array($result['cardInfo'] ?? null) ? $result['cardInfo'] : [];
+
+        $pick = function (string ...$keys) use ($result, $localRaw, $cardInfo): ?string {
+            foreach ($keys as $key) {
+                if (isset($result[$key]) && $result[$key] !== '') {
+                    return (string) $result[$key];
+                }
+                if (isset($cardInfo[$key]) && $cardInfo[$key] !== '') {
+                    return (string) $cardInfo[$key];
+                }
+            }
+            foreach ($keys as $key) {
+                if (isset($localRaw[$key]) && $localRaw[$key] !== '') {
+                    return (string) $localRaw[$key];
+                }
+            }
+
+            return null;
+        };
+
+        $payMethod = $pick('payMethod', 'PayMethod', 'paymethod') ?? '';
+
+        $result['_is_test_mode']      = $this->apiService->isTestMode();
+        $result['_local_is_escrow']   = $isEscrow;
+        $result['_pay_method']        = $payMethod;
+        $result['_pay_method_label']  = $this->payMethodLabel($payMethod);
+        $result['_auth_code']         = $pick('applNum', 'approvedNumber', 'authCode', 'AuthCode');
+        $result['_auth_date']         = $this->formatDateTime(
+            $pick('applDate', 'approvedDate', 'AuthDate'),
+            $pick('applTime', 'approvedTime', 'AuthTime'),
+        );
+        $result['_total_price']       = $pick('TotPrice', 'totalPrice', 'price', 'Amt', 'approvedAmount');
+        $result['_currency']          = $pick('currency', 'Currency', 'currencyCode') ?? 'WON';
+        $result['_moid']              = $pick('MOID', 'moid', 'Moid', 'oid');
+        $result['_buyer_name']        = $pick('buyerName', 'BuyerName');
+        $result['_buyer_email']       = $pick('buyerEmail', 'BuyerEmail', 'buyerMail');
+        $result['_buyer_tel']         = $pick('buyerTel', 'BuyerTel');
+        $result['_status']            = $pick('status', 'Status', 'transactionStatus');
+
+        // 취소이력
+        $result['_cancel_price']      = $pick('cancelPrice', 'CancelPrice', 'cancelAmount');
+        $result['_cancel_date']       = $this->formatDateTime($pick('cancelDate', 'CancelDate'), $pick('cancelTime', 'CancelTime'));
+        $partCancelRaw = $result['partCancelList'] ?? $localRaw['partCancelList'] ?? [];
+        $result['_part_cancel_list']  = $this->normalizePartCancelList(is_array($partCancelRaw) ? $partCancelRaw : []);
+
+        // 결제수단별 상세 (신구 응답 포맷 호환: 평탄 키 + cardInfo 중첩)
+        $result['_card_name']         = $pick('cardName', 'CardName', 'issuerName');
+        $result['_card_num']          = $pick('cardNum', 'CardNum', 'CARD_Num', 'cardNumber');
+        $result['_card_code']         = $pick('cardCode', 'CardCode');
+        $result['_card_quota']        = $this->formatQuota($pick('cardQuota', 'CardQuota', 'quota'));
+        $result['_card_interest']     = $pick('cardInterest', 'CardInterest', 'isInterestFree');
+
+        $result['_vbank_num']         = $pick('VACT_Num', 'vactNum', 'vbank_num');
+        $result['_vbank_bank_code']   = $pick('VACT_BankCode', 'vactBankCode', 'vbank_bank_code');
+        $result['_vbank_bank_name']   = $pick('VACT_BankName', 'vactBankName', 'vbank_bank_name') ?? $this->bankNameByCode($result['_vbank_bank_code'] ?? null);
+        $result['_vbank_holder']      = $pick('VACT_Name', 'vactName', 'vbank_holder');
+        // 가상계좌 입금기한:
+        // 로컬 vbank_due_at 이 있으면 KST 로 변환해 사용 — 결제 발급 시 KG 이니시스가 보낸
+        // VACT_Date(=다음 영업일) + VACT_Time(=08:59:59) 으로 만든 정확한 cutoff timestamp.
+        // DB 는 UTC 로 저장되므로 표시 시 Asia/Seoul 로 변환해야 주문 상세 화면(KST 표시) 과 일치.
+        // 조회 응답의 vacctInfo.validDate 는 "마지막 입금 가능일" convention 이라 1일 일찍 표시되어
+        // 로컬 timestamp 가 더 정확.
+        $result['_vbank_expire_date'] = $localVbankDueAt !== null
+            ? \Carbon\Carbon::parse($localVbankDueAt, 'UTC')->setTimezone('Asia/Seoul')->format('Y-m-d H:i:s')
+            : $this->formatDate($pick('VACT_Date', 'vactDate', 'vbank_expire_date', 'validDate'));
+        $vbankStatus                  = $pick('VACT_Status', 'vactStatus', 'vbank_status');
+        $result['_vbank_status']      = $vbankStatus;
+        $result['_vbank_paid_at']     = $this->formatDateTime($pick('VACT_InputDate', 'VACT_InputTime') ? $pick('VACT_InputDate') : null, $pick('VACT_InputTime'));
+
+        $result['_bank_code']         = $pick('acntBankCode', 'BankCode');
+        $result['_bank_name']         = $pick('acntBankName', 'BankName') ?? $this->bankNameByCode($result['_bank_code'] ?? null);
+        $result['_bank_acnt_num']     = $pick('acntNum', 'AcntNum');
+
+        $result['_hpp_num']           = $pick('HPP_Num', 'hppNum', 'phoneNum');
+        $result['_hpp_corp']          = $pick('HPP_Corp', 'hppCorp', 'mobileCarrier');
+
+        $result['_escrow_status']     = $pick('escrowStatus', 'EscrowStatus');
+        $result['_escrow_confirm']    = $this->formatDateTime($pick('escrowConfirmDate'), $pick('escrowConfirmTime'));
+
+        // 환경 정보
+        $result['_inquiry_at']        = date('Y-m-d H:i:s');
+
+        return $result;
+    }
+
+    /**
+     * KG 이니시스 payMethod 코드를 한국어 라벨로 매핑한다.
+     *
+     * 플러그인 JSON lang 의 중첩 키는 Laravel `__()` 의 flat lookup 으로 해석되지 않으므로
+     * 한국어 어드민 UX 전제하에 PHP 직접 매핑. 다국어가 필요해질 경우 레이아웃 측
+     * `$t:` 보간으로 처리하거나 lang/ko/pay_method.php 같은 PHP 배열 파일로 분리한다.
+     *
+     * @param  string  $code  KG 이니시스 결제수단 코드
+     * @return string 표시용 라벨
+     */
+    private function payMethodLabel(string $code): string
+    {
+        if ($code === '') {
+            return '-';
+        }
+
+        return match (strtolower($code)) {
+            'card'                                    => '신용카드',
+            'wcard'                                   => '해외카드',
+            'vbank'                                   => '가상계좌',
+            'directbank', 'inibank', 'banktransfer'   => '계좌이체',
+            'hpp', 'mobile'                           => '휴대폰',
+            'easypay'                                 => '간편결제',
+            'point'                                   => '포인트',
+            'gift'                                    => '상품권',
+            'paybook'                                 => '도서문화상품권',
+            'billing', 'billingpay'                   => '정기결제',
+            'samsungpay'                              => '삼성페이',
+            'kakaopay'                                => '카카오페이',
+            'lpay'                                    => 'L.pay',
+            'payco'                                   => '페이코',
+            'naverpay'                                => '네이버페이',
+            'tosspay', 'toss'                         => '토스페이',
+            'ssgpay'                                  => 'SSG페이',
+            default                                   => $code,
+        };
+    }
+
+    /**
+     * KG 이니시스 표준 은행 코드 → 은행명 매핑.
+     *
+     * @param  string|null  $code  표준 은행 코드
+     * @return string|null 은행명 또는 null
+     */
+    private function bankNameByCode(?string $code): ?string
+    {
+        if ($code === null || $code === '') {
+            return null;
+        }
+
+        $map = [
+            '03' => '기업은행',
+            '04' => '국민은행',
+            '05' => '하나(외환)은행',
+            '07' => '수협',
+            '11' => '농협',
+            '12' => '단위농협',
+            '20' => '우리은행',
+            '21' => '구.조흥은행',
+            '22' => '구.상업은행',
+            '23' => 'SC제일은행',
+            '26' => '구.신한은행',
+            '27' => '한국씨티은행',
+            '31' => '대구은행',
+            '32' => '부산은행',
+            '34' => '광주은행',
+            '35' => '제주은행',
+            '37' => '전북은행',
+            '39' => '경남은행',
+            '45' => '새마을금고',
+            '48' => '신협',
+            '50' => '상호저축은행',
+            '54' => 'HSBC',
+            '57' => '도이치은행',
+            '60' => 'BOA',
+            '64' => '산림조합',
+            '71' => '우체국',
+            '81' => '하나은행',
+            '83' => '신한은행',
+            '88' => '신한(통합)은행',
+            '89' => '케이뱅크',
+            '90' => '카카오뱅크',
+            '92' => '토스뱅크',
+        ];
+
+        return $map[$code] ?? null;
+    }
+
+    /**
+     * 카드 할부 코드를 한국어로 변환한다.
+     *
+     * @param  string|null  $quota  KG 이니시스 할부 개월 코드
+     * @return string|null 표시용 라벨
+     */
+    private function formatQuota(?string $quota): ?string
+    {
+        if ($quota === null || $quota === '') {
+            return null;
+        }
+
+        $months = (int) $quota;
+
+        return $months === 0 ? '일시불' : "{$months}개월";
+    }
+
+    /**
+     * YYYYMMDD + HHMMSS 형식을 YYYY-MM-DD HH:MM:SS 로 변환한다.
+     *
+     * @param  string|null  $date  YYYYMMDD
+     * @param  string|null  $time  HHMMSS
+     * @return string|null 사람이 읽을 수 있는 형식
+     */
+    private function formatDateTime(?string $date, ?string $time): ?string
+    {
+        if ($date === null || $date === '') {
+            return null;
+        }
+
+        $datePart = $this->formatDate($date) ?? $date;
+        $timePart = '';
+
+        if ($time !== null && $time !== '' && strlen($time) >= 6) {
+            $timePart = ' ' . substr($time, 0, 2) . ':' . substr($time, 2, 2) . ':' . substr($time, 4, 2);
+        }
+
+        return $datePart . $timePart;
+    }
+
+    /**
+     * YYYYMMDD 형식을 YYYY-MM-DD 로 변환한다.
+     *
+     * @param  string|null  $date  YYYYMMDD
+     * @return string|null 변환된 날짜
+     */
+    private function formatDate(?string $date): ?string
+    {
+        if ($date === null || $date === '' || strlen($date) < 8) {
+            return $date;
+        }
+
+        return substr($date, 0, 4) . '-' . substr($date, 4, 2) . '-' . substr($date, 6, 2);
+    }
+
+    /**
+     * 부분취소 이력을 화면 표시용으로 정규화한다.
+     *
+     * @param  array  $list  KG 이니시스 partCancelList
+     * @return array 정규화된 부분취소 이력
+     */
+    private function normalizePartCancelList(array $list): array
+    {
+        $normalized = [];
+        foreach ($list as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $normalized[] = [
+                'price'  => $item['price'] ?? $item['cancelPrice'] ?? null,
+                'date'   => $this->formatDateTime($item['cancelDate'] ?? null, $item['cancelTime'] ?? null),
+                'msg'    => $item['cancelMsg'] ?? $item['msg'] ?? null,
+                'tid'    => $item['cancelTid'] ?? $item['tid'] ?? null,
+            ];
+        }
+
+        return $normalized;
     }
 }
