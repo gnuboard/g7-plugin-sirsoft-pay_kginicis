@@ -38,7 +38,7 @@
                             "type": "basic",
                             "name": "Span",
                             "props": { "className": "text-sm font-semibold text-orange-800 dark:text-orange-300" },
-                            "text": "$t:sirsoft-pay_kginicis.admin.test_mode_badge"
+                            "text": "$t:sirsoft-pay_kginicis.admin.test_mode_warning_badge"
                         },
                         {
                             "type": "basic",

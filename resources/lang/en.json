@@ -32,7 +32,8 @@
         "tax_free_amount": "Tax-Free Amount"
     },
     "admin": {
-        "test_mode_badge": "Test Payment WARNING)",
+        "test_mode_badge": "Test Payment",
+        "test_mode_warning_badge": "Test Payment WARNING)",
         "test_mode_order_notice": "This order is for testing only — no actual payment was processed. DO NOT ship this order under any circumstances.",
         "order_verify_title": "KG Inicis Payment Verification",
         "order_verify_description": "Query real-time payment status from KG Inicis servers.",
