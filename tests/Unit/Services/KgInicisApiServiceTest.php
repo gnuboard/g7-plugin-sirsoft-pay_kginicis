@@ -47,13 +47,29 @@ class KgInicisApiServiceTest extends PluginTestCase
 
     public function test_get_mid_returns_live_mid_in_live_mode(): void
     {
+        // CLAUDE.local.md 규정 — 라이브 MID 는 항상 'SIR' prefix (수익 직결 가맹점 계약).
+        // 입력값에 prefix 가 없으면 buildLiveMid 가 자동 prepend.
         $service = $this->makeService([
             'is_test_mode' => false,
             'live_mid' => 'live_mid_value',
             'live_sign_key' => 'live_sign_key_value',
         ]);
 
-        $this->assertEquals('live_mid_value', $service->getMid());
+        $this->assertEquals('SIRlive_mid_value', $service->getMid());
+    }
+
+    /**
+     * 라이브 MID 입력값이 이미 SIR prefix 를 포함하면 중복 prepend 하지 않는다.
+     */
+    public function test_get_mid_does_not_double_prefix_when_input_already_has_sir(): void
+    {
+        $service = $this->makeService([
+            'is_test_mode' => false,
+            'live_mid' => 'SIRshoptest',
+            'live_sign_key' => 'live_sign_key_value',
+        ]);
+
+        $this->assertEquals('SIRshoptest', $service->getMid());
     }
 
     public function test_get_js_url_returns_test_url_in_test_mode(): void
@@ -179,7 +195,7 @@ class KgInicisApiServiceTest extends PluginTestCase
         $service = $this->makeService();
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/refund' => Http::response([
+            'stginiapi.inicis.com/v2/pg/refund' => Http::response([
                 'resultCode' => '00',
                 'resultMsg' => '취소 성공',
                 'tid' => 'TID_CANCEL',
@@ -191,11 +207,13 @@ class KgInicisApiServiceTest extends PluginTestCase
         $this->assertEquals('00', $result['resultCode']);
 
         Http::assertSent(function ($request) {
-            return $request['type'] === 'Refund'
-                && $request['paymethod'] === 'Card'
+            $data = $request['data'] ?? [];
+
+            return $request['type'] === 'refund'
                 && $request['mid'] === self::TEST_MID
-                && $request['tid'] === 'TID_ORIG'
-                && ! isset($request['price'])
+                && $data['tid'] === 'TID_ORIG'
+                && $data['msg'] === '고객 요청'
+                && ! isset($data['price'])
                 && isset($request['hashData'])
                 && isset($request['timestamp'])
                 && isset($request['clientIp']);
@@ -207,7 +225,7 @@ class KgInicisApiServiceTest extends PluginTestCase
         $service = $this->makeService();
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/refund' => Http::response([
+            'stginiapi.inicis.com/v2/pg/partialRefund' => Http::response([
                 'resultCode' => '00',
                 'resultMsg' => '부분 취소 성공',
             ], 200),
@@ -218,8 +236,10 @@ class KgInicisApiServiceTest extends PluginTestCase
         $this->assertEquals('00', $result['resultCode']);
 
         Http::assertSent(function ($request) {
-            return $request['type'] === 'PartialRefund'
-                && $request['price'] == 10000;
+            $data = $request['data'] ?? [];
+
+            return $request['type'] === 'partialRefund'
+                && $data['price'] === '10000';
         });
     }
 
@@ -228,7 +248,7 @@ class KgInicisApiServiceTest extends PluginTestCase
         $service = $this->makeService();
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/refund' => Http::response([
+            'stginiapi.inicis.com/v2/pg/refund' => Http::response([
                 'resultCode' => '9999',
                 'resultMsg' => '취소 실패',
             ], 200),
@@ -254,7 +274,7 @@ class KgInicisApiServiceTest extends PluginTestCase
         $service->cancelPayment('TID_ORIG', 'Card', null, '취소');
     }
 
-    public function test_cancel_payment_hash_data_includes_price_for_partial_refund(): void
+    public function test_cancel_payment_hash_data_includes_detail_for_partial_refund(): void
     {
         $service = $this->makeService();
 
@@ -263,7 +283,7 @@ class KgInicisApiServiceTest extends PluginTestCase
         $cancelPrice = 10000;
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/refund' => Http::response([
+            'stginiapi.inicis.com/v2/pg/partialRefund' => Http::response([
                 'resultCode' => '00',
                 'resultMsg' => '성공',
             ], 200),
@@ -271,18 +291,22 @@ class KgInicisApiServiceTest extends PluginTestCase
 
         $service->cancelPayment($tid, $payMethod, $cancelPrice, '부분취소');
 
-        Http::assertSent(function ($request) use ($tid, $payMethod, $cancelPrice) {
-            $hashBase = self::TEST_INIAPI_KEY
-                . 'PartialRefund'
-                . $payMethod
-                . $request['timestamp']
-                . $request['clientIp']
-                . self::TEST_MID
-                . $tid
-                . $cancelPrice;
-            $expectedHash = hash('sha512', $hashBase);
+        // INIAPI v2 hash 공식: SHA512(inapiKey + mid + type + timestamp + detailJson)
+        Http::assertSent(function ($request) use ($tid, $cancelPrice) {
+            $detail = $request['data'] ?? [];
+            $detailJson = str_replace('\\/', '/', json_encode($detail, JSON_UNESCAPED_UNICODE));
+            $expectedHash = hash(
+                'sha512',
+                self::TEST_INIAPI_KEY
+                    . self::TEST_MID
+                    . 'partialRefund'
+                    . $request['timestamp']
+                    . $detailJson
+            );
 
-            return $request['hashData'] === $expectedHash;
+            return $request['hashData'] === $expectedHash
+                && $detail['tid'] === $tid
+                && $detail['price'] === (string) $cancelPrice;
         });
     }
 }

@@ -21,7 +21,12 @@
         "live_japan_mid": "",
         "live_japan_sign_key": "",
         "redirect_success_url": "/shop/orders/{orderId}/complete",
-        "redirect_fail_url": "/shop/checkout"
+        "redirect_fail_url": "/shop/checkout",
+        "easy_pay_allow_with_other_pg": false,
+        "easy_pay_samsung_pay": false,
+        "easy_pay_lpay": false,
+        "easy_pay_kakaopay": false,
+        "use_credit_point": false
     },
     "frontend_schema": {
         "is_test_mode": { "expose": false },
@@ -41,6 +46,11 @@
         "live_japan_mid": { "expose": false },
         "live_japan_sign_key": { "expose": false },
         "redirect_success_url": { "expose": false },
-        "redirect_fail_url": { "expose": false }
+        "redirect_fail_url": { "expose": false },
+        "easy_pay_allow_with_other_pg": { "expose": false },
+        "easy_pay_samsung_pay": { "expose": false },
+        "easy_pay_lpay": { "expose": false },
+        "easy_pay_kakaopay": { "expose": false },
+        "use_credit_point": { "expose": false }
     }
 }

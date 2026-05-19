@@ -194,6 +194,8 @@ class MobileCallbackController
                     'result_code'    => $resultStatus,
                     'pay_method'     => $payType ?: null,
                     'auth_date'      => $result['P_AUTH_DT'] ?? null,
+                    'mid'            => $this->apiService->getMid(),
+                    'is_test_mode'   => $this->apiService->isTestMode(),
                     'pg_raw_response' => $result,
                 ],
                 'payment_device'          => 'mobile',
@@ -313,6 +315,8 @@ class MobileCallbackController
                 'result_code'     => $result['P_STATUS'] ?? '00',
                 'pay_method'      => 'VBank',
                 'auth_date'       => $result['P_AUTH_DT'] ?? null,
+                'mid'             => $this->apiService->getMid(),
+                'is_test_mode'    => $this->apiService->isTestMode(),
                 'pg_raw_response' => $result,
             ],
         ], fn ($v) => $v !== null));

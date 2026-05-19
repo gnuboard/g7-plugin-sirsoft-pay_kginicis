@@ -49,6 +49,34 @@ function extractPaymentMethodFromBody(body: string): string | undefined {
     }
 }
 
+/**
+ * KG 이니시스 간편결제 (LPAY/카카오페이/삼성페이) 선택 시 _local.paymentMethod 가
+ * 'kginicis_lpay' 등의 PG 식별자로 설정된다. 그러나 코어 PaymentMethodEnum 은
+ * card/vbank/bank/phone 등 일반 결제수단만 허용하므로 백엔드 validation 에서
+ * 'kginicis_*' 가 거부된다.
+ *
+ * 본 헬퍼는 요청 body 의 payment_method 가 'kginicis_*' 형태이면 'card' 로
+ * 치환한 새 body 를 반환한다 — UI/local state 는 PG 식별자를 그대로 유지해
+ * requestPayment 핸들러의 gopaymethod 매핑이 정상 동작한다.
+ *
+ * gnuboard5 shop/inicis/lpay_form.1.php 의 P_INI_PAYMENT/gopaymethod 패턴과
+ * 동일한 의미: '결제수단 = 신용카드, 간편결제 변종 = gopaymethod=LPAY'.
+ */
+function rewriteEasyPayInBody(body: string): { rewritten: string; originalMethod: string | undefined } {
+    try {
+        const parsed = JSON.parse(body) as Record<string, unknown>;
+        const pm = parsed['payment_method'];
+        if (typeof pm === 'string' && pm.startsWith('kginicis_')) {
+            const original = pm;
+            parsed['payment_method'] = 'card';
+            return { rewritten: JSON.stringify(parsed), originalMethod: original };
+        }
+        return { rewritten: body, originalMethod: typeof pm === 'string' ? pm : undefined };
+    } catch {
+        return { rewritten: body, originalMethod: undefined };
+    }
+}
+
 function extractUrl(input: RequestInfo | URL): string {
     if (typeof input === 'string') return input;
     if (input instanceof URL) return input.toString();
@@ -121,9 +149,16 @@ export function installOrderResponseInterceptor(): void {
         }
 
         // 요청 body에서 payment_method 추출 (vbank, bank, phone 등 비카드 결제수단 감지)
+        // 동시에 'kginicis_*' 간편결제 식별자는 'card' 로 치환하여 backend enum 검증을 통과시킨다.
         let paymentMethod: string | undefined;
+        let mutatedInit: RequestInit | undefined = init;
         if (init?.body && typeof init.body === 'string') {
-            paymentMethod = extractPaymentMethodFromBody(init.body);
+            const { rewritten, originalMethod } = rewriteEasyPayInBody(init.body);
+            paymentMethod = originalMethod;
+            if (rewritten !== init.body) {
+                logger.info('rewrote request payment_method', { from: originalMethod, to: 'card' });
+                mutatedInit = { ...init, body: rewritten };
+            }
         }
         // G7Core 로컬 상태 fallback
         if (!paymentMethod) {
@@ -133,7 +168,7 @@ export function installOrderResponseInterceptor(): void {
             } catch { /* ignore */ }
         }
 
-        const response = await originalFetch(input, init);
+        const response = await originalFetch(input, mutatedInit);
 
         // 본문은 한 번만 읽을 수 있으므로 클론
         let cloned: Response;

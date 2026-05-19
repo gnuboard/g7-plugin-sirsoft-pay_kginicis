@@ -103,26 +103,54 @@ function submitForm(action: string, fields: Record<string, string>, charset = 'u
     form.submit();
 }
 
-// PC 결제수단 → INIStdPay gopaymethod 매핑
-const GOPAYMETHOD_MAP: Record<string, string> = {
+/**
+ * PC 결제수단 → INIStdPay gopaymethod 매핑.
+ *
+ * 일반 결제수단은 자기 자신을, 간편결제 변종은 KG 이니시스 매뉴얼이 지정한
+ * "only{프로바이더}" 표기를 사용한다 (LPAY 가 아니라 'onlylpay').
+ *
+ * gnuboard5 shop/inicis/lpay_order.script.php 참조:
+ *   gopaymethod = (inicis_settle_case === 'inicis_kakaopay') ? 'onlykakaopay' : 'onlylpay'
+ */
+export const GOPAYMETHOD_MAP: Record<string, string> = {
     card:               'Card',
     vbank:              'VBank',
     bank:               'DirectBank',
     phone:              'HPP',
-    kginicis_lpay:      'LPAY',
-    kginicis_kakaopay:  'KAKAOPAY',
+    kginicis_lpay:      'onlylpay',
+    kginicis_kakaopay:  'onlykakaopay',
 };
 
-// 모바일 결제수단 → P_INI_PAYMENT 매핑 (manual.inicis.com/pay/stdpay_m.html#popup_7)
-// 휴대폰결제 코드는 PC 의 'HPP' 가 아닌 'MOBILE' — 잘못된 P_INI_PAYMENT 응답 회귀 차단.
-const MOBILE_PAYMETHOD_MAP: Record<string, string> = {
-    card:                 'CARD',
-    vbank:                'VBANK',
-    bank:                 'BANK',
-    phone:                'MOBILE',
-    kginicis_samsung_pay: 'SAMSUNG',
-    kginicis_lpay:        'LPAY',
-    kginicis_kakaopay:    'KAKAOPAY',
+/**
+ * 모바일 결제수단 → P_INI_PAYMENT 매핑 (manual.inicis.com/pay/stdpay_m.html#popup_7).
+ *
+ * 일반 결제수단만 P_INI_PAYMENT 로 분기 가능. 간편결제 (Samsung Pay / L.pay /
+ * 카카오페이) 는 모바일에서 *완전히 다른 엔드포인트* 를 사용하며 P_INI_PAYMENT
+ * 가 아닌 P_RESERVED 의 'd_samsungpay=Y' / 'd_lpay=Y' / 'd_kakaopay=Y' 힌트로
+ * 식별된다. 따라서 본 맵은 일반 결제수단만 보유한다.
+ *
+ * 휴대폰결제 코드는 PC 의 'HPP' 가 아닌 'MOBILE' — 잘못된 P_INI_PAYMENT 응답 회귀 차단.
+ */
+export const MOBILE_PAYMETHOD_MAP: Record<string, string> = {
+    card:  'CARD',
+    vbank: 'VBANK',
+    bank:  'BANK',
+    phone: 'MOBILE',
+};
+
+/**
+ * 모바일 간편결제 → P_RESERVED 에 추가할 hint 토큰 매핑.
+ *
+ * gnuboard5 mobile/shop/samsungpay/order.script.php 참조:
+ *   d_samsungpay=Y / d_lpay=Y / d_kakaopay=Y
+ *
+ * 모바일 간편결제는 https://mobile.inicis.com/smart/wcard/ 로 폼 제출하며
+ * P_INI_PAYMENT 를 보내지 않는다.
+ */
+export const MOBILE_EASY_PAY_RESERVED_HINT: Record<string, string> = {
+    kginicis_samsung_pay: 'd_samsungpay=Y',
+    kginicis_lpay:        'd_lpay=Y',
+    kginicis_kakaopay:    'd_kakaopay=Y',
 };
 
 /**
@@ -152,12 +180,35 @@ async function requestMobileKoreanPayment(
         config.callback_urls.mobile_callback +
         '?orderId=' + encodeURIComponent(pgPaymentData.order_number);
 
+    const easyPayHint = MOBILE_EASY_PAY_RESERVED_HINT[paymentMethod];
+    const isEasyPay = easyPayHint !== undefined;
+
+    // 모바일 간편결제 (Samsung Pay / L.pay / 카카오페이) 는 별도 엔드포인트 사용.
+    // gnuboard5 mobile/shop/samsungpay/order.script.php 참조:
+    //   form.action = 'https://mobile.inicis.com/smart/wcard/'
+    // 백엔드가 반환한 mobilePaymentUrl (/smart/payment/) 의 마지막 path segment 를
+    // 'wcard' 로 치환하여 호스트/스킴은 보존하면서 엔드포인트만 전환한다.
+    const submitUrl = isEasyPay
+        ? mobilePaymentUrl.replace(/\/smart\/[^/]+\/?$/, '/smart/wcard/')
+        : mobilePaymentUrl;
+
     const iniPayment = MOBILE_PAYMETHOD_MAP[paymentMethod] ?? 'CARD';
+
+    // 간편결제는 P_RESERVED 에 hint 추가 + P_SKIP_TERMS=Y. 일반 결제는 기존 옵션 유지.
+    const baseReserved = config.use_escrow
+        ? 'below1000=Y&vbank_receipt=Y&useescrow=Y&centerCd=Y&amt_hash=Y'
+        : 'below1000=Y&vbank_receipt=Y&centerCd=Y&amt_hash=Y';
+    const reserved = isEasyPay
+        ? baseReserved.replace('&useescrow=Y', '') + '&' + easyPayHint
+        : baseReserved;
 
     // 휴대폰결제(MOBILE) 는 P_HPP_METHOD 필수 — '1'=콘텐츠 / '2'=실물상품
     // (manual.inicis.com/pay/stdpay_m.html). 누락 시 PG 가 MX1006 으로 반려.
+    //
+    // 간편결제는 P_INI_PAYMENT 를 보내지 않는다 — gnuboard5 samsungpay/orderform.1.php
+    // 에는 P_INI_PAYMENT 필드 자체가 없으며 결제 종류는 P_RESERVED 의 d_*pay=Y
+    // hint 와 form action (/smart/wcard/) 으로 식별된다.
     const fields: Record<string, string> = {
-        P_INI_PAYMENT: iniPayment,
         P_MID:         config.mid,
         P_OID:         pgPaymentData.order_number,
         P_AMT:         String(pgPaymentData.amount),
@@ -169,25 +220,29 @@ async function requestMobileKoreanPayment(
         P_CHARSET:     'utf8',
         P_TIMESTAMP:   timestamp,
         P_CHKFAKE:     chkfake,
-        // centerCd=Y: 취소 버튼 활성화 / amt_hash=Y: 금액 위변조 검증 활성화 / useescrow=Y: 에스크로 결제
-        P_RESERVED:    config.use_escrow
-            ? 'below1000=Y&vbank_receipt=Y&useescrow=Y&centerCd=Y&amt_hash=Y'
-            : 'below1000=Y&vbank_receipt=Y&centerCd=Y&amt_hash=Y',
+        P_RESERVED:    reserved,
     };
 
-    if (iniPayment === 'MOBILE') {
+    if (! isEasyPay) {
+        fields.P_INI_PAYMENT = iniPayment;
+    } else {
+        // 간편결제는 약관 동의 화면 skip (samsungpay/orderform.1.php 와 동일)
+        fields.P_SKIP_TERMS = 'Y';
+    }
+
+    if (iniPayment === 'MOBILE' && ! isEasyPay) {
         fields.P_HPP_METHOD = '2';
     }
 
     // 가상계좌 결제 시 P_NOTI_URL 필수 (manual.inicis.com/pay/stdpay_m.html).
     // PC 가상계좌는 KG 이니시스 가맹점 어드민의 등록 URL 로 통보되지만, 모바일은
     // 요청에 P_NOTI_URL 을 명시해야 입금통보를 받을 수 있다.
-    if (iniPayment === 'VBANK') {
+    if (iniPayment === 'VBANK' && ! isEasyPay) {
         fields.P_NOTI_URL =
             window.location.origin + config.callback_urls.mobile_vbank_notify;
     }
 
-    submitForm(mobilePaymentUrl, fields, 'euc-kr');
+    submitForm(submitUrl, fields, 'euc-kr');
 }
 
 /**
@@ -221,8 +276,13 @@ async function requestKoreanPayment(
     }
 
     const callbackUrl = window.location.origin + config.callback_urls.callback;
-    const shopBase = (window as any).G7Core?.state?.get?.('templateSettings')?.shopBase ?? '/shop';
-    const orderCloseUrl = window.location.origin + shopBase + '/checkout';
+    // closeUrl 비우기 — KG 이니시스 결제창 X / 취소 클릭 시 SPA 페이지가
+    // location.href = closeUrl 로 전체 새로고침되어 체크아웃 폼 입력 상태
+    // (배송지/연락처/옵션 선택) 가 모두 휘발하는 UX 회귀 회피.
+    // 빈 문자열일 때 INIStdPay 는 자체 fallback 으로 팝업만 닫고 부모
+    // 페이지는 유지하는 동작을 기대 (PG 매뉴얼 상 옵션 필드).
+    // 미동작 시 옵션 A 로 현재 URL 을 closeUrl 로 두는 fallback 가능.
+    const orderCloseUrl = '';
     const formId = 'kginicis_pay_form_' + Date.now();
 
     const form = document.createElement('form');
@@ -248,11 +308,21 @@ async function requestKoreanPayment(
         closeUrl:     orderCloseUrl,
         gopaymethod:  GOPAYMETHOD_MAP[paymentMethod] ?? 'Card',
         acceptmethod: (() => {
+            // 기본 acceptmethod 토큰 (일반 결제수단 옵션)
             const escrow = config.use_escrow ? 'useescrow:' : '';
             const creditPoint = config.use_credit_point ? 'CREDITCARD(Y):' : '';
-            return paymentMethod === 'phone'
+            const base = paymentMethod === 'phone'
                 ? `HPP(1):${escrow}${creditPoint}centerCd(Y)`
                 : `${escrow}${creditPoint}centerCd(Y)`;
+
+            // 간편결제 (LPAY / 카카오페이) 는 base 뒤에 ':cardonly' 를 append.
+            // gnuboard5 orderform.4.php 의
+            //   f.acceptmethod.value = f.acceptmethod.value + ":cardonly"
+            // 와 일치 — 에스크로 옵션 등 base 를 보존하고 cardonly 만 추가.
+            if (paymentMethod === 'kginicis_lpay' || paymentMethod === 'kginicis_kakaopay') {
+                return base ? `${base}:cardonly` : 'cardonly';
+            }
+            return base;
         })(),
         payViewType:  'overlay',
         use_chkfake:  'Y',

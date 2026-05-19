@@ -98,6 +98,27 @@ class Plugin extends AbstractPlugin
                 'sensitive' => true,
                 'label' => ['ko' => '라이브 INIAPI IV', 'en' => 'Live INIAPI IV'],
             ],
+            'test_mobile_hash_key' => [
+                'type' => 'string',
+                'default' => '3CB8183A4BE283555ACC8363C0360223',
+                'sensitive' => true,
+                'label' => ['ko' => '테스트 모바일 해시키', 'en' => 'Test Mobile Hash Key'],
+            ],
+            'live_mobile_hash_key' => [
+                'type' => 'string',
+                'default' => '',
+                'sensitive' => true,
+                'label' => ['ko' => '라이브 모바일 해시키', 'en' => 'Live Mobile Hash Key'],
+            ],
+            'use_escrow' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => '에스크로 결제 활성화', 'en' => 'Enable Escrow Payment'],
+                'hint' => [
+                    'ko' => '활성화 시 PC는 acceptmethod 에 useescrow 가 추가되고, 모바일은 P_RESERVED 에 useescrow=Y 가 추가됩니다.',
+                    'en' => 'When enabled, acceptmethod adds useescrow on PC and P_RESERVED adds useescrow=Y on mobile.',
+                ],
+            ],
             'japan_enabled' => [
                 'type' => 'boolean',
                 'default' => false,
@@ -150,6 +171,31 @@ class Plugin extends AbstractPlugin
                     'en' => 'Supports relative paths or full URLs. Error details are appended as query parameters.',
                 ],
             ],
+            'easy_pay_allow_with_other_pg' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => '타 PG와 사용가능함', 'en' => 'Allow with Other PG'],
+            ],
+            'easy_pay_samsung_pay' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => 'KG이니시스 삼성페이 사용', 'en' => 'Enable Samsung Pay (KG Inicis)'],
+            ],
+            'easy_pay_lpay' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => 'KG이니시스 L.pay 사용', 'en' => 'Enable L.pay (KG Inicis)'],
+            ],
+            'easy_pay_kakaopay' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => 'KG이니시스 카카오페이 사용', 'en' => 'Enable Kakao Pay (KG Inicis)'],
+            ],
+            'use_credit_point' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => '신용카드 포인트 사용', 'en' => 'Use Credit Card Points'],
+            ],
         ];
     }
 
@@ -165,12 +211,20 @@ class Plugin extends AbstractPlugin
             'live_sign_key' => '',
             'live_iniapi_key' => '',
             'live_iniapi_iv' => '',
+            'test_mobile_hash_key' => '3CB8183A4BE283555ACC8363C0360223',
+            'live_mobile_hash_key' => '',
+            'use_escrow' => false,
             'japan_enabled' => false,
             'test_japan_sign_key' => '5AL5Djb1Ipualn0F',
             'live_japan_mid' => '',
             'live_japan_sign_key' => '',
             'redirect_success_url' => '/shop/orders/{orderId}/complete',
             'redirect_fail_url' => '/shop/checkout',
+            'easy_pay_allow_with_other_pg' => false,
+            'easy_pay_samsung_pay' => false,
+            'easy_pay_lpay' => false,
+            'easy_pay_kakaopay' => false,
+            'use_credit_point' => false,
         ];
     }
 

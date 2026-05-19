@@ -104,6 +104,8 @@ class CbtCallbackController
                     'result_code' => $resultCode,
                     'pay_method' => 'CBT',
                     'cbt_type' => $pgResponse['cbtType'] ?? null,
+                    'mid' => $this->apiService->getMid(),
+                    'is_test_mode' => $this->apiService->isTestMode(),
                     'pg_raw_response' => $pgResponse,
                 ],
             ], $amount > 0 ? $amount : null);

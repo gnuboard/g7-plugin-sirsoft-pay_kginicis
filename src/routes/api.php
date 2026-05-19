@@ -2,9 +2,11 @@
 
 use Illuminate\Support\Facades\Route;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCashReceiptController;
+use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtConnectivityCheckController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtTestProductController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminEscrowDeliveryController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminEscrowDenyConfirmController;
+use Plugins\Sirsoft\PayKginicis\Controllers\AdminOrderListController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminTransactionController;
 use Plugins\Sirsoft\PayKginicis\Controllers\CbtHashDataController;
 use Plugins\Sirsoft\PayKginicis\Controllers\MobileSignatureController;
@@ -46,10 +48,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
             'data' => [
                 'url' => url('/plugins/sirsoft-pay_kginicis/payment/vbank-notify'),
                 'mobile_url' => url('/plugins/sirsoft-pay_kginicis/payment/mobile/vbank-notify'),
-                'escrow_url' => url('/plugins/sirsoft-pay_kginicis/payment/escrow-notify'),
             ],
         ]);
     })->name('vbank.notify.url');
+
+    // 어드민 주문 목록의 테스트 결제 배지 표시용 맵 (auto_fetch)
+    Route::get('/orders/test-mode-map', [AdminOrderListController::class, 'testModeMap'])
+        ->name('orders.test-mode-map');
 
     // 거래 조회 — TID 직접 조회
     Route::post('/transaction/query', [AdminTransactionController::class, 'query'])
@@ -76,4 +81,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
     // CBT (일본 결제) 테스트용 JPY 상품 자동 생성 — 운영자가 CBT 검증 시 진입 장벽 낮추기 위함
     Route::post('/cbt-test-product', [AdminCbtTestProductController::class, 'create'])
         ->name('cbt.test-product.create');
+
+    // CBT 호스트 연결 진단 — 서버 egress IP + devcbt.inicis.com / cbt.inicis.com 의 TCP 443 도달성
+    // (devcbt 는 KG 이니시스 측 IP 화이트리스트 등록 필요)
+    Route::get('/cbt-connectivity-check', [AdminCbtConnectivityCheckController::class, 'check'])
+        ->name('cbt.connectivity.check');
 });

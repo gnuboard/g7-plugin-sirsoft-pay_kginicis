@@ -103,7 +103,10 @@ class PaymentCallbackControllerTest extends PluginTestCase
             'resultCode' => '0000',
             'resultMsg' => '성공',
             'authToken' => 'AUTH_TOKEN_' . uniqid(),
-            'authUrl' => 'https://stginiapi.inicis.com/api/v1/auth',
+            'authUrl' => 'https://fcstdpay.inicis.com/api/payAuth',
+            // idc_name 은 KG 이니시스가 success 콜백에 항상 포함시키는 IDC 식별자.
+            // 컨트롤러가 isValidIdcAuthUrl 화이트리스트 검증에 사용 (SSRF 방어).
+            'idc_name' => 'fc',
             'netCancelUrl' => 'https://stginiapi.inicis.com/api/v1/netcancel',
             'MOID' => $moid,
             'TotPrice' => $totPrice,
@@ -121,7 +124,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams($order->order_number, 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response(
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(
                 $this->makeAuthorizeResponse($tid, $order->order_number, 50000),
                 200
             ),
@@ -140,19 +143,57 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $this->assertEquals('APP12345', $payment->card_approval_number);
     }
 
-    public function test_auth_callback_redirects_to_fail_on_result_code_not_0000(): void
+    public function test_auth_callback_user_cancel_2001_redirects_without_error_query(): void
     {
+        // 사용자가 결제창을 X 또는 '취소' 버튼으로 종료한 경우 — 에러 토스트 노출 X.
+        // NHN KCP 의 CANCEL_RES_CODES 패턴과 동일하게 조용히 체크아웃으로 복귀.
         $this->mockPluginSettings();
 
         $params = $this->makeCallbackParams('ORD-TEST-99999', 50000, [
             'resultCode' => '2001',
-            'resultMsg' => '사용자 취소',
+            'resultMsg' => '사용자가 취소를 요청하였습니다.',
         ]);
 
         $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/callback', $params);
 
         $response->assertRedirect();
-        $this->assertStringContainsString('error=2001', $response->headers->get('Location'));
+        $location = $response->headers->get('Location');
+        $this->assertStringNotContainsString('error=', $location, 'user cancel must not append error query');
+        $this->assertStringNotContainsString('message=', $location, 'user cancel must not append message query');
+    }
+
+    public function test_auth_callback_user_cancel_message_keyword_redirects_without_error_query(): void
+    {
+        // resultCode 가 표준 cancel 코드가 아니지만 resultMsg 에 '취소' 키워드가
+        // 포함된 경우도 사용자 취소로 간주 (KG 이니시스 버전별 코드 차이 대응).
+        $this->mockPluginSettings();
+
+        $params = $this->makeCallbackParams('ORD-TEST-99999', 50000, [
+            'resultCode' => '9998',
+            'resultMsg' => '사용자가 결제를 취소하였습니다.',
+        ]);
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/callback', $params);
+
+        $response->assertRedirect();
+        $this->assertStringNotContainsString('error=', $response->headers->get('Location'));
+    }
+
+    public function test_auth_callback_real_failure_still_redirects_with_error_query(): void
+    {
+        // 사용자 취소가 아닌 실제 결제 실패는 기존대로 error query 포함하여
+        // 사용자에게 에러 토스트 노출.
+        $this->mockPluginSettings();
+
+        $params = $this->makeCallbackParams('ORD-TEST-99999', 50000, [
+            'resultCode' => '9999',
+            'resultMsg' => 'PG 시스템 오류',
+        ]);
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/callback', $params);
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('error=9999', $response->headers->get('Location'));
     }
 
     public function test_auth_callback_redirects_to_fail_on_order_not_found(): void
@@ -162,7 +203,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams('NON_EXISTENT_ORDER', 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response(
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(
                 $this->makeAuthorizeResponse('TID_NONE', 'NON_EXISTENT_ORDER', 50000),
                 200
             ),
@@ -182,7 +223,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams($order->order_number, 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response([
+            'fcstdpay.inicis.com/api/payAuth' => Http::response([
                 'resultCode' => '9999',
                 'resultMsg' => '승인 실패',
             ], 200),
@@ -202,7 +243,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams($order->order_number, 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response(null, 500),
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(null, 500),
             'stginiapi.inicis.com/api/v1/netcancel' => Http::response('OK', 200),
         ]);
 
@@ -233,7 +274,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams($order->order_number, 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response(
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(
                 $this->makeAuthorizeResponse($tid, $order->order_number, 50000),
                 200
             ),
@@ -252,7 +293,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $params = $this->makeCallbackParams($order->order_number, 50000);
 
         Http::fake([
-            'stginiapi.inicis.com/api/v1/auth' => Http::response(
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(
                 $this->makeAuthorizeResponse('TID_MOBILE', $order->order_number, 50000),
                 200
             ),
@@ -276,16 +317,12 @@ class PaymentCallbackControllerTest extends PluginTestCase
     public function test_vbank_notify_returns_ok_on_successful_deposit(): void
     {
         $order = $this->createTestOrder(30000);
+        $this->mockPluginSettings();
 
-        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', [
-            'tid' => 'VBANK_TID_001',
-            'MOID' => $order->order_number,
-            'TotPrice' => 30000,
-            'resultCode' => '0000',
-            'vbankNum' => '1234567890',
-            'vbankName' => '국민은행',
-            'vbankExpDate' => now()->addDays(3)->format('Ymd'),
-        ]);
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $this->makeVbankNotifyPayload([
+            'no_oid' => $order->order_number,
+            'amt_input' => '30000',
+        ]));
 
         $response->assertOk();
         $this->assertEquals('OK', $response->getContent());
@@ -294,29 +331,61 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $this->assertEquals(OrderStatusEnum::PAYMENT_COMPLETE, $order->order_status);
     }
 
-    public function test_vbank_notify_returns_ok_on_cancelled_deposit(): void
+    /**
+     * 동일 TID 가 두 번 통보되어도 중복 결제 처리하지 않고 OK 반환 (replay 방어).
+     */
+    public function test_vbank_notify_is_idempotent_on_duplicate_tid(): void
     {
-        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', [
-            'tid' => 'VBANK_TID_002',
-            'MOID' => 'ORD-TEST-CANCEL',
-            'TotPrice' => 30000,
-            'resultCode' => '9999',
+        $order = $this->createTestOrder(30000);
+        $this->mockPluginSettings();
+
+        $payload = $this->makeVbankNotifyPayload([
+            'no_tid' => 'VBANK_TID_DUP',
+            'no_oid' => $order->order_number,
+            'amt_input' => '30000',
         ]);
 
+        $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $payload)->assertOk();
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $payload);
+
         $response->assertOk();
-        $this->assertEquals('OK', $response->getContent());
+        $this->assertEquals('OK', $response->getContent(), '재처리 요청도 OK 반환 (replay 방어)');
     }
 
     public function test_vbank_notify_returns_fail_on_order_not_found(): void
     {
-        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', [
-            'tid' => 'VBANK_TID_003',
-            'MOID' => 'NON_EXISTENT_ORDER',
-            'TotPrice' => 30000,
-            'resultCode' => '0000',
-        ]);
+        $this->mockPluginSettings();
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $this->makeVbankNotifyPayload([
+            'no_oid' => 'NON_EXISTENT_ORDER',
+        ]));
 
         $response->assertOk();
         $this->assertEquals('FAIL', $response->getContent());
+    }
+
+    /**
+     * KG 이니시스 PC 가상계좌 입금통보 페이로드 빌더.
+     *
+     * 공식 매뉴얼 https://manual.inicis.com/pay/etc-noti.html#pc 의 필드명을 사용한다.
+     * 테스트마다 일부 필드만 override 하기 위한 헬퍼.
+     *
+     * @param  array  $overrides  필드 override
+     * @return array 입금통보 페이로드
+     */
+    private function makeVbankNotifyPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'no_tid'       => 'VBANK_TID_' . uniqid(),
+            'no_oid'       => 'ORD-TEST-VBANK',
+            'id_merchant'  => 'INIpayTest',
+            'dt_trans'     => now()->format('Ymd'),
+            'tm_trans'     => now()->format('His'),
+            'cd_bank'      => '04',
+            'no_vacct'     => '1234567890',
+            'amt_input'    => '30000',
+            'nm_inputbank' => '국민은행',
+            'nm_input'     => '홍길동',
+        ], $overrides);
     }
 }

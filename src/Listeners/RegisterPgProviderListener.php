@@ -125,8 +125,30 @@ class RegisterPgProviderListener implements HookListenerInterface
         ]);
     }
 
+    /**
+     * 활성화된 간편결제 수단 목록 반환.
+     *
+     * 테스트 모드: KG 이니시스 공식 테스트 MID/sign_key 가 plugin code 에 내장되어
+     *   있으므로 토글만 켜져 있으면 항상 노출 가능.
+     * 실결제 모드: 가맹점이 자체 발급받은 live_mid 와 live_sign_key 가 모두
+     *   채워져 있을 때만 노출. 미입력 상태로 노출 시 결제창 진입 후 실패가
+     *   확실하므로 사용자 혼란 방지를 위해 사전 차단.
+     *
+     * @param  array  $settings  플러그인 설정
+     * @return list<'SAMSUNG'|'LPAY'|'KAKAOPAY'>
+     */
     private function getEnabledEasyPays(array $settings): array
     {
+        $isTest = (bool) ($settings['is_test_mode'] ?? true);
+
+        if (! $isTest) {
+            $liveMid = trim((string) ($settings['live_mid'] ?? ''));
+            $liveSignKey = trim((string) ($settings['live_sign_key'] ?? ''));
+            if ($liveMid === '' || $liveSignKey === '') {
+                return [];
+            }
+        }
+
         $enabled = [];
         if ($settings['easy_pay_samsung_pay'] ?? false) $enabled[] = 'SAMSUNG';
         if ($settings['easy_pay_lpay'] ?? false)        $enabled[] = 'LPAY';

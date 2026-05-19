@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use Plugins\Sirsoft\PayKginicis\Controllers\CbtCallbackController;
-use Plugins\Sirsoft\PayKginicis\Controllers\EscrowNotifyController;
 use Plugins\Sirsoft\PayKginicis\Controllers\MobileCallbackController;
 use Plugins\Sirsoft\PayKginicis\Controllers\PaymentCallbackController;
 use Plugins\Sirsoft\PayKginicis\Controllers\UserEscrowConfirmController;
@@ -33,9 +32,9 @@ Route::withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfTok
         ->middleware(InicisNotifyIpWhitelist::class)
         ->name('payment.mobile.vbank-notify');
 
-    Route::post('/payment/escrow-notify', [EscrowNotifyController::class, 'handle'])
-        ->middleware(InicisNotifyIpWhitelist::class)
-        ->name('payment.escrow-notify');
+    // (제거됨) /payment/escrow-notify — KG 이니시스 PC 에스크로 매뉴얼에는 webhook
+    // 통보 채널이 존재하지 않음. 가맹점이 outbound API 로 배송등록/구매결정/구매거절확인
+    // 만 수행. 잘못 추가된 route 였음.
 
     // 모바일: KG 이니시스가 인증 후 P_NEXT_URL 로 POST 콜백을 전송 (모바일 표준결제 표준).
     // GET 도 허용해 일부 케이스(PG 자체 리다이렉트 패턴) 호환 — 인증/주문번호는 동일하게 P_OID 로 수신.

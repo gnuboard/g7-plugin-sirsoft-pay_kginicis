@@ -98,9 +98,15 @@ class KgInicisApiService
 
     private string $mobileHashKey;
 
+    /**
+     * 생성 시점에 로드한 원본 설정 — 결제 시점 모드로 자격증명 재구성에 사용.
+     */
+    private array $settingsSnapshot;
+
     public function __construct(PluginSettingsService $pluginSettingsService)
     {
         $settings = $pluginSettingsService->get(self::PLUGIN_IDENTIFIER) ?? [];
+        $this->settingsSnapshot = $settings;
         $this->isTest = $settings['is_test_mode'] ?? true;
         $useEscrow = (bool) ($settings['use_escrow'] ?? false);
         $this->mid = $this->isTest
@@ -170,6 +176,40 @@ class KgInicisApiService
             $this->inapiKey = $this->standardTestInapiKey;
             $this->inapiIv = $this->standardTestInapiIv;
         }
+    }
+
+    /**
+     * 결제 시점에 저장된 모드(isTest) 와 MID 로 inquiry/cancel 시 사용할 자격증명을 재구성.
+     *
+     * 운영자가 결제 후 test↔live 모드 토글을 했거나, 과거 다른 MID 로 결제된 거래를
+     * 조회할 때 "TID 가맹점ID 불일치" / "해시 데이터 불일치" 회귀를 방지한다.
+     * payment_meta 의 mid + is_test_mode 를 컨트롤러가 그대로 전달.
+     *
+     * @param  bool  $isTest  결제 시점의 테스트 모드 여부
+     * @param  string  $mid  결제 시점에 사용된 MID
+     * @return void
+     */
+    public function useStoredCredentials(bool $isTest, string $mid): void
+    {
+        $this->isTest = $isTest;
+        $this->mid = $mid;
+
+        // KG 이니시스 에스크로 테스트 MID 는 표준 테스트 키와 다른 inapi 키 사용
+        $isEscrowTest = $isTest && $mid === self::ESCROW_TEST_MID;
+
+        if ($isEscrowTest) {
+            $this->inapiKey = self::ESCROW_TEST_INIAPI_KEY;
+            $this->inapiIv = self::ESCROW_TEST_INIAPI_IV;
+
+            return;
+        }
+
+        $this->inapiKey = $isTest
+            ? ($this->settingsSnapshot['test_iniapi_key'] ?? $this->standardTestInapiKey)
+            : ($this->settingsSnapshot['live_iniapi_key'] ?? '');
+        $this->inapiIv = $isTest
+            ? ($this->settingsSnapshot['test_iniapi_iv'] ?? $this->standardTestInapiIv)
+            : ($this->settingsSnapshot['live_iniapi_iv'] ?? '');
     }
 
 /**
@@ -500,24 +540,28 @@ class KgInicisApiService
      * 거래 조회 API 호출 (INIAPI v2)
      *
      * @param string $tid 거래번호
+     * @param string|null $overrideMid 결제 시점에 저장된 MID (지정 시 현재 설정 MID 대신 사용).
+     *   에스크로/일반 모드 토글이 발생하거나 운영자가 설정 MID 를 바꾼 뒤 과거 거래를
+     *   조회할 때 "TID 가맹점ID 불일치" 회귀를 방지하기 위함.
      * @return array PG 응답 데이터
      * @throws \Exception API 호출 실패 시
      */
-    public function queryTransaction(string $tid): array
+    public function queryTransaction(string $tid, ?string $overrideMid = null): array
     {
+        $mid = ($overrideMid !== null && $overrideMid !== '') ? $overrideMid : $this->mid;
         $type = 'inquiry';
         $timestamp = date('YmdHis');
         $clientIp = request()->ip() ?? '127.0.0.1';
 
         $detail = ['tid' => $tid];
         $detailJson = str_replace('\\/', '/', json_encode($detail, JSON_UNESCAPED_UNICODE));
-        $hashData = hash('sha512', $this->inapiKey . $this->mid . $type . $timestamp . $detailJson);
+        $hashData = hash('sha512', $this->inapiKey . $mid . $type . $timestamp . $detailJson);
 
         $baseUrl = $this->isTest ? self::API_BASE_URL_TEST : self::API_BASE_URL_LIVE;
         $apiUrl = $baseUrl . '/v2/pg/inquiry';
 
         $payload = [
-            'mid'       => $this->mid,
+            'mid'       => $mid,
             'type'      => $type,
             'timestamp' => $timestamp,
             'clientIp'  => $clientIp,
