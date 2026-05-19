@@ -90,13 +90,16 @@ class PaymentRefundListener implements HookListenerInterface
             $cancelAmt = (int) $refundAmount;
             $payMethod = $payment->payment_meta['pay_method'] ?? 'Card';
 
-            $isPartial = $cancelAmt < (int) $payment->amount;
+            $paidAmount = (int) $payment->paid_amount_local;
+            $previousCancelled = max(0, (int) $payment->cancelled_amount - $cancelAmt);
+            $totalAmount = max($cancelAmt, $paidAmount - $previousCancelled);
+            $isPartial = $previousCancelled > 0 || $cancelAmt < $paidAmount;
             $response = $apiService->cancelPayment(
                 $tid,
                 $payMethod,
                 $isPartial ? $cancelAmt : null,
                 $cancelMsg,
-                $isPartial ? (int) $payment->amount : null,
+                $isPartial ? $totalAmount : null,
             );
 
             Log::info('KG Inicis: refund success', [
