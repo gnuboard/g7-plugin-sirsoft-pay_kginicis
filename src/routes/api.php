@@ -6,6 +6,7 @@ use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtConnectivityCheckController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtTestProductController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminEscrowDeliveryController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminEscrowDenyConfirmController;
+use Plugins\Sirsoft\PayKginicis\Controllers\AdminOrderListController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminTransactionController;
 use Plugins\Sirsoft\PayKginicis\Controllers\CbtHashDataController;
 use Plugins\Sirsoft\PayKginicis\Controllers\MobileSignatureController;
@@ -50,6 +51,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
             ],
         ]);
     })->name('vbank.notify.url');
+
+    // 어드민 주문 목록의 테스트 결제 배지 표시용 맵 (auto_fetch)
+    Route::get('/orders/test-mode-map', [AdminOrderListController::class, 'testModeMap'])
+        ->name('orders.test-mode-map');
 
     // 거래 조회 — TID 직접 조회
     Route::post('/transaction/query', [AdminTransactionController::class, 'query'])

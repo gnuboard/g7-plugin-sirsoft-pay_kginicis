@@ -32,8 +32,8 @@
         "tax_free_amount": "면세금액"
     },
     "admin": {
-        "test_mode_badge": "테스트 결제",
-        "test_mode_order_notice": "이 주문은 테스트 결제로 처리되었습니다.",
+        "test_mode_badge": "테스트 결제 주의)",
+        "test_mode_order_notice": "이 주문은 테스트용으로 실제 결제가 이루어지지 않았으므로 절대 배송하시면 안됩니다.",
         "order_verify_title": "KG 이니시스 결제 검증",
         "order_verify_description": "KG 이니시스 서버에서 실시간으로 결제 상태를 조회합니다.",
         "order_verify_button": "결제 조회",
