@@ -247,6 +247,14 @@
                                             "className": "text-base font-semibold text-gray-900 dark:text-white"
                                         },
                                         "text": "$t:sirsoft-pay_kginicis.settings.section_live_keys"
+                                    },
+                                    {
+                                        "type": "basic",
+                                        "name": "P",
+                                        "props": {
+                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                        },
+                                        "text": "$t:sirsoft-pay_kginicis.settings.section_live_keys_hint"
                                     }
                                 ]
                             },
@@ -378,13 +386,42 @@
                                                 "children": [
                                                     {
                                                         "type": "basic",
-                                                        "name": "Input",
-                                                        "props": {
-                                                            "type": "password",
-                                                            "name": "live_sign_key",
-                                                            "placeholder": "••••••••••••••••",
-                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
-                                                        }
+                                                        "name": "Div",
+                                                        "props": { "className": "relative" },
+                                                        "children": [
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Input",
+                                                                "props": {
+                                                                    "type": "{{_local._show_live_sign_key ? 'text' : 'password'}}",
+                                                                    "name": "live_sign_key",
+                                                                    "placeholder": "••••••••••••••••",
+                                                                    "className": "w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
+                                                                }
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Button",
+                                                                "props": {
+                                                                    "type": "button",
+                                                                    "className": "absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                                                },
+                                                                "actions": [
+                                                                    {
+                                                                        "type": "click",
+                                                                        "handler": "setState",
+                                                                        "params": {
+                                                                            "target": "local",
+                                                                            "_show_live_sign_key": "{{!_local._show_live_sign_key}}"
+                                                                        }
+                                                                    }
+                                                                ],
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Icon", "if": "{{!_local._show_live_sign_key}}", "props": { "name": "eye", "className": "w-4 h-4" } },
+                                                                    { "type": "basic", "name": "Icon", "if": "{{_local._show_live_sign_key}}", "props": { "name": "eye-slash", "className": "w-4 h-4" } }
+                                                                ]
+                                                            }
+                                                        ]
                                                     }
                                                 ]
                                             }
@@ -432,13 +469,42 @@
                                                 "children": [
                                                     {
                                                         "type": "basic",
-                                                        "name": "Input",
-                                                        "props": {
-                                                            "type": "password",
-                                                            "name": "live_iniapi_key",
-                                                            "placeholder": "••••••••••••••••",
-                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
-                                                        }
+                                                        "name": "Div",
+                                                        "props": { "className": "relative" },
+                                                        "children": [
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Input",
+                                                                "props": {
+                                                                    "type": "{{_local._show_live_iniapi_key ? 'text' : 'password'}}",
+                                                                    "name": "live_iniapi_key",
+                                                                    "placeholder": "••••••••••••••••",
+                                                                    "className": "w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
+                                                                }
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Button",
+                                                                "props": {
+                                                                    "type": "button",
+                                                                    "className": "absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                                                },
+                                                                "actions": [
+                                                                    {
+                                                                        "type": "click",
+                                                                        "handler": "setState",
+                                                                        "params": {
+                                                                            "target": "local",
+                                                                            "_show_live_iniapi_key": "{{!_local._show_live_iniapi_key}}"
+                                                                        }
+                                                                    }
+                                                                ],
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Icon", "if": "{{!_local._show_live_iniapi_key}}", "props": { "name": "eye", "className": "w-4 h-4" } },
+                                                                    { "type": "basic", "name": "Icon", "if": "{{_local._show_live_iniapi_key}}", "props": { "name": "eye-slash", "className": "w-4 h-4" } }
+                                                                ]
+                                                            }
+                                                        ]
                                                     }
                                                 ]
                                             }
@@ -486,13 +552,125 @@
                                                 "children": [
                                                     {
                                                         "type": "basic",
-                                                        "name": "Input",
+                                                        "name": "Div",
+                                                        "props": { "className": "relative" },
+                                                        "children": [
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Input",
+                                                                "props": {
+                                                                    "type": "{{_local._show_live_iniapi_iv ? 'text' : 'password'}}",
+                                                                    "name": "live_iniapi_iv",
+                                                                    "placeholder": "••••••••••••••••",
+                                                                    "className": "w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
+                                                                }
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Button",
+                                                                "props": {
+                                                                    "type": "button",
+                                                                    "className": "absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                                                },
+                                                                "actions": [
+                                                                    {
+                                                                        "type": "click",
+                                                                        "handler": "setState",
+                                                                        "params": {
+                                                                            "target": "local",
+                                                                            "_show_live_iniapi_iv": "{{!_local._show_live_iniapi_iv}}"
+                                                                        }
+                                                                    }
+                                                                ],
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Icon", "if": "{{!_local._show_live_iniapi_iv}}", "props": { "name": "eye", "className": "w-4 h-4" } },
+                                                                    { "type": "basic", "name": "Icon", "if": "{{_local._show_live_iniapi_iv}}", "props": { "name": "eye-slash", "className": "w-4 h-4" } }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "field_live_mobile_hash_key",
+                                        "type": "basic",
+                                        "name": "Div",
+                                        "props": {
+                                            "className": "grid grid-cols-1 lg:grid-cols-3 gap-4 items-start"
+                                        },
+                                        "children": [
+                                            {
+                                                "type": "basic",
+                                                "name": "Div",
+                                                "props": {
+                                                    "className": "lg:col-span-1"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "type": "basic",
+                                                        "name": "Label",
                                                         "props": {
-                                                            "type": "password",
-                                                            "name": "live_iniapi_iv",
-                                                            "placeholder": "••••••••••••••••",
-                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
-                                                        }
+                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                        },
+                                                        "text": "$t:sirsoft-pay_kginicis.settings.live_mobile_hash_key"
+                                                    },
+                                                    {
+                                                        "type": "basic",
+                                                        "name": "P",
+                                                        "props": {
+                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                        },
+                                                        "text": "$t:sirsoft-pay_kginicis.settings.live_mobile_hash_key_hint"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "type": "basic",
+                                                "name": "Div",
+                                                "props": {
+                                                    "className": "lg:col-span-2"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "type": "basic",
+                                                        "name": "Div",
+                                                        "props": { "className": "relative" },
+                                                        "children": [
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Input",
+                                                                "props": {
+                                                                    "type": "{{_local._show_live_mobile_hash_key ? 'text' : 'password'}}",
+                                                                    "name": "live_mobile_hash_key",
+                                                                    "placeholder": "••••••••••••••••",
+                                                                    "className": "w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
+                                                                }
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Button",
+                                                                "props": {
+                                                                    "type": "button",
+                                                                    "className": "absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                                                },
+                                                                "actions": [
+                                                                    {
+                                                                        "type": "click",
+                                                                        "handler": "setState",
+                                                                        "params": {
+                                                                            "target": "local",
+                                                                            "_show_live_mobile_hash_key": "{{!_local._show_live_mobile_hash_key}}"
+                                                                        }
+                                                                    }
+                                                                ],
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Icon", "if": "{{!_local._show_live_mobile_hash_key}}", "props": { "name": "eye", "className": "w-4 h-4" } },
+                                                                    { "type": "basic", "name": "Icon", "if": "{{_local._show_live_mobile_hash_key}}", "props": { "name": "eye-slash", "className": "w-4 h-4" } }
+                                                                ]
+                                                            }
+                                                        ]
                                                     }
                                                 ]
                                             }
