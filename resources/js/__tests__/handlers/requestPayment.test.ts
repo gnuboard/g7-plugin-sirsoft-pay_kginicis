@@ -33,29 +33,24 @@ describe('requestPaymentHandler', () => {
         vi.restoreAllMocks();
     });
 
-    it('pgPaymentData가 없으면 console.error 후 조기 반환', async () => {
-        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
+    it('pgPaymentData가 없으면 조기 반환', async () => {
         await requestPaymentHandler({ params: {} });
 
-        expect(consoleSpy).toHaveBeenCalledWith(
-            expect.stringContaining('pgPaymentData is required')
-        );
         expect(apiGet).not.toHaveBeenCalled();
         expect(setLocalSpy).not.toHaveBeenCalled();
     });
 
-    it('client config 응답에 data 가 없으면 console.error 후 조기 반환', async () => {
-        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    it('client config 응답에 data 가 없으면 catch 블록에서 setLocal 복구', async () => {
         apiGet.mockResolvedValue({}); // data 누락
 
         await requestPaymentHandler({ params: { pgPaymentData: PG_PAYMENT } });
 
-        expect(consoleSpy).toHaveBeenCalledWith(
-            expect.stringContaining('Failed to fetch client config'),
-            expect.anything()
+        expect(setLocalSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                isSubmittingOrder: false,
+                paymentErrorMessage: 'Failed to fetch KG Inicis client config',
+            }),
         );
-        expect(setLocalSpy).not.toHaveBeenCalled();
     });
 
     it('client config API 자체가 throw 하면 catch 블록에서 setLocal 복구', async () => {
@@ -80,7 +75,7 @@ describe('requestPaymentHandler', () => {
  * - cbtType: 'JPPG' 고정 (4 bytes)
  * - timestamp: yyyyMMddHHmmss (14 bytes, epoch ms 사용 금지)
  * - buyerTel: 선택이지만 customer_phone 이 있으면 전송
- * - extraData: JSON String (빈 객체 허용)
+ * - extraData: JSON String (JPPG 결제창 표시 정보 포함)
  * - hashData plainText 순서는 백엔드 책임 (INIAPIKey+mid+timestamp+amount+orderId)
  */
 describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
@@ -98,11 +93,29 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         data: {
             mid: 'INIpayTest',
             japan_enabled: true,
+            japan_configured: true,
             japan_mid: 'CBTTEST001',
             callback_urls: {
                 cbt_hash_data: '/api/plugins/sirsoft-pay_kginicis/payment/cbt/hash-data',
                 cbt_callback: '/api/plugins/sirsoft-pay_kginicis/payment/cbt/callback',
                 cbt_auth_url: 'https://devcbt.inicis.com/cbtauth',
+            },
+            cbt_extra_data: {
+                paymentUI: { language: 'JP', colorTheme: 'blue2' },
+                payment: {
+                    paymethod: ['CARD'],
+                    card: { payType: ['one'], installMonth: [3] },
+                },
+                gmoPayment: {
+                    merchantName: 'サンプルストア',
+                    merchantNameKana: 'サンプルストア',
+                    merchantNameAlphabet: 'Sample Store',
+                    merchantNameShort: 'サンプル',
+                    contactName: 'サポート窓口',
+                    contactEmail: 'support@example.com',
+                    contactPhone: '0120-123-456',
+                    contactOpeningHours: '10:00-18:00',
+                },
             },
         },
     };
@@ -153,6 +166,8 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
             expect.objectContaining({
                 oid: CBT_PG_PAYMENT.order_number,
                 price: CBT_PG_PAYMENT.amount,
+                buyer_email: CBT_PG_PAYMENT.customer_email,
+                buyer_phone: CBT_PG_PAYMENT.customer_phone,
             }),
         );
         expect(submitSpy).toHaveBeenCalledTimes(1);
@@ -166,7 +181,11 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         expect(fields.amount).toBe(String(CBT_PG_PAYMENT.amount));
         expect(fields.goodName).toBe(CBT_PG_PAYMENT.order_name);
         expect(fields.hashData).toBe('sha512hashstub');
-        expect(fields.extraData).toBe('{}');
+        const extraData = JSON.parse(fields.extraData);
+        expect(extraData.paymentUI.language).toBe('JP');
+        expect(extraData.payment.paymethod).toEqual(['CARD']);
+        expect(extraData.payment.isMobile).toBe('false');
+        expect(extraData.gmoPayment.merchantName).toBe('サンプルストア');
     });
 
     it('timestamp 가 yyyyMMddHHmmss 형식 (14자 숫자, epoch ms 아님)', async () => {
@@ -203,37 +222,31 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         expect(fields.buyerTel).toBe('');
     });
 
-    it('returnUrl 은 현재 origin + cbt_callback + oid/amount 쿼리', async () => {
+    it('returnUrl 은 현재 origin + cbt_callback + oid 쿼리', async () => {
         await requestPaymentHandler({ params: { pgPaymentData: CBT_PG_PAYMENT } });
 
         const fields = getLastSubmittedFormFields();
         expect(fields.returnUrl).toBe(
             `${window.location.origin}${CLIENT_CONFIG.data.callback_urls.cbt_callback}` +
-                `?oid=${encodeURIComponent(CBT_PG_PAYMENT.order_number)}` +
-                `&amount=${CBT_PG_PAYMENT.amount}`,
+                `?oid=${encodeURIComponent(CBT_PG_PAYMENT.order_number)}`,
         );
     });
 
-    it('japan_mid 누락 시 CBT 분기 진입 안 함 (cbt hash-data API 미호출)', async () => {
-        // japan_enabled=true 라도 japan_mid 가 빈 문자열이면 isJapan 조건이 false
-        // → 한국 분기로 빠지며 cbt_hash_data 가 아닌 signature API 호출됨
+    it('JPY 주문에서 CBT 설정이 부족하면 한국 결제로 fallback 하지 않고 중단', async () => {
         apiGet.mockResolvedValue({
-            data: { ...CLIENT_CONFIG.data, japan_mid: '' },
+            data: { ...CLIENT_CONFIG.data, japan_mid: '', japan_configured: false },
         });
-        // signature API mock (KRW 분기 진입을 막지 않기 위해)
-        apiPost.mockResolvedValue({ data: { signature: 's', verification: 'v', mKey: 'k' } });
-        // INIStdPay SDK 로드 분기를 건너뛰도록 미리 mock
-        (window as Record<string, unknown>).INIStdPay = { pay: vi.fn() };
 
         await requestPaymentHandler({ params: { pgPaymentData: CBT_PG_PAYMENT } });
 
-        // CBT hash-data endpoint 가 호출되지 않았어야 함
-        const cbtCall = apiPost.mock.calls.find(
-            ([url]) => url === CLIENT_CONFIG.data.callback_urls.cbt_hash_data,
+        expect(apiPost).not.toHaveBeenCalled();
+        expect(submitSpy).not.toHaveBeenCalled();
+        expect((window as any).G7Core.state.setLocal).toHaveBeenCalledWith(
+            expect.objectContaining({
+                isSubmittingOrder: false,
+                paymentErrorMessage: 'KG Inicis Japan CBT payment is not configured.',
+            }),
         );
-        expect(cbtCall).toBeUndefined();
-
-        delete (window as Record<string, unknown>).INIStdPay;
     });
 });
 

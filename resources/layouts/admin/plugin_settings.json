@@ -1606,6 +1606,111 @@
                                                         ]
                                                     }
                                                 ]
+                                            },
+                                            {
+                                                "id": "jppg_merchant_info",
+                                                "type": "basic",
+                                                "name": "Div",
+                                                "props": {
+                                                    "className": "rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 p-4 space-y-4"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "type": "basic",
+                                                        "name": "Div",
+                                                        "children": [
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "H4",
+                                                                "props": {
+                                                                    "className": "text-sm font-semibold text-gray-900 dark:text-gray-100"
+                                                                },
+                                                                "text": "$t:sirsoft-pay_kginicis.settings.jppg_merchant_info_title"
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "P",
+                                                                "props": {
+                                                                    "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                                },
+                                                                "text": "$t:sirsoft-pay_kginicis.settings.jppg_merchant_info_hint"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "type": "basic",
+                                                        "name": "Div",
+                                                        "props": {
+                                                            "className": "grid grid-cols-1 md:grid-cols-2 gap-4"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_merchant_name" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_merchant_name", "placeholder": "サンプルストア", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_merchant_name_kana" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_merchant_name_kana", "placeholder": "サンプルストア", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_merchant_name_alphabet" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_merchant_name_alphabet", "placeholder": "Sample Store", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_merchant_name_short" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_merchant_name_short", "placeholder": "サンプル", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_contact_name" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_contact_name", "placeholder": "サポート窓口", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_contact_email" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "email", "name": "japan_contact_email", "placeholder": "support@example.com", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_contact_phone" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_contact_phone", "placeholder": "0120-123-456", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_contact_opening_hours" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_contact_opening_hours", "placeholder": "10:00-18:00", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
                                             }
                                         ]
                                     }

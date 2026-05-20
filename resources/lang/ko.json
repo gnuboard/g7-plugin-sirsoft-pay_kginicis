@@ -14,6 +14,20 @@
         "cbt_connectivity": {
             "checked": "CBT 호스트 연결 진단을 완료했습니다.",
             "check_failed": "연결 진단 중 오류가 발생했습니다."
+        },
+        "settings_validation": {
+            "test_japan_sign_key_required": "일본 결제(CBT)를 사용하려면 테스트 일본 CBT 해시키가 필요합니다.",
+            "live_japan_mid_required": "운영 모드에서 일본 결제(CBT)를 사용하려면 라이브 일본 MID가 필요합니다.",
+            "live_japan_sign_key_required": "운영 모드에서 일본 결제(CBT)를 사용하려면 라이브 일본 CBT 해시키가 필요합니다.",
+            "japan_merchant_name_required": "운영 일본 결제창에 표시할 가맹점명이 필요합니다.",
+            "japan_merchant_name_kana_required": "운영 일본 결제창에 표시할 가맹점명 Kana가 필요합니다.",
+            "japan_merchant_name_alphabet_required": "운영 일본 결제창에 표시할 영문 가맹점명이 필요합니다.",
+            "japan_merchant_name_short_required": "운영 일본 결제창에 표시할 가맹점 약칭이 필요합니다.",
+            "japan_contact_name_required": "운영 일본 결제창에 표시할 문의처명이 필요합니다.",
+            "japan_contact_email_required": "운영 일본 결제창에 표시할 문의 이메일이 필요합니다.",
+            "japan_contact_phone_required": "운영 일본 결제창에 표시할 문의 전화번호가 필요합니다.",
+            "japan_contact_opening_hours_required": "운영 일본 결제창에 표시할 문의 영업시간이 필요합니다.",
+            "replace_sample_value": "운영 모드에서는 샘플값 대신 실제 계약 정보를 입력하세요."
         }
     },
     "payment_error": {
@@ -184,6 +198,16 @@
         "live_japan_mid_hint": "KG 이니시스 CBT 서비스에서 발급받은 라이브 MID",
         "live_japan_cbt_key": "라이브 일본 CBT 해시키",
         "live_japan_cbt_key_hint": "CBT 해시 데이터 생성에 사용되는 라이브 KEY입니다. 외부에 노출되지 않도록 주의하세요.",
+        "jppg_merchant_info_title": "JPPG 결제창 표시 정보",
+        "jppg_merchant_info_hint": "KG 이니시스 CBT JPPG 결제창 extraData에 포함되는 가맹점명과 문의처입니다. 운영 전 실제 일본 결제 계약 정보로 교체하세요.",
+        "japan_merchant_name": "가맹점명",
+        "japan_merchant_name_kana": "가맹점명 Kana",
+        "japan_merchant_name_alphabet": "가맹점명 영문",
+        "japan_merchant_name_short": "가맹점 약칭",
+        "japan_contact_name": "문의처명",
+        "japan_contact_email": "문의 이메일",
+        "japan_contact_phone": "문의 전화번호",
+        "japan_contact_opening_hours": "문의 영업시간",
         "cbt_helper_title": "CBT 테스트 도우미",
         "cbt_helper_description": "일본 결제(CBT) 검증을 위한 JPY 가격(100엔) 샘플 상품을 즉시 생성합니다. 생성 후 사이트 언어를 일본어로 전환하고 KG 이니시스를 결제수단으로 선택하면 CBT 결제창이 열립니다.",
         "cbt_helper_create_button": "CBT 테스트 상품 생성",

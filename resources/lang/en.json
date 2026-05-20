@@ -14,6 +14,20 @@
         "cbt_connectivity": {
             "checked": "CBT host connectivity diagnostic completed.",
             "check_failed": "Connectivity diagnostic failed."
+        },
+        "settings_validation": {
+            "test_japan_sign_key_required": "The test Japan CBT hash key is required to use Japan payment (CBT).",
+            "live_japan_mid_required": "The live Japan MID is required to use Japan payment (CBT) in live mode.",
+            "live_japan_sign_key_required": "The live Japan CBT hash key is required to use Japan payment (CBT) in live mode.",
+            "japan_merchant_name_required": "Merchant name for the live Japan payment window is required.",
+            "japan_merchant_name_kana_required": "Merchant name Kana for the live Japan payment window is required.",
+            "japan_merchant_name_alphabet_required": "Alphabet merchant name for the live Japan payment window is required.",
+            "japan_merchant_name_short_required": "Short merchant name for the live Japan payment window is required.",
+            "japan_contact_name_required": "Contact name for the live Japan payment window is required.",
+            "japan_contact_email_required": "Contact email for the live Japan payment window is required.",
+            "japan_contact_phone_required": "Contact phone for the live Japan payment window is required.",
+            "japan_contact_opening_hours_required": "Contact opening hours for the live Japan payment window are required.",
+            "replace_sample_value": "Replace sample values with your real contract information in live mode."
         }
     },
     "payment_error": {
@@ -171,6 +185,16 @@
         "live_japan_mid_hint": "Live MID issued by KG Inicis CBT service.",
         "live_japan_cbt_key": "Live Japan CBT Hash Key",
         "live_japan_cbt_key_hint": "Live KEY used for CBT hash data generation. Keep this key secret.",
+        "jppg_merchant_info_title": "JPPG Payment Window Merchant Info",
+        "jppg_merchant_info_hint": "Merchant and contact information included in the KG Inicis CBT JPPG extraData payload. Replace sample values with your live Japan payment contract information before launch.",
+        "japan_merchant_name": "Merchant Name",
+        "japan_merchant_name_kana": "Merchant Name Kana",
+        "japan_merchant_name_alphabet": "Merchant Name Alphabet",
+        "japan_merchant_name_short": "Merchant Short Name",
+        "japan_contact_name": "Contact Name",
+        "japan_contact_email": "Contact Email",
+        "japan_contact_phone": "Contact Phone",
+        "japan_contact_opening_hours": "Contact Opening Hours",
         "cbt_helper_title": "CBT Test Helper",
         "cbt_helper_description": "Instantly create a sample product priced in JPY (100 yen) for Japan Payment (CBT) verification. After creation, switch the site language to Japanese and select KG Inicis as the payment method to open the CBT payment window.",
         "cbt_helper_create_button": "Create CBT Test Product",

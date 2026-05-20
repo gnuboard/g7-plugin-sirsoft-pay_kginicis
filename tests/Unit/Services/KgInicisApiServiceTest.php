@@ -29,6 +29,10 @@ class KgInicisApiServiceTest extends PluginTestCase
             'live_sign_key' => '',
             'live_iniapi_key' => '',
             'live_iniapi_iv' => '',
+            'japan_enabled' => true,
+            'test_japan_sign_key' => '5AL5Djb1Ipualn0F',
+            'live_japan_mid' => '',
+            'live_japan_sign_key' => '',
         ];
 
         $settingsMock = $this->createMock(PluginSettingsService::class);
@@ -307,6 +311,116 @@ class KgInicisApiServiceTest extends PluginTestCase
             return $request['hashData'] === $expectedHash
                 && $detail['tid'] === $tid
                 && $detail['price'] === (string) $cancelPrice;
+        });
+    }
+
+    public function test_refund_cbt_payment_sends_manual_v071_full_refund_request(): void
+    {
+        $service = $this->makeService();
+
+        Http::fake([
+            'deviniapi.inicis.com/api/v1/refund' => Http::response([
+                'resultCode' => '00',
+                'resultMsg' => '취소 성공',
+                'tid' => 'CBT_TID',
+            ], 200),
+        ]);
+
+        $result = $service->refundCbtPayment('CBT_TID', null, '고객 요청');
+
+        $this->assertEquals('00', $result['resultCode']);
+
+        Http::assertSent(function ($request) {
+            $expectedHash = hash(
+                'sha512',
+                '5AL5Djb1Ipualn0F'
+                . 'Refund'
+                . 'CBT'
+                . $request['timestamp']
+                . $request['clientIp']
+                . KgInicisApiService::JAPAN_TEST_MID
+                . 'CBT_TID'
+            );
+
+            return $request->url() === 'https://deviniapi.inicis.com/api/v1/refund'
+                && $request['type'] === 'Refund'
+                && $request['paymethod'] === 'CBT'
+                && $request['mid'] === KgInicisApiService::JAPAN_TEST_MID
+                && $request['tid'] === 'CBT_TID'
+                && $request['msg'] === '고객 요청'
+                && $request['hashData'] === $expectedHash;
+        });
+    }
+
+    public function test_refund_cbt_payment_sends_partial_refund_request(): void
+    {
+        $service = $this->makeService();
+
+        Http::fake([
+            'deviniapi.inicis.com/api/v1/refund' => Http::response([
+                'resultCode' => '00',
+                'resultMsg' => '부분취소 성공',
+                'refundTid' => 'CBT_REFUND_TID',
+            ], 200),
+        ]);
+
+        $service->refundCbtPayment('CBT_TID', 300, '부분 취소', 1000);
+
+        Http::assertSent(function ($request) {
+            $expectedHash = hash(
+                'sha512',
+                '5AL5Djb1Ipualn0F'
+                . 'PartialRefund'
+                . 'CBT'
+                . $request['timestamp']
+                . $request['clientIp']
+                . KgInicisApiService::JAPAN_TEST_MID
+                . 'CBT_TID'
+                . '300'
+                . '700'
+            );
+
+            return $request['type'] === 'PartialRefund'
+                && $request['price'] === '300'
+                && $request['confirmPrice'] === '700'
+                && $request['hashData'] === $expectedHash;
+        });
+    }
+
+    public function test_use_stored_cbt_credentials_uses_payment_time_live_mid_for_refund(): void
+    {
+        $service = $this->makeService([
+            'is_test_mode' => true,
+            'live_japan_mid' => 'JP_LIVE_CURRENT',
+            'live_japan_sign_key' => 'LIVE_CBT_KEY',
+        ]);
+
+        $service->useStoredCbtCredentials(false, 'JP_LIVE_PAID');
+
+        Http::fake([
+            'iniapi.inicis.com/api/v1/refund' => Http::response([
+                'resultCode' => '00',
+                'resultMsg' => '취소 성공',
+            ], 200),
+        ]);
+
+        $service->refundCbtPayment('CBT_LIVE_TID', null, '고객 요청');
+
+        Http::assertSent(function ($request) {
+            $expectedHash = hash(
+                'sha512',
+                'LIVE_CBT_KEY'
+                . 'Refund'
+                . 'CBT'
+                . $request['timestamp']
+                . $request['clientIp']
+                . 'JP_LIVE_PAID'
+                . 'CBT_LIVE_TID'
+            );
+
+            return $request->url() === 'https://iniapi.inicis.com/api/v1/refund'
+                && $request['mid'] === 'JP_LIVE_PAID'
+                && $request['hashData'] === $expectedHash;
         });
     }
 }
