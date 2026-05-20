@@ -1,5 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import {
+    KOREAN_PAYMENT_FORM_ID_PREFIX,
+    consumeStandardPaySdkReloadFlag,
+    removeKoreanPaymentForms,
+    resetStandardPaySdk,
+} from '../paymentDomCleanup';
+
 interface PgPaymentData {
     order_number: string;
     order_name: string;
@@ -25,6 +32,7 @@ interface ClientConfig {
     callback_urls: {
         signature: string;
         callback: string;
+        close: string;
         cbt_checkout_token: string;
         cbt_hash_data: string;
         cbt_callback: string;
@@ -280,6 +288,10 @@ async function requestKoreanPayment(
 
     const { signature, verification, mKey } = signatureJson.data;
 
+    if (consumeStandardPaySdkReloadFlag()) {
+        resetStandardPaySdk(config.sdk_url);
+    }
+
     if (!window.INIStdPay) {
         await loadScript(config.sdk_url);
     }
@@ -293,14 +305,11 @@ async function requestKoreanPayment(
     }
 
     const callbackUrl = window.location.origin + config.callback_urls.callback;
-    // closeUrl 비우기 — KG 이니시스 결제창 X / 취소 클릭 시 SPA 페이지가
-    // location.href = closeUrl 로 전체 새로고침되어 체크아웃 폼 입력 상태
-    // (배송지/연락처/옵션 선택) 가 모두 휘발하는 UX 회귀 회피.
-    // 빈 문자열일 때 INIStdPay 는 자체 fallback 으로 팝업만 닫고 부모
-    // 페이지는 유지하는 동작을 기대 (PG 매뉴얼 상 옵션 필드).
-    // 미동작 시 옵션 A 로 현재 URL 을 closeUrl 로 두는 fallback 가능.
-    const orderCloseUrl = '';
-    const formId = 'kginicis_pay_form_' + Date.now();
+    // KG 이니시스 공식 closeUrl 페이지에서 결제창만 닫게 하여 체크아웃 SPA를 유지한다.
+    const orderCloseUrl = window.location.origin + config.callback_urls.close;
+    removeKoreanPaymentForms();
+
+    const formId = KOREAN_PAYMENT_FORM_ID_PREFIX + Date.now();
 
     const form = document.createElement('form');
     form.id = formId;

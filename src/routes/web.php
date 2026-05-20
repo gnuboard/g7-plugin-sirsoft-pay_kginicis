@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Plugins\Sirsoft\PayKginicis\Controllers\CbtCallbackController;
 use Plugins\Sirsoft\PayKginicis\Controllers\MobileCallbackController;
 use Plugins\Sirsoft\PayKginicis\Controllers\PaymentCallbackController;
+use Plugins\Sirsoft\PayKginicis\Controllers\PaymentCloseController;
 use Plugins\Sirsoft\PayKginicis\Controllers\UserEscrowConfirmController;
 use Plugins\Sirsoft\PayKginicis\Http\Middleware\InicisNotifyIpWhitelist;
 
@@ -15,6 +16,21 @@ Route::get('/payment/escrow-confirm/{orderNumber}', [UserEscrowConfirmController
 // 팝업 닫기 (KG 이니시스 closeUrl — 인증 불필요)
 Route::get('/payment/escrow-confirm/close', [UserEscrowConfirmController::class, 'close'])
     ->name('payment.escrow-confirm.close');
+
+// PC 표준결제창 닫기 (KG 이니시스 closeUrl — 인증 불필요)
+Route::get('/payment/close', [PaymentCloseController::class, 'show'])
+    ->withoutMiddleware([
+        \App\Http\Middleware\SyncBoostWithDebugMode::class,
+        \Illuminate\Cookie\Middleware\EncryptCookies::class,
+        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+        \Illuminate\Session\Middleware\StartSession::class,
+        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+        \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        \App\Http\Middleware\SetLocale::class,
+        \App\Http\Middleware\SetTimezone::class,
+    ])
+    ->name('payment.close');
 
 Route::withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class])->group(function () {
     Route::match(['get', 'post'], '/payment/cbt/callback', [CbtCallbackController::class, 'handle'])
