@@ -66,6 +66,112 @@ describe('requestPaymentHandler', () => {
     });
 });
 
+describe('requestPaymentHandler — PC closeUrl', () => {
+    const CLIENT_CONFIG = {
+        data: {
+            mid: 'INIpayTest',
+            sdk_url: 'https://stgstdpay.inicis.com/stdjs/INIStdPay.js',
+            japan_enabled: false,
+            japan_mid: '',
+            use_escrow: false,
+            use_credit_point: false,
+            callback_urls: {
+                signature: '/api/plugins/sirsoft-pay_kginicis/payment/signature',
+                callback: '/plugins/sirsoft-pay_kginicis/payment/callback',
+                close: '/plugins/sirsoft-pay_kginicis/payment/close',
+            },
+        },
+    };
+
+    let apiGet: ReturnType<typeof vi.fn>;
+    let apiPost: ReturnType<typeof vi.fn>;
+    let paySpy: ReturnType<typeof vi.fn>;
+    let originalUserAgent: PropertyDescriptor | undefined;
+
+    beforeEach(() => {
+        apiGet = vi.fn().mockResolvedValue(CLIENT_CONFIG);
+        apiPost = vi.fn().mockResolvedValue({
+            data: {
+                signature: 'signature-stub',
+                verification: 'verification-stub',
+                mKey: 'mkey-stub',
+            },
+        });
+        paySpy = vi.fn();
+        (window as any).INIStdPay = { pay: paySpy };
+        (window as Record<string, unknown>).G7Core = {
+            api: { get: apiGet, post: apiPost },
+            state: { setLocal: vi.fn() },
+            toast: { error: vi.fn() },
+        };
+        originalUserAgent = Object.getOwnPropertyDescriptor(window.navigator, 'userAgent');
+        Object.defineProperty(window.navigator, 'userAgent', {
+            value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)',
+            configurable: true,
+        });
+    });
+
+    afterEach(() => {
+        delete (window as any).INIStdPay;
+        delete (window as Record<string, unknown>).G7Core;
+        document.body.innerHTML = '';
+        if (originalUserAgent) {
+            Object.defineProperty(window.navigator, 'userAgent', originalUserAgent);
+        }
+        vi.restoreAllMocks();
+    });
+
+    function getLastPaymentFormFields(): Record<string, string> {
+        const forms = document.body.querySelectorAll('form');
+        const form = forms[forms.length - 1];
+        if (!form) throw new Error('No payment form was created');
+        const fields: Record<string, string> = {};
+        form.querySelectorAll('input[type="hidden"]').forEach((el) => {
+            const input = el as HTMLInputElement;
+            fields[input.name] = input.value;
+        });
+        return fields;
+    }
+
+    it('X 버튼 취소 시 체크아웃 SPA를 새로고침하지 않도록 닫기 전용 closeUrl 을 전달', async () => {
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: PG_PAYMENT,
+                paymentMethod: 'card',
+            },
+        });
+
+        expect(paySpy).toHaveBeenCalledTimes(1);
+        const fields = getLastPaymentFormFields();
+        expect(fields.returnUrl).toBe(
+            `${window.location.origin}/plugins/sirsoft-pay_kginicis/payment/callback`,
+        );
+        expect(fields.closeUrl).toBe(
+            `${window.location.origin}/plugins/sirsoft-pay_kginicis/payment/close`,
+        );
+        expect(fields.closeUrl).not.toBe('');
+        expect(fields.payViewType).toBe('overlay');
+    });
+
+    it('이전 KG 결제 폼 잔재를 제거하고 새 폼만 생성한다', async () => {
+        const staleForm = document.createElement('form');
+        staleForm.id = 'kginicis_pay_form_stale';
+        document.body.appendChild(staleForm);
+
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: PG_PAYMENT,
+                paymentMethod: 'card',
+            },
+        });
+
+        const kginicisForms = document.body.querySelectorAll('form[id^="kginicis_pay_form_"]');
+
+        expect(kginicisForms).toHaveLength(1);
+        expect(document.getElementById('kginicis_pay_form_stale')).toBeNull();
+    });
+});
+
 /**
  * CBT (일본 엔 결제, JPPG) 흐름 회귀 테스트
  *
