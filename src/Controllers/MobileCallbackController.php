@@ -12,6 +12,7 @@ use Modules\Sirsoft\Ecommerce\Exceptions\PaymentAmountMismatchException;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
+use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\MobileCallbackRequest;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
@@ -27,12 +28,49 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 class MobileCallbackController
 {
     use PreventsReplayCallback;
+    use SanitizesPgResponse;
 
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
     // KG 이니시스 모바일 표준결제 — 사용자 결제창 닫기 시 P_RMESG1 에 포함되는 패턴.
     // Playwright 운영 재현으로 확인 (P_STATUS=01 은 일반 실패와 공유되므로 메시지 기반 분기).
     private const USER_CANCEL_MESSAGE_PATTERNS = ['사용자가 결제를 취소', '결제를 취소하셨'];
+
+    private const MOBILE_APPROVE_RESPONSE_KEYS = [
+        'P_STATUS',
+        'P_RMESG1',
+        'P_TID',
+        'P_OID',
+        'P_AMT',
+        'P_TYPE',
+        'P_AUTH_DT',
+        'P_APPL_NUM',
+        'P_FN_CD1',
+        'P_FN_NM',
+        'P_CARD_ISSUER_NAME',
+        'P_CARD_QUOTA',
+        'P_CARD_INTEREST',
+        'P_MID',
+        'P_GOODS',
+    ];
+
+    private const MOBILE_VBANK_ISSUE_RESPONSE_KEYS = [
+        'P_STATUS',
+        'P_RMESG1',
+        'P_TID',
+        'P_OID',
+        'P_AMT',
+        'P_TYPE',
+        'P_AUTH_DT',
+        'P_FN_CD1',
+        'P_FN_NM',
+        'P_VACT_BANK_CODE',
+        'P_VACT_BANK_NAME',
+        'P_VACT_DATE',
+        'P_VACT_TIME',
+        'P_MID',
+        'P_GOODS',
+    ];
 
     public function __construct(
         private readonly OrderProcessingService $orderService,
@@ -196,7 +234,8 @@ class MobileCallbackController
                     'auth_date'      => $result['P_AUTH_DT'] ?? null,
                     'mid'            => $this->apiService->getMid(),
                     'is_test_mode'   => $this->apiService->isTestMode(),
-                    'pg_raw_response' => $result,
+                    'pg_response_sanitized' => true,
+                    'pg_raw_response' => $this->sanitizePgResponse($result, self::MOBILE_APPROVE_RESPONSE_KEYS),
                 ],
                 'payment_device'          => 'mobile',
             ], $totPrice);
@@ -317,7 +356,8 @@ class MobileCallbackController
                 'auth_date'       => $result['P_AUTH_DT'] ?? null,
                 'mid'             => $this->apiService->getMid(),
                 'is_test_mode'    => $this->apiService->isTestMode(),
-                'pg_raw_response' => $result,
+                'pg_response_sanitized' => true,
+                'pg_raw_response' => $this->sanitizePgResponse($result, self::MOBILE_VBANK_ISSUE_RESPONSE_KEYS),
             ],
         ], fn ($v) => $v !== null));
 

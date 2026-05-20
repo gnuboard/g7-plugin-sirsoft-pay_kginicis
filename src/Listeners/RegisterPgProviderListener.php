@@ -107,6 +107,7 @@ class RegisterPgProviderListener implements HookListenerInterface
             'callback_urls' => [
                 'signature'           => '/plugins/sirsoft-pay_kginicis/payment/signature',
                 'callback'            => '/plugins/sirsoft-pay_kginicis/payment/callback',
+                'cbt_checkout_token'  => '/plugins/sirsoft-pay_kginicis/payment/cbt/checkout-token',
                 'cbt_hash_data'       => '/plugins/sirsoft-pay_kginicis/payment/cbt/hash-data',
                 'cbt_callback'        => '/plugins/sirsoft-pay_kginicis/payment/cbt/callback',
                 'cbt_auth_url'        => $isTest ? self::CBT_AUTH_URL_TEST : self::CBT_AUTH_URL_LIVE,

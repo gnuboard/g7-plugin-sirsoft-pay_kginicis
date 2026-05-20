@@ -66,7 +66,25 @@ class AdminTransactionController extends AdminBaseController
         try {
             $localPayment = DB::table('ecommerce_order_payments')
                 ->where('transaction_id', $tid)
-                ->select(['is_escrow', 'payment_meta', 'vbank_due_at'])
+                ->select([
+                    'is_escrow',
+                    'payment_meta',
+                    'paid_amount_local',
+                    'currency',
+                    'card_name',
+                    'card_number_masked',
+                    'card_approval_number',
+                    'card_installment_months',
+                    'vbank_code',
+                    'vbank_name',
+                    'vbank_number',
+                    'vbank_holder',
+                    'vbank_due_at',
+                    'buyer_name',
+                    'buyer_email',
+                    'buyer_phone',
+                    'payment_name',
+                ])
                 ->first();
 
             $localMeta = [];
@@ -75,6 +93,7 @@ class AdminTransactionController extends AdminBaseController
                 $localMeta = json_decode($localPayment->payment_meta, true) ?: [];
                 $localRaw = $localMeta['pg_raw_response'] ?? [];
             }
+            $localRaw = $this->mergeLocalPaymentFallback($localRaw, $localPayment);
 
             $paymentMid = $this->resolvePaymentMid($localMeta, $localRaw, $tid);
 
@@ -145,6 +164,38 @@ class AdminTransactionController extends AdminBaseController
         }
 
         return null;
+    }
+
+    private function mergeLocalPaymentFallback(array $localRaw, mixed $localPayment): array
+    {
+        if (! $localPayment) {
+            return $localRaw;
+        }
+
+        $fallbacks = [
+            'approvedAmount' => $localPayment->paid_amount_local ?? null,
+            'currency' => $localPayment->currency ?? null,
+            'applNum' => $localPayment->card_approval_number ?? null,
+            'cardName' => $localPayment->card_name ?? null,
+            'cardNum' => $localPayment->card_number_masked ?? null,
+            'cardQuota' => $localPayment->card_installment_months ?? null,
+            'VACT_BankCode' => $localPayment->vbank_code ?? null,
+            'VACT_BankName' => $localPayment->vbank_name ?? null,
+            'VACT_Num' => $localPayment->vbank_number ?? null,
+            'VACT_Name' => $localPayment->vbank_holder ?? null,
+            'buyerName' => $localPayment->buyer_name ?? null,
+            'buyerEmail' => $localPayment->buyer_email ?? null,
+            'buyerTel' => $localPayment->buyer_phone ?? null,
+            'goodName' => $localPayment->payment_name ?? null,
+        ];
+
+        foreach ($fallbacks as $key => $value) {
+            if (($localRaw[$key] ?? null) === null && $value !== null && $value !== '') {
+                $localRaw[$key] = $value;
+            }
+        }
+
+        return $localRaw;
     }
 
     /**

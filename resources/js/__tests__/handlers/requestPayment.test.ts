@@ -96,6 +96,7 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
             japan_configured: true,
             japan_mid: 'CBTTEST001',
             callback_urls: {
+                cbt_checkout_token: '/api/plugins/sirsoft-pay_kginicis/payment/cbt/checkout-token',
                 cbt_hash_data: '/api/plugins/sirsoft-pay_kginicis/payment/cbt/hash-data',
                 cbt_callback: '/api/plugins/sirsoft-pay_kginicis/payment/cbt/callback',
                 cbt_auth_url: 'https://devcbt.inicis.com/cbtauth',
@@ -126,7 +127,13 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
 
     beforeEach(() => {
         apiGet = vi.fn().mockResolvedValue(CLIENT_CONFIG);
-        apiPost = vi.fn().mockResolvedValue({ data: { hash_data: 'sha512hashstub' } });
+        apiPost = vi.fn().mockImplementation((url: string) => {
+            if (url === CLIENT_CONFIG.data.callback_urls.cbt_checkout_token) {
+                return Promise.resolve({ data: { checkout_token: 'checkout-token-stub' } });
+            }
+
+            return Promise.resolve({ data: { hash_data: 'sha512hashstub' } });
+        });
         (window as Record<string, unknown>).G7Core = {
             api: { get: apiGet, post: apiPost },
             state: { setLocal: vi.fn() },
@@ -162,12 +169,22 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         await requestPaymentHandler({ params: { pgPaymentData: CBT_PG_PAYMENT } });
 
         expect(apiPost).toHaveBeenCalledWith(
+            CLIENT_CONFIG.data.callback_urls.cbt_checkout_token,
+            expect.objectContaining({
+                oid: CBT_PG_PAYMENT.order_number,
+                price: CBT_PG_PAYMENT.amount,
+                buyer_email: CBT_PG_PAYMENT.customer_email,
+                buyer_phone: CBT_PG_PAYMENT.customer_phone,
+            }),
+        );
+        expect(apiPost).toHaveBeenCalledWith(
             CLIENT_CONFIG.data.callback_urls.cbt_hash_data,
             expect.objectContaining({
                 oid: CBT_PG_PAYMENT.order_number,
                 price: CBT_PG_PAYMENT.amount,
                 buyer_email: CBT_PG_PAYMENT.customer_email,
                 buyer_phone: CBT_PG_PAYMENT.customer_phone,
+                checkout_token: 'checkout-token-stub',
             }),
         );
         expect(submitSpy).toHaveBeenCalledTimes(1);
@@ -200,7 +217,8 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         // epoch ms (13자) 가 우연히 같은 정규식을 통과하지 않게 길이도 명시
         expect(fields.timestamp).not.toMatch(/^\d{13}$/);
         // hash-data 호출 시에도 같은 timestamp 가 전달되어야 함 (백엔드 hash 일관성)
-        const hashCallArgs = apiPost.mock.calls[0][1] as { timestamp: string };
+        const hashCall = apiPost.mock.calls.find(([url]) => url === CLIENT_CONFIG.data.callback_urls.cbt_hash_data);
+        const hashCallArgs = hashCall?.[1] as { timestamp: string };
         expect(hashCallArgs.timestamp).toBe(fields.timestamp);
     });
 

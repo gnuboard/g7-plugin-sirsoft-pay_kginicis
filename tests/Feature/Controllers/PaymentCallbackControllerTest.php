@@ -18,9 +18,9 @@ class PaymentCallbackControllerTest extends PluginTestCase
 
     private const TEST_SIGN_KEY = 'SU5JTElURV9UUklQTEVERVNfS0VZU1RS';
 
-    private function makeAuthorizeResponse(string $tid, string $moid, int $amount, string $resultCode = '0000'): array
+    private function makeAuthorizeResponse(string $tid, string $moid, int $amount, string $resultCode = '0000', array $overrides = []): array
     {
-        return [
+        return array_merge([
             'resultCode' => $resultCode,
             'resultMsg' => '성공',
             'tid' => $tid,
@@ -32,7 +32,10 @@ class PaymentCallbackControllerTest extends PluginTestCase
             'cardName' => '신한카드',
             'cardQuota' => '00',
             'applDate' => now()->format('YmdHis'),
-        ];
+            'buyerName' => '홍길동',
+            'buyerEmail' => 'buyer@example.com',
+            'buyerTel' => '01012345678',
+        ], $overrides);
     }
 
     private function createTestOrder(int $totalAmount = 50000): Order
@@ -141,6 +144,14 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $payment->refresh();
         $this->assertEquals($tid, $payment->transaction_id);
         $this->assertEquals('APP12345', $payment->card_approval_number);
+
+        $meta = $payment->payment_meta;
+        $this->assertTrue($meta['pg_response_sanitized'] ?? false);
+        $this->assertSame($tid, $meta['pg_raw_response']['tid'] ?? null);
+        $this->assertArrayNotHasKey('cardNum', $meta['pg_raw_response']);
+        $this->assertArrayNotHasKey('buyerName', $meta['pg_raw_response']);
+        $this->assertArrayNotHasKey('buyerEmail', $meta['pg_raw_response']);
+        $this->assertArrayNotHasKey('buyerTel', $meta['pg_raw_response']);
     }
 
     public function test_auth_callback_user_cancel_2001_redirects_without_error_query(): void
@@ -329,6 +340,71 @@ class PaymentCallbackControllerTest extends PluginTestCase
 
         $order->refresh();
         $this->assertEquals(OrderStatusEnum::PAYMENT_COMPLETE, $order->order_status);
+
+        $payment = $order->payment;
+        $payment->refresh();
+        $meta = $payment->payment_meta;
+        $this->assertTrue($meta['pg_response_sanitized'] ?? false);
+        $this->assertSame('1234567890', $meta['vbank_num'] ?? null);
+        $this->assertSame('홍길동', $meta['depositor_name'] ?? null);
+        $this->assertArrayHasKey('no_tid', $meta['pg_raw_response']);
+        $this->assertArrayNotHasKey('no_vacct', $meta['pg_raw_response']);
+        $this->assertArrayNotHasKey('nm_input', $meta['pg_raw_response']);
+    }
+
+    public function test_mobile_callback_stores_sanitized_pg_response_only(): void
+    {
+        $order = $this->createTestOrder(50000);
+        $this->mockPluginSettings();
+
+        $tid = 'MOBILE_TID_' . uniqid();
+
+        Http::fake([
+            'fcmobile.inicis.com/smart/payReq.ini' => Http::response(http_build_query([
+                'P_STATUS' => '00',
+                'P_RMESG1' => '성공',
+                'P_TID' => $tid,
+                'P_OID' => $order->order_number,
+                'P_AMT' => '50000',
+                'P_TYPE' => 'CARD',
+                'P_AUTH_DT' => now()->format('YmdHis'),
+                'P_APPL_NUM' => 'MAPP123',
+                'P_CARD_NUM' => '4330-****-****-1234',
+                'P_CARD_ISSUER_NAME' => '신한카드',
+                'P_CARD_QUOTA' => '00',
+                'P_UNAME' => '홍길동',
+                'P_EMAIL' => 'buyer@example.com',
+                'P_MOBILE' => '01012345678',
+            ]), 200),
+        ]);
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/mobile/callback?' . http_build_query([
+            'orderId' => $order->order_number,
+        ]), [
+            'P_STATUS' => '00',
+            'P_TID' => $tid,
+            'P_REQ_URL' => 'https://fcmobile.inicis.com/smart/payReq.ini',
+            'P_AMT' => '50000',
+            'P_OID' => $order->order_number,
+            'idc_name' => 'fc',
+        ]);
+
+        $response->assertRedirect("/shop/orders/{$order->order_number}/complete");
+
+        $payment = $order->payment;
+        $payment->refresh();
+
+        $this->assertEquals($tid, $payment->transaction_id);
+        $this->assertEquals('MAPP123', $payment->card_approval_number);
+        $this->assertEquals('4330-****-****-1234', $payment->card_number_masked);
+
+        $meta = $payment->payment_meta;
+        $this->assertTrue($meta['pg_response_sanitized'] ?? false);
+        $this->assertSame($tid, $meta['pg_raw_response']['P_TID'] ?? null);
+        $this->assertArrayNotHasKey('P_CARD_NUM', $meta['pg_raw_response']);
+        $this->assertArrayNotHasKey('P_UNAME', $meta['pg_raw_response']);
+        $this->assertArrayNotHasKey('P_EMAIL', $meta['pg_raw_response']);
+        $this->assertArrayNotHasKey('P_MOBILE', $meta['pg_raw_response']);
     }
 
     /**

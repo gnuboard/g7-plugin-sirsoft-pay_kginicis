@@ -25,6 +25,7 @@ interface ClientConfig {
     callback_urls: {
         signature: string;
         callback: string;
+        cbt_checkout_token: string;
         cbt_hash_data: string;
         cbt_callback: string;
         cbt_auth_url: string;
@@ -64,6 +65,10 @@ interface MobileSignatureResponse {
 
 interface CbtHashDataResponse {
     hash_data: string;
+}
+
+interface CbtCheckoutTokenResponse {
+    checkout_token: string;
 }
 
 declare global {
@@ -400,14 +405,29 @@ async function requestCbtPayment(
     const japanMid = config.japan_mid;
     const timestamp = formatCbtTimestamp();
 
+    const buyerEmail = pgPaymentData.customer_email ?? '';
+    const buyerPhone = pgPaymentData.customer_phone ?? '';
+    const tokenResponse: { data: CbtCheckoutTokenResponse } = await G7Core.api.post(
+        config.callback_urls.cbt_checkout_token,
+        {
+            oid: pgPaymentData.order_number,
+            price: pgPaymentData.amount,
+            buyer_email: buyerEmail,
+            buyer_phone: buyerPhone,
+        },
+    );
+
+    const { checkout_token: checkoutToken } = tokenResponse.data;
+
     const hashResponse: { data: CbtHashDataResponse } = await G7Core.api.post(
         config.callback_urls.cbt_hash_data,
         {
             oid: pgPaymentData.order_number,
             price: pgPaymentData.amount,
             timestamp,
-            buyer_email: pgPaymentData.customer_email ?? '',
-            buyer_phone: pgPaymentData.customer_phone ?? '',
+            buyer_email: buyerEmail,
+            buyer_phone: buyerPhone,
+            checkout_token: checkoutToken,
         },
     );
 
