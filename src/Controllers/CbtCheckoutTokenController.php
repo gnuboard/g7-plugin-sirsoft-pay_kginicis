@@ -7,16 +7,14 @@ namespace Plugins\Sirsoft\PayKginicis\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
-use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\ValidatesCbtOrderContext;
-use Plugins\Sirsoft\PayKginicis\Concerns\ValidatesTimestampFreshness;
 use Plugins\Sirsoft\PayKginicis\Services\CbtCheckoutTokenService;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
+use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 
-class CbtHashDataController
+class CbtCheckoutTokenController
 {
     use ValidatesCbtOrderContext;
-    use ValidatesTimestampFreshness;
 
     public function __construct(
         private readonly KgInicisApiService $apiService,
@@ -24,41 +22,26 @@ class CbtHashDataController
         private readonly CbtCheckoutTokenService $checkoutTokenService,
     ) {}
 
-    /**
-     * generate
-     *
-     * @param  Request  $request
-     * @return JsonResponse
-     */
-    public function generate(Request $request): JsonResponse
+    public function issue(Request $request): JsonResponse
     {
         $oid = (string) $request->input('oid', '');
         $price = (int) $request->input('price', 0);
-        $timestamp = (string) $request->input('timestamp', '');
-        $checkoutToken = (string) $request->input('checkout_token', '');
 
-        if ($oid === '' || $price <= 0 || $timestamp === '') {
+        if ($oid === '' || $price <= 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Missing required parameters: oid, price, timestamp',
+                'message' => 'Missing required parameters: oid, price',
             ], 422);
         }
 
-        $rateLimitKey = $this->rateLimitKey($request, $oid);
+        $rateLimitKey = 'sirsoft-pay_kginicis:cbt-token:' . sha1($request->ip() . '|' . $oid);
         if (RateLimiter::tooManyAttempts($rateLimitKey, 10)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Too many CBT hash requests. Please try again later.',
+                'message' => 'Too many CBT checkout token requests. Please try again later.',
             ], 429);
         }
         RateLimiter::hit($rateLimitKey, 60);
-
-        if (! $this->isTimestampFresh($timestamp)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Timestamp is stale or invalid (signature replay protection).',
-            ], 422);
-        }
 
         if (! $this->apiService->isJapanEnabled()) {
             return response()->json([
@@ -103,41 +86,26 @@ class CbtHashDataController
             ], 403);
         }
 
-        $expectedPrice = $this->cbtExpectedPrice($order);
-        if ($price !== $expectedPrice) {
+        if ($price !== $this->cbtExpectedPrice($order)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Payment amount does not match the order amount.',
             ], 422);
         }
 
-        if (! $this->checkoutTokenService->verify(
-            $checkoutToken,
+        $token = $this->checkoutTokenService->issue(
             $oid,
             $price,
             (string) $request->input('buyer_email', ''),
             (string) $request->input('buyer_phone', ''),
             $request,
-        )) {
-            return response()->json([
-                'success' => false,
-                'message' => 'CBT checkout token verification failed.',
-            ], 403);
-        }
-
-        $mid = $this->apiService->getJapanMid();
-        $hashData = $this->apiService->generateCbtHashData($mid, $timestamp, $price, $oid);
+        );
 
         return response()->json([
             'success' => true,
             'data' => [
-                'hash_data' => $hashData,
+                'checkout_token' => $token,
             ],
         ]);
-    }
-
-    private function rateLimitKey(Request $request, string $oid): string
-    {
-        return 'sirsoft-pay_kginicis:cbt-hash:' . sha1($request->ip() . '|' . $oid);
     }
 }

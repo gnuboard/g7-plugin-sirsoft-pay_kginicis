@@ -85,6 +85,7 @@ class AdminCbtConnectivityCheckController extends AdminBaseController
                     'egress_ip' => $egressIp,
                     'server_ip' => $serverIp,
                     'hosts' => $hosts,
+                    'callback' => $this->buildCallbackDiagnostics(),
                 ]
             );
         } catch (\Throwable $e) {
@@ -165,5 +166,41 @@ class AdminCbtConnectivityCheckController extends AdminBaseController
             'error' => null,
             'latency_ms' => $latencyMs,
         ];
+    }
+
+    private function buildCallbackDiagnostics(): array
+    {
+        $appUrl = rtrim((string) config('app.url'), '/');
+        $callbackUrl = url('/plugins/sirsoft-pay_kginicis/payment/cbt/callback');
+        $appHost = parse_url($appUrl, PHP_URL_HOST);
+        $callbackHost = parse_url($callbackUrl, PHP_URL_HOST);
+
+        return [
+            'app_url' => $appUrl,
+            'callback_url' => $callbackUrl,
+            'app_url_https' => parse_url($appUrl, PHP_URL_SCHEME) === 'https',
+            'callback_url_https' => parse_url($callbackUrl, PHP_URL_SCHEME) === 'https',
+            'app_url_public' => $this->isPublicHostname(is_string($appHost) ? $appHost : ''),
+            'callback_url_public' => $this->isPublicHostname(is_string($callbackHost) ? $callbackHost : ''),
+            'host_matches_app_url' => $appHost !== null && $callbackHost !== null && $appHost === $callbackHost,
+        ];
+    }
+
+    private function isPublicHostname(string $host): bool
+    {
+        $host = strtolower(trim($host));
+        if ($host === '' || $host === 'localhost') {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return filter_var(
+                $host,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE,
+            ) !== false;
+        }
+
+        return ! str_ends_with($host, '.local');
     }
 }

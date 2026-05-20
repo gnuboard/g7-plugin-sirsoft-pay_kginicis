@@ -153,6 +153,46 @@ class Plugin extends AbstractPlugin
                     'en' => 'Live KEY used for CBT hash data generation. Keep this key secret.',
                 ],
             ],
+            'japan_merchant_name' => [
+                'type' => 'string',
+                'default' => 'サンプルストア',
+                'label' => ['ko' => '일본 결제 가맹점명', 'en' => 'Japan Payment Merchant Name'],
+            ],
+            'japan_merchant_name_kana' => [
+                'type' => 'string',
+                'default' => 'サンプルストア',
+                'label' => ['ko' => '일본 결제 가맹점명 Kana', 'en' => 'Japan Payment Merchant Name Kana'],
+            ],
+            'japan_merchant_name_alphabet' => [
+                'type' => 'string',
+                'default' => 'Sample Store',
+                'label' => ['ko' => '일본 결제 가맹점명 영문', 'en' => 'Japan Payment Merchant Name Alphabet'],
+            ],
+            'japan_merchant_name_short' => [
+                'type' => 'string',
+                'default' => 'サンプル',
+                'label' => ['ko' => '일본 결제 가맹점 약칭', 'en' => 'Japan Payment Merchant Short Name'],
+            ],
+            'japan_contact_name' => [
+                'type' => 'string',
+                'default' => 'サポート窓口',
+                'label' => ['ko' => '일본 결제 문의처명', 'en' => 'Japan Payment Contact Name'],
+            ],
+            'japan_contact_email' => [
+                'type' => 'string',
+                'default' => 'support@example.com',
+                'label' => ['ko' => '일본 결제 문의 이메일', 'en' => 'Japan Payment Contact Email'],
+            ],
+            'japan_contact_phone' => [
+                'type' => 'string',
+                'default' => '0120-123-456',
+                'label' => ['ko' => '일본 결제 문의 전화번호', 'en' => 'Japan Payment Contact Phone'],
+            ],
+            'japan_contact_opening_hours' => [
+                'type' => 'string',
+                'default' => '10:00-18:00',
+                'label' => ['ko' => '일본 결제 문의 영업시간', 'en' => 'Japan Payment Contact Hours'],
+            ],
             'redirect_success_url' => [
                 'type' => 'string',
                 'default' => '/shop/orders/{orderId}/complete',
@@ -218,6 +258,14 @@ class Plugin extends AbstractPlugin
             'test_japan_sign_key' => '5AL5Djb1Ipualn0F',
             'live_japan_mid' => '',
             'live_japan_sign_key' => '',
+            'japan_merchant_name' => 'サンプルストア',
+            'japan_merchant_name_kana' => 'サンプルストア',
+            'japan_merchant_name_alphabet' => 'Sample Store',
+            'japan_merchant_name_short' => 'サンプル',
+            'japan_contact_name' => 'サポート窓口',
+            'japan_contact_email' => 'support@example.com',
+            'japan_contact_phone' => '0120-123-456',
+            'japan_contact_opening_hours' => '10:00-18:00',
             'redirect_success_url' => '/shop/orders/{orderId}/complete',
             'redirect_fail_url' => '/shop/checkout',
             'easy_pay_allow_with_other_pg' => false,
@@ -270,6 +318,22 @@ class Plugin extends AbstractPlugin
                 'description' => [
                     'ko' => 'KG 이니시스 결제 취소 완료 후',
                     'en' => 'After KG Inicis cancel completed',
+                ],
+            ],
+            [
+                'name' => 'sirsoft-pay_kginicis.payment.before_cbt_refund',
+                'type' => 'action',
+                'description' => [
+                    'ko' => 'KG 이니시스 일본 CBT 결제 취소 API 호출 전',
+                    'en' => 'Before KG Inicis Japan CBT refund API call',
+                ],
+            ],
+            [
+                'name' => 'sirsoft-pay_kginicis.payment.after_cbt_refund',
+                'type' => 'action',
+                'description' => [
+                    'ko' => 'KG 이니시스 일본 CBT 결제 취소 완료 후',
+                    'en' => 'After KG Inicis Japan CBT refund completed',
                 ],
             ],
         ];

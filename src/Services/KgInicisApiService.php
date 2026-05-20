@@ -71,6 +71,14 @@ class KgInicisApiService
 
     private const CBT_APPROVE_URL_LIVE = 'https://cbt.inicis.com/cbtapprove';
 
+    private const CBT_REFUND_URL_TEST = 'https://deviniapi.inicis.com/api/v1/refund';
+
+    private const CBT_REFUND_URL_LIVE = 'https://iniapi.inicis.com/api/v1/refund';
+
+    private const CBT_CONNECT_TIMEOUT_SECONDS = 5;
+
+    private const CBT_REQUEST_TIMEOUT_SECONDS = 20;
+
     /** KG 이니시스 일본결제(CBT) 공식 테스트 MID — 고정값, 변경 불가 */
     public const JAPAN_TEST_MID = 'CBTTEST001';
 
@@ -268,6 +276,33 @@ class KgInicisApiService
         return $this->japanEnabled;
     }
 
+    /**
+     * 일본결제(CBT)가 현재 모드에서 실제 요청 가능한 설정인지 확인.
+     */
+    public function isJapanConfigured(): bool
+    {
+        return $this->japanEnabled
+            && trim($this->japanMid) !== ''
+            && trim($this->japanCbtKey) !== '';
+    }
+
+    /**
+     * 결제 당시 저장된 CBT 모드/MID 기준으로 취소 API 자격증명을 재구성.
+     *
+     * 운영자가 결제 후 테스트/운영 모드 또는 MID 설정을 변경해도 과거 CBT 거래가
+     * 현재 설정의 MID 로 취소 요청되는 회귀를 막는다.
+     */
+    public function useStoredCbtCredentials(bool $isTest, string $mid): void
+    {
+        $this->isTest = $isTest;
+        $this->japanMid = trim($mid) !== ''
+            ? trim($mid)
+            : ($isTest ? self::JAPAN_TEST_MID : (string) ($this->settingsSnapshot['live_japan_mid'] ?? ''));
+        $this->japanCbtKey = $isTest
+            ? (string) ($this->settingsSnapshot['test_japan_sign_key'] ?? '')
+            : (string) ($this->settingsSnapshot['live_japan_sign_key'] ?? '');
+    }
+
 /**
 
  * getJsUrl
@@ -459,7 +494,10 @@ class KgInicisApiService
     {
         $approveUrl = $this->getCbtApproveUrl();
 
-        $response = Http::asForm()->post($approveUrl, [
+        $response = Http::connectTimeout(self::CBT_CONNECT_TIMEOUT_SECONDS)
+            ->timeout(self::CBT_REQUEST_TIMEOUT_SECONDS)
+            ->asForm()
+            ->post($approveUrl, [
             'mid' => $this->japanMid,
             'sid' => $sid,
         ]);
@@ -469,6 +507,83 @@ class KgInicisApiService
         }
 
         return $response->json() ?? [];
+    }
+
+    /**
+     * CBT(JPPG) 신용카드/간편결제 취소 API 호출.
+     *
+     * 한국 표준결제 INIAPI v2 취소와 달리 CBT 취소는 /api/v1/refund + Form Data 를
+     * 사용하고, 성공 resultCode 도 '00' 이다.
+     *
+     * @param string $tid CBT 승인 TID
+     * @param int|null $cancelPrice null 이면 전체취소, 값이 있으면 부분취소
+     * @param string $msg 취소 사유
+     * @param int|null $totalAmount 부분취소 전 취소 가능 총액
+     * @return array PG 응답 데이터
+     */
+    public function refundCbtPayment(
+        string $tid,
+        ?int $cancelPrice = null,
+        string $msg = '관리자 취소',
+        ?int $totalAmount = null,
+    ): array {
+        $type = $cancelPrice === null ? 'Refund' : 'PartialRefund';
+        $paymethod = 'CBT';
+        $timestamp = date('YmdHis');
+        $clientIp = $this->resolveServerIp();
+
+        $payload = [
+            'type' => $type,
+            'paymethod' => $paymethod,
+            'timestamp' => $timestamp,
+            'clientIp' => $clientIp,
+            'mid' => $this->japanMid,
+            'tid' => $tid,
+            'msg' => $msg,
+        ];
+
+        $plainText = $this->japanCbtKey . $type . $paymethod . $timestamp . $clientIp . $this->japanMid . $tid;
+
+        if ($cancelPrice !== null) {
+            $confirmPrice = max(0, ($totalAmount ?? $cancelPrice) - $cancelPrice);
+            $payload['price'] = (string) $cancelPrice;
+            $payload['confirmPrice'] = (string) $confirmPrice;
+            $plainText .= (string) $cancelPrice . (string) $confirmPrice;
+        }
+
+        $payload['hashData'] = hash('sha512', $plainText);
+
+        HookManager::doAction('sirsoft-pay_kginicis.payment.before_cbt_refund', $tid, $cancelPrice, $msg);
+
+        $response = Http::connectTimeout(self::CBT_CONNECT_TIMEOUT_SECONDS)
+            ->timeout(self::CBT_REQUEST_TIMEOUT_SECONDS)
+            ->withHeaders([
+                'Content-Type' => 'application/x-www-form-urlencoded; charset=utf-8',
+            ])
+            ->asForm()
+            ->post($this->getCbtRefundUrl(), $payload);
+
+        if ($response->failed()) {
+            throw new KgInicisApiException('KG Inicis CBT refund API error: HTTP ' . $response->status());
+        }
+
+        $result = $response->json();
+        if (! is_array($result)) {
+            parse_str($response->body(), $result);
+        }
+
+        if (($result['resultCode'] ?? '') !== '00') {
+            Log::error('KG Inicis CBT refund failed', [
+                'result_code' => $result['resultCode'] ?? 'UNKNOWN',
+                'result_msg' => $result['resultMsg'] ?? '',
+                'tid' => $tid,
+            ]);
+            throw new KgInicisApiException($result['resultMsg'] ?? 'KG Inicis CBT refund failed');
+        }
+
+        HookManager::doAction('sirsoft-pay_kginicis.payment.after_cbt_refund', $tid, $result);
+
+        return $result;
     }
 
     /**
@@ -879,5 +994,25 @@ class KgInicisApiService
         }
 
         return str_starts_with($suffix, self::LIVE_MID_PREFIX) ? $suffix : self::LIVE_MID_PREFIX . $suffix;
+    }
+
+    private function getCbtRefundUrl(): string
+    {
+        return $this->isTest ? self::CBT_REFUND_URL_TEST : self::CBT_REFUND_URL_LIVE;
+    }
+
+    private function resolveServerIp(): string
+    {
+        $serverIp = (string) (request()->server('SERVER_ADDR') ?? '');
+        if (filter_var($serverIp, FILTER_VALIDATE_IP) !== false) {
+            return $serverIp;
+        }
+
+        $hostIp = gethostbyname((string) gethostname());
+        if (filter_var($hostIp, FILTER_VALIDATE_IP) !== false) {
+            return $hostIp;
+        }
+
+        return request()->ip() ?? '127.0.0.1';
     }
 }

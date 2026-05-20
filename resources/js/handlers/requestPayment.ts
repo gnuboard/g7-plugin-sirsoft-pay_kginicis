@@ -25,6 +25,7 @@ interface ClientConfig {
     callback_urls: {
         signature: string;
         callback: string;
+        cbt_checkout_token: string;
         cbt_hash_data: string;
         cbt_callback: string;
         cbt_auth_url: string;
@@ -33,10 +34,22 @@ interface ClientConfig {
         mobile_vbank_notify: string;
     };
     japan_enabled: boolean;
+    japan_configured?: boolean;
     use_escrow: boolean;
     japan_mid: string;
+    cbt_extra_data?: CbtExtraData;
     enabled_easy_pays: string[];
     use_credit_point: boolean;
+}
+
+interface CbtExtraData {
+    paymentUI?: Record<string, string>;
+    payment?: {
+        paymethod?: string[];
+        isMobile?: string;
+        card?: Record<string, unknown>;
+    };
+    gmoPayment?: Record<string, string>;
 }
 
 interface SignatureResponse {
@@ -52,6 +65,10 @@ interface MobileSignatureResponse {
 
 interface CbtHashDataResponse {
     hash_data: string;
+}
+
+interface CbtCheckoutTokenResponse {
+    checkout_token: string;
 }
 
 declare global {
@@ -363,6 +380,23 @@ function formatCbtTimestamp(date: Date = new Date()): string {
     );
 }
 
+function buildCbtExtraData(config: ClientConfig): CbtExtraData {
+    const base: CbtExtraData = config.cbt_extra_data ?? {};
+
+    return {
+        ...base,
+        paymentUI: {
+            language: 'JP',
+            ...(base.paymentUI ?? {}),
+        },
+        payment: {
+            paymethod: ['CARD'],
+            ...(base.payment ?? {}),
+            isMobile: isMobileUserAgent() ? 'true' : 'false',
+        },
+    };
+}
+
 async function requestCbtPayment(
     G7Core: any,
     config: ClientConfig,
@@ -371,9 +405,30 @@ async function requestCbtPayment(
     const japanMid = config.japan_mid;
     const timestamp = formatCbtTimestamp();
 
+    const buyerEmail = pgPaymentData.customer_email ?? '';
+    const buyerPhone = pgPaymentData.customer_phone ?? '';
+    const tokenResponse: { data: CbtCheckoutTokenResponse } = await G7Core.api.post(
+        config.callback_urls.cbt_checkout_token,
+        {
+            oid: pgPaymentData.order_number,
+            price: pgPaymentData.amount,
+            buyer_email: buyerEmail,
+            buyer_phone: buyerPhone,
+        },
+    );
+
+    const { checkout_token: checkoutToken } = tokenResponse.data;
+
     const hashResponse: { data: CbtHashDataResponse } = await G7Core.api.post(
         config.callback_urls.cbt_hash_data,
-        { oid: pgPaymentData.order_number, price: pgPaymentData.amount, timestamp },
+        {
+            oid: pgPaymentData.order_number,
+            price: pgPaymentData.amount,
+            timestamp,
+            buyer_email: buyerEmail,
+            buyer_phone: buyerPhone,
+            checkout_token: checkoutToken,
+        },
     );
 
     const { hash_data: hashData } = hashResponse.data;
@@ -381,7 +436,7 @@ async function requestCbtPayment(
     const returnUrl =
         window.location.origin +
         config.callback_urls.cbt_callback +
-        `?oid=${encodeURIComponent(pgPaymentData.order_number)}&amount=${pgPaymentData.amount}`;
+        `?oid=${encodeURIComponent(pgPaymentData.order_number)}`;
 
     submitForm(config.callback_urls.cbt_auth_url, {
         cbtType:     'JPPG',
@@ -395,7 +450,7 @@ async function requestCbtPayment(
         amount:      String(pgPaymentData.amount),
         orderId:     pgPaymentData.order_number,
         hashData,
-        extraData:   JSON.stringify({}),
+        extraData:   JSON.stringify(buildCbtExtraData(config)),
     });
 }
 
@@ -428,9 +483,17 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
 
         const config: ClientConfig = configJson.data;
         const currency = pgPaymentData.currency ?? 'WON';
-        const isJapan = currency === 'JPY' && config.japan_enabled && !!config.japan_mid;
+        const isJpy = currency === 'JPY';
+        const isJapanConfigured =
+            config.japan_enabled &&
+            !!config.japan_mid &&
+            config.japan_configured !== false;
 
-        if (isJapan) {
+        if (isJpy && !isJapanConfigured) {
+            throw new Error('KG Inicis Japan CBT payment is not configured.');
+        }
+
+        if (isJpy) {
             await requestCbtPayment(G7Core, config, pgPaymentData);
         } else if (isMobileUserAgent()) {
             await requestMobileKoreanPayment(G7Core, config, pgPaymentData, paymentMethod);
