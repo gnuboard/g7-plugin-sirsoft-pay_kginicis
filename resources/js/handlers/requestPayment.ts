@@ -130,12 +130,13 @@ function submitForm(action: string, fields: Record<string, string>, charset = 'u
  *   gopaymethod = (inicis_settle_case === 'inicis_kakaopay') ? 'onlykakaopay' : 'onlylpay'
  */
 export const GOPAYMETHOD_MAP: Record<string, string> = {
-    card:               'Card',
-    vbank:              'VBank',
-    bank:               'DirectBank',
-    phone:              'HPP',
-    kginicis_lpay:      'onlylpay',
-    kginicis_kakaopay:  'onlykakaopay',
+    card:                 'Card',
+    vbank:                'VBank',
+    bank:                 'DirectBank',
+    phone:                'HPP',
+    kginicis_samsung_pay: 'onlysamsungpay',
+    kginicis_lpay:        'onlylpay',
+    kginicis_kakaopay:    'onlykakaopay',
 };
 
 /**
@@ -332,11 +333,15 @@ async function requestKoreanPayment(
                 ? `HPP(1):${escrow}${creditPoint}centerCd(Y)`
                 : `${escrow}${creditPoint}centerCd(Y)`;
 
-            // 간편결제 (LPAY / 카카오페이) 는 base 뒤에 ':cardonly' 를 append.
+            // 간편결제 (삼성페이 / LPAY / 카카오페이) 는 base 뒤에 ':cardonly' 를 append.
             // gnuboard5 orderform.4.php 의
             //   f.acceptmethod.value = f.acceptmethod.value + ":cardonly"
             // 와 일치 — 에스크로 옵션 등 base 를 보존하고 cardonly 만 추가.
-            if (paymentMethod === 'kginicis_lpay' || paymentMethod === 'kginicis_kakaopay') {
+            if (
+                paymentMethod === 'kginicis_samsung_pay'
+                || paymentMethod === 'kginicis_lpay'
+                || paymentMethod === 'kginicis_kakaopay'
+            ) {
                 return base ? `${base}:cardonly` : 'cardonly';
             }
             return base;

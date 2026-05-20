@@ -682,6 +682,8 @@
                     },
                     {
                         "id": "easy_pay_section",
+                        "_comment_hidden": "간편결제 토글은 이커머스 admin/ecommerce/settings 의 결제수단 목록으로 이동됨 (RegisterEasyPayMethodsListener). 본 카드는 차후 별도 보강 시 if 키 제거하면 복원.",
+                        "if": "{{false}}",
                         "type": "basic",
                         "name": "Div",
                         "props": {

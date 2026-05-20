@@ -267,14 +267,47 @@ export function installOrderResponseInterceptor(): void {
         const data = body?.data;
         if (!data) return response;
 
+        // 'kginicis_*' 간편결제 (samsung_pay / lpay / kakaopay) 선택 시 기본 PG 가 다른 PG
+        // 라도 KG 이니시스 결제창을 강제로 열어야 한다. 이때 backend 가 requires_pg_payment
+        // 를 false 로 응답하거나 pg_provider 를 다른 PG 로 응답해도 KG 흐름으로 강제.
+        const isKginicisEasyPay = typeof paymentMethod === 'string' && paymentMethod.startsWith('kginicis_');
+
         const requiresPg = data.requires_pg_payment === true;
         const isKginicis = data.pg_provider === TARGET_PG_PROVIDER;
 
-        if (!requiresPg || !isKginicis) {
+        // 일반 결제: requires_pg_payment 가 true + pg_provider 가 KG 이니시스 → 처리
+        // 간편결제(kginicis_*): pg_provider / requires_pg_payment 무관 → 강제 처리
+        if (!isKginicisEasyPay && (!requiresPg || !isKginicis)) {
             return response;
         }
 
-        const pgPaymentData = data.pg_payment_data;
+        // pg_payment_data: backend 응답에 포함되거나, 간편결제 + 기본 PG 미설정/다른 PG 시
+        // order 데이터에서 직접 구성 (NicePay 의 동일 패턴 차용)
+        let pgPaymentData = data.pg_payment_data as Record<string, unknown> | undefined;
+        if (!pgPaymentData && isKginicisEasyPay) {
+            const orderData = (data as unknown as { order?: Record<string, unknown> }).order;
+            if (orderData) {
+                const options = orderData.options as Array<Record<string, unknown>> | undefined;
+                const firstName = (options?.[0]?.product_name as string | undefined) ?? String(orderData.order_number ?? '');
+                const orderName = (options?.length ?? 0) > 1
+                    ? `${firstName} 외 ${(options?.length ?? 0) - 1}건`
+                    : firstName;
+                pgPaymentData = {
+                    order_number: orderData.order_number,
+                    order_name: orderName,
+                    amount: Math.floor(Number(orderData.total_amount ?? 0)),
+                    currency: 'KRW',
+                    customer_name: orderData.orderer_name ?? null,
+                    customer_email: orderData.orderer_email ?? null,
+                    customer_phone: String(orderData.orderer_phone ?? '').replace(/[^0-9]/g, ''),
+                };
+                logger.info('pg_payment_data constructed from order (기본 PG 미설정 또는 다른 PG)', {
+                    order_number: pgPaymentData.order_number,
+                    amount: pgPaymentData.amount,
+                });
+            }
+        }
+
         if (!pgPaymentData) {
             logger.warn('kginicis order detected but pg_payment_data missing');
             return response;
