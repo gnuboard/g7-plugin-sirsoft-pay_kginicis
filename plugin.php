@@ -283,6 +283,7 @@ class Plugin extends AbstractPlugin
             Listeners\PaymentRefundListener::class,
             Listeners\CancelActivityLogListener::class,
             Listeners\RegisterEasyPayMethodsListener::class,
+            Listeners\AdjustEcommercePaymentMethodsLayoutListener::class,
         ];
     }
 

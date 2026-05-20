@@ -38,7 +38,6 @@ interface ClientConfig {
     use_escrow: boolean;
     japan_mid: string;
     cbt_extra_data?: CbtExtraData;
-    enabled_easy_pays: string[];
     use_credit_point: boolean;
 }
 
