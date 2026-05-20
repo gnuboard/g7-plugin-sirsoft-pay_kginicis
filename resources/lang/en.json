@@ -34,7 +34,7 @@
     "admin": {
         "test_mode_badge": "Test Payment",
         "test_mode_warning_badge": "Test Payment WARNING)",
-        "test_mode_order_notice": "This order is for testing only — no actual payment was processed. DO NOT ship this order under any circumstances.",
+        "test_mode_order_notice": "This order was processed in test mode. Real card authorization/withdrawal notifications may occur, but KG Inicis test transactions may be automatically cancelled daily between 23:00 and 23:50. DO NOT ship this order.",
         "order_verify_title": "KG Inicis Payment Verification",
         "order_verify_description": "Query real-time payment status from KG Inicis servers.",
         "order_verify_button": "Query Payment",
@@ -145,7 +145,7 @@
         "title": "KG Inicis Settings",
         "description": "Manage KG Inicis payment plugin settings.",
         "test_mode": "Test Mode",
-        "test_mode_hint": "No real payments occur in test mode.",
+        "test_mode_hint": "Real card authorization/withdrawal notifications may still occur in test mode; test transactions may be automatically cancelled daily between 23:00 and 23:50.",
         "live_mode_warning_title": "Live Mode Active",
         "live_mode_warning_body": "Real payments will occur. Verify that your live MID and keys are configured correctly.",
         "section_live_keys": "Live Credentials",

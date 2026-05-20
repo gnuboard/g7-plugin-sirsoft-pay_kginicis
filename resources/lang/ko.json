@@ -34,7 +34,7 @@
     "admin": {
         "test_mode_badge": "테스트 결제",
         "test_mode_warning_badge": "테스트 결제 주의)",
-        "test_mode_order_notice": "이 주문은 테스트용으로 실제 결제가 이루어지지 않았으므로 절대 배송하시면 안됩니다.",
+        "test_mode_order_notice": "이 주문은 테스트 결제로 처리되었습니다. 실제 카드 승인/출금 알림이 발생할 수 있으나, KG 이니시스 테스트 거래는 매일 23:00~23:50 사이 자동 취소될 수 있습니다. 절대 배송하지 마세요.",
         "order_verify_title": "KG 이니시스 결제 검증",
         "order_verify_description": "KG 이니시스 서버에서 실시간으로 결제 상태를 조회합니다.",
         "order_verify_button": "결제 조회",
@@ -145,7 +145,7 @@
         "title": "KG 이니시스 설정",
         "description": "KG 이니시스 결제 플러그인 설정을 관리합니다.",
         "test_mode": "테스트 모드",
-        "test_mode_hint": "테스트 모드에서는 실제 결제가 발생하지 않습니다.",
+        "test_mode_hint": "테스트 모드에서도 실제 카드 승인/출금 알림이 발생할 수 있으며, 테스트 거래는 매일 23:00~23:50 사이 자동 취소됩니다.",
         "live_mode_warning_title": "라이브 모드 활성화",
         "live_mode_warning_body": "실제 결제가 발생합니다. 라이브 MID 및 키를 정확히 설정했는지 확인하세요.",
         "section_live_keys": "라이브 인증 정보",
