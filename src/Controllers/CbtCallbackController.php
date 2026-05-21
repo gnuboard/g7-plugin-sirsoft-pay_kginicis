@@ -8,10 +8,8 @@ use App\Services\PluginSettingsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
-use Plugins\Sirsoft\PayKginicis\Services\CbtReconciliationService;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
 /**
@@ -29,54 +27,10 @@ class CbtCallbackController
 
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
-    private const CBT_AUTH_RESPONSE_KEYS = [
-        'resultCode',
-        'resultMsg',
-        'orderID',
-        'orderId',
-        'oid',
-        'mid',
-        'sid',
-        'paymethod',
-    ];
-
-    private const CBT_APPROVE_RESPONSE_KEYS = [
-        'resultCode',
-        'resultMsg',
-        'code',
-        'message',
-        'tid',
-        'transactionId',
-        'paymethod',
-        'payMethod',
-        'amount',
-        'price',
-        'currency',
-        'approve',
-        'applDate',
-        'applTime',
-        'installMonth',
-        'cardCode',
-        'cardName',
-        'mid',
-        'oid',
-        'orderId',
-    ];
-
-    private const CBT_REFUND_RESPONSE_KEYS = [
-        'resultCode',
-        'resultMsg',
-        'tid',
-        'cancelDate',
-        'cancelTime',
-        'prtcCode',
-    ];
-
     public function __construct(
         private readonly OrderProcessingService $orderService,
         private readonly PluginSettingsService $pluginSettingsService,
         private readonly KgInicisApiService $apiService,
-        private readonly CbtReconciliationService $reconciliationService,
     ) {}
 
     /**
@@ -87,45 +41,14 @@ class CbtCallbackController
      */
     public function handle(Request $request): RedirectResponse
     {
-        $sid = (string) $request->input('sid', '');
-        $oid = $this->resolveOrderId($request);
-        $authResultCode = (string) $request->input('resultCode', '');
-        $authResultMsg = (string) $request->input('resultMsg', '');
-        $authMid = (string) $request->input('mid', '');
+        $sid = (string) $request->query('sid', '');
+        $oid = (string) $request->query('oid', '');
+        $amount = (int) $request->query('amount', 0);
 
         if ($sid === '' || $oid === '') {
             Log::warning('KG Inicis CBT: missing sid or oid', ['oid' => $oid, 'sid' => $sid]);
 
             return redirect($this->resolveFailUrl(['error' => 'invalid_params', 'orderId' => $oid]));
-        }
-
-        if ($authResultCode !== '' && $authResultCode !== 'OK') {
-            $order = $this->orderService->findByOrderNumber($oid);
-            if ($order) {
-                $this->orderService->failPayment($order, $authResultCode, $authResultMsg);
-            }
-
-            Log::warning('KG Inicis CBT: auth failed', [
-                'oid' => $oid,
-                'result_code' => $authResultCode,
-                'result_msg' => $authResultMsg,
-            ]);
-
-            return redirect($this->resolveFailUrl([
-                'error' => $authResultCode !== '' ? $authResultCode : 'cbt_auth_failed',
-                'message' => $authResultMsg,
-                'orderId' => $oid,
-            ]));
-        }
-
-        if ($authMid !== '' && $authMid !== $this->apiService->getJapanMid()) {
-            Log::warning('KG Inicis CBT: callback MID mismatch', [
-                'oid' => $oid,
-                'received_mid' => $authMid,
-                'expected_mid' => $this->apiService->getJapanMid(),
-            ]);
-
-            return redirect($this->resolveFailUrl(['error' => 'mid_mismatch', 'orderId' => $oid]));
         }
 
         // Approve 성공 후 후속 처리 실패 시 PG 자동 cancel 추적 변수.
@@ -141,13 +64,11 @@ class CbtCallbackController
                 return redirect($this->resolveFailUrl(['error' => 'order_not_found', 'orderId' => $oid]));
             }
 
-            $this->assertPayableCbtOrder($order);
-
             $pgResponse = $this->apiService->approveCbtPayment($sid);
 
             $resultCode = $pgResponse['resultCode'] ?? ($pgResponse['code'] ?? '');
 
-            if (! $this->isCbtSuccessCode((string) $resultCode)) {
+            if (! in_array($resultCode, ['0000', '00'], true)) {
                 $resultMsg = $pgResponse['resultMsg'] ?? ($pgResponse['message'] ?? 'CBT approve failed');
                 Log::warning('KG Inicis CBT: approve failed', [
                     'oid' => $oid,
@@ -165,12 +86,6 @@ class CbtCallbackController
             }
 
             $tid = $pgResponse['tid'] ?? ($pgResponse['transactionId'] ?? '');
-            if ($tid === '') {
-                throw new \RuntimeException('KG Inicis CBT approve response missing tid.');
-            }
-
-            // PG 승인이 확정된 직후부터는 어떤 후속 예외라도 자동 취소 대상이다.
-            $approvedTid = $tid;
 
             // Replay 가드: 동일 tid 가 이미 paid 상태면 중복 처리하지 않고 성공 페이지로 복귀
             if ($this->wasAlreadyPaid($tid)) {
@@ -179,31 +94,21 @@ class CbtCallbackController
                 return redirect($this->resolveSuccessUrl($oid));
             }
 
-            $payMethod = (string) ($pgResponse['paymethod'] ?? $request->input('paymethod', 'CBT'));
-            $approvedAmount = $this->resolveApprovedAmount($pgResponse, $order);
-            $authResponse = $this->sanitizePgResponse($request->except(['_token']), self::CBT_AUTH_RESPONSE_KEYS);
-            $approveResponse = $this->sanitizePgResponse($pgResponse, self::CBT_APPROVE_RESPONSE_KEYS);
+            // PG 측 승인이 확정된 시점 — 후속 처리 실패 시 cancel 알림 필요. catch 에서 참조.
+            $approvedTid = $tid;
+            $approvedAmount = $amount;
 
             $this->orderService->completePayment($order, [
                 'transaction_id' => $tid,
-                'card_approval_number' => $pgResponse['approve'] ?? null,
-                'card_installment_months' => $this->normalizeInstallmentMonths($pgResponse['installMonth'] ?? null),
                 'payment_meta' => [
                     'result_code' => $resultCode,
-                    'pay_method' => $payMethod,
-                    'cbt_type' => 'JPPG',
-                    'cbt_mid' => $this->apiService->getJapanMid(),
-                    'cbt_sid' => $sid,
-                    'mid' => $this->apiService->getJapanMid(),
-                    'currency' => 'JPY',
-                    'is_cbt' => true,
+                    'pay_method' => 'CBT',
+                    'cbt_type' => $pgResponse['cbtType'] ?? null,
+                    'mid' => $this->apiService->getMid(),
                     'is_test_mode' => $this->apiService->isTestMode(),
-                    'pg_response_sanitized' => true,
-                    'pg_auth_response' => $authResponse,
-                    'pg_approve_response' => $approveResponse,
-                    'pg_raw_response' => $approveResponse,
+                    'pg_raw_response' => $pgResponse,
                 ],
-            ], $approvedAmount);
+            ], $amount > 0 ? $amount : null);
 
             Log::info('KG Inicis CBT: payment completed', ['oid' => $oid, 'tid' => $tid]);
 
@@ -215,70 +120,24 @@ class CbtCallbackController
                 'error' => $e->getMessage(),
             ]);
 
-            $this->refundApprovedCbtPaymentOrFlagManualReconciliation(
-                $approvedTid,
-                $oid,
-                $approvedAmount,
-                $e->getMessage(),
-            );
+            $this->flagCbtManualReconciliation($approvedTid, $oid, $approvedAmount, $e->getMessage());
 
             return redirect($this->resolveFailUrl(['error' => 'cbt_failed', 'orderId' => $oid]));
         }
     }
 
-    private function resolveOrderId(Request $request): string
-    {
-        return (string) (
-            $request->input('orderID')
-            ?: $request->input('orderId')
-            ?: $request->input('oid')
-            ?: ''
-        );
-    }
-
-    private function isCbtSuccessCode(string $resultCode): bool
-    {
-        return in_array($resultCode, ['OK', '00', '0000'], true);
-    }
-
-    private function assertPayableCbtOrder(Order $order): void
-    {
-        if (! $order->order_status->isBeforePayment()) {
-            throw new \RuntimeException('Order is not payable.');
-        }
-
-        if ((string) $order->currency !== 'JPY') {
-            throw new \RuntimeException('CBT payment is only available for JPY orders.');
-        }
-    }
-
-    private function resolveApprovedAmount(array $pgResponse, Order $order): int
-    {
-        $expectedAmount = (int) round((float) $order->total_due_amount);
-        $pgAmount = $pgResponse['amount'] ?? $pgResponse['price'] ?? null;
-
-        if ($pgAmount === null || $pgAmount === '') {
-            return $expectedAmount;
-        }
-
-        $approvedAmount = (int) $pgAmount;
-        if ($approvedAmount !== $expectedAmount) {
-            throw new \RuntimeException('KG Inicis CBT approved amount mismatch.');
-        }
-
-        return $approvedAmount;
-    }
-
-    private function normalizeInstallmentMonths(mixed $value): ?int
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        return (int) $value;
-    }
-
-    private function refundApprovedCbtPaymentOrFlagManualReconciliation(
+    /**
+     * CBT 승인 후 후속 처리 실패 시 운영자 수동 정산을 위한 강한 신호 로깅.
+     *
+     * KG 이니시스 CBT 는 일본 결제 전용 MID 와 별도 API (cbtapprove/cbtcancel) 를
+     * 사용한다. 기존 cancelPayment() 는 한국 결제용 standard MID 기반이라 CBT TID
+     * 에는 적용 불가. 따라서 자동 cancel API 호출 대신 ERROR 로그로 운영자가
+     * KG 이니시스 가맹점 관리자(JP) 에서 수동 처리하도록 신호한다.
+     *
+     * 향후 KgInicisApiService::cancelCbtPayment() 가 추가되면 본 메서드를
+     * 자동 cancel 호출 흐름으로 전환 가능.
+     */
+    private function flagCbtManualReconciliation(
         ?string $tid,
         string $oid,
         int $amount,
@@ -288,86 +147,12 @@ class CbtCallbackController
             return;
         }
 
-        try {
-            $refundResult = $this->apiService->refundCbtPayment(
-                $tid,
-                null,
-                'CBT approved but local payment completion failed: ' . mb_substr($reason, 0, 80),
-            );
-
-            $this->recordCbtReconciliationStatus($oid, [
-                'status' => CbtReconciliationService::STATUS_AUTO_REFUNDED,
-                'manual_action_required' => false,
-                'tid' => $tid,
-                'amount' => $amount,
-                'reason' => $reason,
-                'refund_error' => null,
-                'refund_result' => $this->sanitizePgResponse($refundResult, self::CBT_REFUND_RESPONSE_KEYS),
-                'is_test_mode' => $this->apiService->isTestMode(),
-                'cbt_mid' => $this->apiService->getJapanMid(),
-                'retry_count' => 0,
-            ]);
-
-            Log::warning('KG Inicis CBT: approved payment auto-refunded after local failure', [
-                'tid' => $tid,
-                'oid' => $oid,
-                'amount' => $amount,
-                'reason' => $reason,
-            ]);
-
-            return;
-        } catch (\Throwable $refundException) {
-            Log::error('KG Inicis CBT: auto refund after local failure failed', [
-                'tid' => $tid,
-                'oid' => $oid,
-                'amount' => $amount,
-                'reason' => $reason,
-                'refund_error' => $refundException->getMessage(),
-            ]);
-
-            $this->recordCbtReconciliationStatus($oid, [
-                'status' => CbtReconciliationService::STATUS_MANUAL_REFUND_REQUIRED,
-                'manual_action_required' => true,
-                'tid' => $tid,
-                'amount' => $amount,
-                'reason' => $reason,
-                'refund_error' => $refundException->getMessage(),
-                'refund_result' => null,
-                'is_test_mode' => $this->apiService->isTestMode(),
-                'cbt_mid' => $this->apiService->getJapanMid(),
-                'retry_count' => 0,
-            ]);
-        }
-
         Log::error('KG Inicis CBT: post-approve failure — MANUAL CANCEL REQUIRED on KG Inicis JP merchant admin', [
             'tid'    => $tid,
             'oid'    => $oid,
             'amount' => $amount,
             'reason' => $reason,
         ]);
-    }
-
-    private function recordCbtReconciliationStatus(string $oid, array $attributes): void
-    {
-        $this->reconciliationService->record($oid, $attributes);
-    }
-
-    private function sanitizePgResponse(array $response, array $allowedKeys): array
-    {
-        $allowed = array_flip($allowedKeys);
-        $sanitized = [];
-
-        foreach ($response as $key => $value) {
-            if (! isset($allowed[$key])) {
-                continue;
-            }
-
-            $sanitized[$key] = is_scalar($value) || $value === null
-                ? $value
-                : json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        }
-
-        return $sanitized;
     }
 
     private function resolveSuccessUrl(string $orderId): string

@@ -12,8 +12,6 @@ use Modules\Sirsoft\Ecommerce\Exceptions\PaymentAmountMismatchException;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
-use Plugins\Sirsoft\PayKginicis\Concerns\ResolvesEasyPaySelection;
-use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\MobileCallbackRequest;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
@@ -29,50 +27,12 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 class MobileCallbackController
 {
     use PreventsReplayCallback;
-    use ResolvesEasyPaySelection;
-    use SanitizesPgResponse;
 
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
     // KG 이니시스 모바일 표준결제 — 사용자 결제창 닫기 시 P_RMESG1 에 포함되는 패턴.
     // Playwright 운영 재현으로 확인 (P_STATUS=01 은 일반 실패와 공유되므로 메시지 기반 분기).
     private const USER_CANCEL_MESSAGE_PATTERNS = ['사용자가 결제를 취소', '결제를 취소하셨'];
-
-    private const MOBILE_APPROVE_RESPONSE_KEYS = [
-        'P_STATUS',
-        'P_RMESG1',
-        'P_TID',
-        'P_OID',
-        'P_AMT',
-        'P_TYPE',
-        'P_AUTH_DT',
-        'P_APPL_NUM',
-        'P_FN_CD1',
-        'P_FN_NM',
-        'P_CARD_ISSUER_NAME',
-        'P_CARD_QUOTA',
-        'P_CARD_INTEREST',
-        'P_MID',
-        'P_GOODS',
-    ];
-
-    private const MOBILE_VBANK_ISSUE_RESPONSE_KEYS = [
-        'P_STATUS',
-        'P_RMESG1',
-        'P_TID',
-        'P_OID',
-        'P_AMT',
-        'P_TYPE',
-        'P_AUTH_DT',
-        'P_FN_CD1',
-        'P_FN_NM',
-        'P_VACT_BANK_CODE',
-        'P_VACT_BANK_NAME',
-        'P_VACT_DATE',
-        'P_VACT_TIME',
-        'P_MID',
-        'P_GOODS',
-    ];
 
     public function __construct(
         private readonly OrderProcessingService $orderService,
@@ -89,7 +49,6 @@ class MobileCallbackController
     public function handle(MobileCallbackRequest $request): \Illuminate\Http\RedirectResponse
     {
         $validated = $request->validated();
-        $selectedEasyPayMethod = $this->resolveSelectedEasyPayMethod($request);
 
         $pStatus   = $validated['P_STATUS'];
         // KG 이니시스 모바일 메뉴얼(STEP 2) 표준 응답에는 P_OID 가 없으므로 P_NEXT_URL 쿼리스트링의
@@ -104,7 +63,6 @@ class MobileCallbackController
             'P_REQ_URL' => $validated['P_REQ_URL'] ?? null,
             'input_keys' => array_keys($request->all()),
             'query_keys' => array_keys($request->query()),
-            'easy_pay' => $this->buildEasyPayLogContext($selectedEasyPayMethod),
         ]);
 
         if (! $moid) {
@@ -222,14 +180,6 @@ class MobileCallbackController
             // PG 측 승인이 확정된 시점 — 후속 처리 실패 시 cancel 필요. catch 에서 참조.
             $approvedTid = $tid;
             $approvedTotPrice = $totPrice;
-            $embeddedPgProvider = $this->resolveEmbeddedPgProvider($selectedEasyPayMethod);
-
-            Log::info('KG Inicis mobile: completing card payment', [
-                'P_OID' => $moid,
-                'P_TID' => $tid,
-                'P_TYPE' => $payType ?: null,
-                'easy_pay' => $this->buildEasyPayLogContext($selectedEasyPayMethod),
-            ]);
 
             $this->orderService->completePayment($order, [
                 'transaction_id'          => $tid,
@@ -238,17 +188,16 @@ class MobileCallbackController
                 'card_name'               => $result['P_CARD_ISSUER_NAME'] ?? null,
                 'card_installment_months' => (int) ($result['P_CARD_QUOTA'] ?? 0),
                 'is_interest_free'        => false,
-                'embedded_pg_provider'    => $embeddedPgProvider,
+                'embedded_pg_provider'    => null,
                 'receipt_url'             => null,
-                'payment_meta'            => array_merge([
+                'payment_meta'            => [
                     'result_code'    => $resultStatus,
                     'pay_method'     => $payType ?: null,
                     'auth_date'      => $result['P_AUTH_DT'] ?? null,
                     'mid'            => $this->apiService->getMid(),
                     'is_test_mode'   => $this->apiService->isTestMode(),
-                    'pg_response_sanitized' => true,
-                    'pg_raw_response' => $this->sanitizePgResponse($result, self::MOBILE_APPROVE_RESPONSE_KEYS),
-                ], $this->buildEasyPayPaymentMeta($selectedEasyPayMethod)),
+                    'pg_raw_response' => $result,
+                ],
                 'payment_device'          => 'mobile',
             ], $totPrice);
 
@@ -368,8 +317,7 @@ class MobileCallbackController
                 'auth_date'       => $result['P_AUTH_DT'] ?? null,
                 'mid'             => $this->apiService->getMid(),
                 'is_test_mode'    => $this->apiService->isTestMode(),
-                'pg_response_sanitized' => true,
-                'pg_raw_response' => $this->sanitizePgResponse($result, self::MOBILE_VBANK_ISSUE_RESPONSE_KEYS),
+                'pg_raw_response' => $result,
             ],
         ], fn ($v) => $v !== null));
 

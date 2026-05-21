@@ -94,26 +94,13 @@ class PaymentRefundListener implements HookListenerInterface
             $previousCancelled = max(0, (int) $payment->cancelled_amount - $cancelAmt);
             $totalAmount = max($cancelAmt, $paidAmount - $previousCancelled);
             $isPartial = $previousCancelled > 0 || $cancelAmt < $paidAmount;
-
-            $isCbt = $this->isCbtPayment($payment);
-            if ($isCbt) {
-                $this->useStoredCbtCredentials($apiService, $payment);
-            }
-
-            $response = $isCbt
-                ? $apiService->refundCbtPayment(
-                    $tid,
-                    $isPartial ? $cancelAmt : null,
-                    $cancelMsg,
-                    $isPartial ? $totalAmount : null,
-                )
-                : $apiService->cancelPayment(
-                    $tid,
-                    $payMethod,
-                    $isPartial ? $cancelAmt : null,
-                    $cancelMsg,
-                    $isPartial ? $totalAmount : null,
-                );
+            $response = $apiService->cancelPayment(
+                $tid,
+                $payMethod,
+                $isPartial ? $cancelAmt : null,
+                $cancelMsg,
+                $isPartial ? $totalAmount : null,
+            );
 
             Log::info('KG Inicis: refund success', [
                 'order_id' => $order->id,
@@ -125,7 +112,7 @@ class PaymentRefundListener implements HookListenerInterface
                 'success' => true,
                 'error_code' => null,
                 'error_message' => null,
-                'transaction_id' => $response['refundTid'] ?? ($response['tid'] ?? $tid),
+                'transaction_id' => $response['tid'] ?? $tid,
             ];
         } catch (\Exception $e) {
             Log::error('KG Inicis: refund failed', [
@@ -142,24 +129,5 @@ class PaymentRefundListener implements HookListenerInterface
                 'transaction_id' => null,
             ];
         }
-    }
-
-    private function isCbtPayment(OrderPayment $payment): bool
-    {
-        $meta = $payment->payment_meta ?? [];
-
-        return (bool) ($meta['is_cbt'] ?? false)
-            || ($meta['cbt_type'] ?? null) !== null
-            || strtoupper((string) ($meta['pay_method'] ?? '')) === 'CBT';
-    }
-
-    private function useStoredCbtCredentials(KgInicisApiService $apiService, OrderPayment $payment): void
-    {
-        $meta = $payment->payment_meta ?? [];
-
-        $apiService->useStoredCbtCredentials(
-            (bool) ($meta['is_test_mode'] ?? true),
-            (string) ($meta['cbt_mid'] ?? ($meta['mid'] ?? '')),
-        );
     }
 }

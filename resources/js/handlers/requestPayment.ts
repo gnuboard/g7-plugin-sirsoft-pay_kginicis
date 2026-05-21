@@ -1,13 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import {
-    KOREAN_PAYMENT_FORM_ID_PREFIX,
-    consumeStandardPaySdkReloadFlag,
-    markMobilePaymentReturnPending,
-    removeKoreanPaymentForms,
-    resetStandardPaySdk,
-} from '../paymentDomCleanup';
-
 interface PgPaymentData {
     order_number: string;
     order_name: string;
@@ -33,8 +25,6 @@ interface ClientConfig {
     callback_urls: {
         signature: string;
         callback: string;
-        close: string;
-        cbt_checkout_token: string;
         cbt_hash_data: string;
         cbt_callback: string;
         cbt_auth_url: string;
@@ -43,21 +33,10 @@ interface ClientConfig {
         mobile_vbank_notify: string;
     };
     japan_enabled: boolean;
-    japan_configured?: boolean;
     use_escrow: boolean;
     japan_mid: string;
-    cbt_extra_data?: CbtExtraData;
+    enabled_easy_pays: string[];
     use_credit_point: boolean;
-}
-
-interface CbtExtraData {
-    paymentUI?: Record<string, string>;
-    payment?: {
-        paymethod?: string[];
-        isMobile?: string;
-        card?: Record<string, unknown>;
-    };
-    gmoPayment?: Record<string, string>;
 }
 
 interface SignatureResponse {
@@ -73,10 +52,6 @@ interface MobileSignatureResponse {
 
 interface CbtHashDataResponse {
     hash_data: string;
-}
-
-interface CbtCheckoutTokenResponse {
-    checkout_token: string;
 }
 
 declare global {
@@ -110,26 +85,11 @@ function loadScript(src: string): Promise<void> {
     });
 }
 
-function appendSelectedPaymentMethod(url: string, paymentMethod: string): string {
-    if (!paymentMethod.startsWith('kginicis_')) {
-        return url;
-    }
-
-    const resolved = new URL(url, window.location.origin);
-    resolved.searchParams.set('selectedPaymentMethod', paymentMethod);
-
-    return resolved.toString();
-}
-
-function submitForm(action: string, fields: Record<string, string>, charset = 'utf-8', formId?: string): void {
+function submitForm(action: string, fields: Record<string, string>, charset = 'utf-8'): void {
     const form = document.createElement('form');
-    if (formId) {
-        form.id = formId;
-    }
     form.method = 'POST';
     form.action = action;
     form.acceptCharset = charset;
-    form.style.display = 'none';
 
     for (const [name, value] of Object.entries(fields)) {
         const input = document.createElement('input');
@@ -151,28 +111,22 @@ function submitForm(action: string, fields: Record<string, string>, charset = 'u
  *
  * gnuboard5 shop/inicis/lpay_order.script.php 참조:
  *   gopaymethod = (inicis_settle_case === 'inicis_kakaopay') ? 'onlykakaopay' : 'onlylpay'
- *
- * KG 이니시스 간편결제 다이렉트 호출 옵션:
- *   - Samsung Pay: onlyssp
- *   - Naver Pay: onlynaverpay
  */
 export const GOPAYMETHOD_MAP: Record<string, string> = {
-    card:                 'Card',
-    vbank:                'VBank',
-    bank:                 'DirectBank',
-    phone:                'HPP',
-    kginicis_samsung_pay: 'onlyssp',
-    kginicis_naverpay:    'onlynaverpay',
-    kginicis_lpay:        'onlylpay',
-    kginicis_kakaopay:    'onlykakaopay',
+    card:               'Card',
+    vbank:              'VBank',
+    bank:               'DirectBank',
+    phone:              'HPP',
+    kginicis_lpay:      'onlylpay',
+    kginicis_kakaopay:  'onlykakaopay',
 };
 
 /**
  * 모바일 결제수단 → P_INI_PAYMENT 매핑 (manual.inicis.com/pay/stdpay_m.html#popup_7).
  *
- * 일반 결제수단만 P_INI_PAYMENT 로 분기 가능. 간편결제 (Samsung Pay / Naver Pay /
- * L.pay / 카카오페이) 는 모바일에서 *완전히 다른 엔드포인트* 를 사용하며 P_INI_PAYMENT
- * 가 아닌 P_RESERVED 의 'd_samsungpay=Y' / 'd_npay=Y' / 'd_lpay=Y' / 'd_kakaopay=Y' 힌트로
+ * 일반 결제수단만 P_INI_PAYMENT 로 분기 가능. 간편결제 (Samsung Pay / L.pay /
+ * 카카오페이) 는 모바일에서 *완전히 다른 엔드포인트* 를 사용하며 P_INI_PAYMENT
+ * 가 아닌 P_RESERVED 의 'd_samsungpay=Y' / 'd_lpay=Y' / 'd_kakaopay=Y' 힌트로
  * 식별된다. 따라서 본 맵은 일반 결제수단만 보유한다.
  *
  * 휴대폰결제 코드는 PC 의 'HPP' 가 아닌 'MOBILE' — 잘못된 P_INI_PAYMENT 응답 회귀 차단.
@@ -188,14 +142,13 @@ export const MOBILE_PAYMETHOD_MAP: Record<string, string> = {
  * 모바일 간편결제 → P_RESERVED 에 추가할 hint 토큰 매핑.
  *
  * gnuboard5 mobile/shop/samsungpay/order.script.php 참조:
- *   d_samsungpay=Y / d_npay=Y / d_lpay=Y / d_kakaopay=Y
+ *   d_samsungpay=Y / d_lpay=Y / d_kakaopay=Y
  *
  * 모바일 간편결제는 https://mobile.inicis.com/smart/wcard/ 로 폼 제출하며
  * P_INI_PAYMENT 를 보내지 않는다.
  */
 export const MOBILE_EASY_PAY_RESERVED_HINT: Record<string, string> = {
     kginicis_samsung_pay: 'd_samsungpay=Y',
-    kginicis_naverpay:    'd_npay=Y',
     kginicis_lpay:        'd_lpay=Y',
     kginicis_kakaopay:    'd_kakaopay=Y',
 };
@@ -222,17 +175,15 @@ async function requestMobileKoreanPayment(
     const { chkfake, mobile_payment_url: mobilePaymentUrl } = sigJson.data;
 
     // 메뉴얼(STEP 2) 표준 응답에는 P_OID 가 없음 — 주문번호를 쿼리스트링으로 echo 받아 회수.
-    const nextUrl = appendSelectedPaymentMethod(
+    const nextUrl =
         window.location.origin +
-            config.callback_urls.mobile_callback +
-            '?orderId=' + encodeURIComponent(pgPaymentData.order_number),
-        paymentMethod,
-    );
+        config.callback_urls.mobile_callback +
+        '?orderId=' + encodeURIComponent(pgPaymentData.order_number);
 
     const easyPayHint = MOBILE_EASY_PAY_RESERVED_HINT[paymentMethod];
     const isEasyPay = easyPayHint !== undefined;
 
-    // 모바일 간편결제 (Samsung Pay / Naver Pay / L.pay / 카카오페이) 는 별도 엔드포인트 사용.
+    // 모바일 간편결제 (Samsung Pay / L.pay / 카카오페이) 는 별도 엔드포인트 사용.
     // gnuboard5 mobile/shop/samsungpay/order.script.php 참조:
     //   form.action = 'https://mobile.inicis.com/smart/wcard/'
     // 백엔드가 반환한 mobilePaymentUrl (/smart/payment/) 의 마지막 path segment 를
@@ -291,13 +242,7 @@ async function requestMobileKoreanPayment(
             window.location.origin + config.callback_urls.mobile_vbank_notify;
     }
 
-    markMobilePaymentReturnPending();
-    submitForm(
-        submitUrl,
-        fields,
-        'euc-kr',
-        KOREAN_PAYMENT_FORM_ID_PREFIX + 'mobile_' + Date.now(),
-    );
+    submitForm(submitUrl, fields, 'euc-kr');
 }
 
 /**
@@ -318,10 +263,6 @@ async function requestKoreanPayment(
 
     const { signature, verification, mKey } = signatureJson.data;
 
-    if (consumeStandardPaySdkReloadFlag()) {
-        resetStandardPaySdk(config.sdk_url);
-    }
-
     if (!window.INIStdPay) {
         await loadScript(config.sdk_url);
     }
@@ -334,15 +275,15 @@ async function requestKoreanPayment(
         throw new Error('INIStdPay SDK not available');
     }
 
-    const callbackUrl = appendSelectedPaymentMethod(
-        window.location.origin + config.callback_urls.callback,
-        paymentMethod,
-    );
-    // KG 이니시스 공식 closeUrl 페이지에서 결제창만 닫게 하여 체크아웃 SPA를 유지한다.
-    const orderCloseUrl = window.location.origin + config.callback_urls.close;
-    removeKoreanPaymentForms();
-
-    const formId = KOREAN_PAYMENT_FORM_ID_PREFIX + Date.now();
+    const callbackUrl = window.location.origin + config.callback_urls.callback;
+    // closeUrl 비우기 — KG 이니시스 결제창 X / 취소 클릭 시 SPA 페이지가
+    // location.href = closeUrl 로 전체 새로고침되어 체크아웃 폼 입력 상태
+    // (배송지/연락처/옵션 선택) 가 모두 휘발하는 UX 회귀 회피.
+    // 빈 문자열일 때 INIStdPay 는 자체 fallback 으로 팝업만 닫고 부모
+    // 페이지는 유지하는 동작을 기대 (PG 매뉴얼 상 옵션 필드).
+    // 미동작 시 옵션 A 로 현재 URL 을 closeUrl 로 두는 fallback 가능.
+    const orderCloseUrl = '';
+    const formId = 'kginicis_pay_form_' + Date.now();
 
     const form = document.createElement('form');
     form.id = formId;
@@ -374,16 +315,11 @@ async function requestKoreanPayment(
                 ? `HPP(1):${escrow}${creditPoint}centerCd(Y)`
                 : `${escrow}${creditPoint}centerCd(Y)`;
 
-            // 간편결제 (삼성페이 / 네이버페이 / LPAY / 카카오페이) 는 base 뒤에 ':cardonly' 를 append.
+            // 간편결제 (LPAY / 카카오페이) 는 base 뒤에 ':cardonly' 를 append.
             // gnuboard5 orderform.4.php 의
             //   f.acceptmethod.value = f.acceptmethod.value + ":cardonly"
             // 와 일치 — 에스크로 옵션 등 base 를 보존하고 cardonly 만 추가.
-            if (
-                paymentMethod === 'kginicis_samsung_pay'
-                || paymentMethod === 'kginicis_naverpay'
-                || paymentMethod === 'kginicis_lpay'
-                || paymentMethod === 'kginicis_kakaopay'
-            ) {
+            if (paymentMethod === 'kginicis_lpay' || paymentMethod === 'kginicis_kakaopay') {
                 return base ? `${base}:cardonly` : 'cardonly';
             }
             return base;
@@ -427,23 +363,6 @@ function formatCbtTimestamp(date: Date = new Date()): string {
     );
 }
 
-function buildCbtExtraData(config: ClientConfig): CbtExtraData {
-    const base: CbtExtraData = config.cbt_extra_data ?? {};
-
-    return {
-        ...base,
-        paymentUI: {
-            language: 'JP',
-            ...(base.paymentUI ?? {}),
-        },
-        payment: {
-            paymethod: ['CARD'],
-            ...(base.payment ?? {}),
-            isMobile: isMobileUserAgent() ? 'true' : 'false',
-        },
-    };
-}
-
 async function requestCbtPayment(
     G7Core: any,
     config: ClientConfig,
@@ -452,30 +371,9 @@ async function requestCbtPayment(
     const japanMid = config.japan_mid;
     const timestamp = formatCbtTimestamp();
 
-    const buyerEmail = pgPaymentData.customer_email ?? '';
-    const buyerPhone = pgPaymentData.customer_phone ?? '';
-    const tokenResponse: { data: CbtCheckoutTokenResponse } = await G7Core.api.post(
-        config.callback_urls.cbt_checkout_token,
-        {
-            oid: pgPaymentData.order_number,
-            price: pgPaymentData.amount,
-            buyer_email: buyerEmail,
-            buyer_phone: buyerPhone,
-        },
-    );
-
-    const { checkout_token: checkoutToken } = tokenResponse.data;
-
     const hashResponse: { data: CbtHashDataResponse } = await G7Core.api.post(
         config.callback_urls.cbt_hash_data,
-        {
-            oid: pgPaymentData.order_number,
-            price: pgPaymentData.amount,
-            timestamp,
-            buyer_email: buyerEmail,
-            buyer_phone: buyerPhone,
-            checkout_token: checkoutToken,
-        },
+        { oid: pgPaymentData.order_number, price: pgPaymentData.amount, timestamp },
     );
 
     const { hash_data: hashData } = hashResponse.data;
@@ -483,7 +381,7 @@ async function requestCbtPayment(
     const returnUrl =
         window.location.origin +
         config.callback_urls.cbt_callback +
-        `?oid=${encodeURIComponent(pgPaymentData.order_number)}`;
+        `?oid=${encodeURIComponent(pgPaymentData.order_number)}&amount=${pgPaymentData.amount}`;
 
     submitForm(config.callback_urls.cbt_auth_url, {
         cbtType:     'JPPG',
@@ -497,7 +395,7 @@ async function requestCbtPayment(
         amount:      String(pgPaymentData.amount),
         orderId:     pgPaymentData.order_number,
         hashData,
-        extraData:   JSON.stringify(buildCbtExtraData(config)),
+        extraData:   JSON.stringify({}),
     });
 }
 
@@ -530,17 +428,9 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
 
         const config: ClientConfig = configJson.data;
         const currency = pgPaymentData.currency ?? 'WON';
-        const isJpy = currency === 'JPY';
-        const isJapanConfigured =
-            config.japan_enabled &&
-            !!config.japan_mid &&
-            config.japan_configured !== false;
+        const isJapan = currency === 'JPY' && config.japan_enabled && !!config.japan_mid;
 
-        if (isJpy && !isJapanConfigured) {
-            throw new Error('KG Inicis Japan CBT payment is not configured.');
-        }
-
-        if (isJpy) {
+        if (isJapan) {
             await requestCbtPayment(G7Core, config, pgPaymentData);
         } else if (isMobileUserAgent()) {
             await requestMobileKoreanPayment(G7Core, config, pgPaymentData, paymentMethod);

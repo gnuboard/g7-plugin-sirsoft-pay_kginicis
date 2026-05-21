@@ -16,8 +16,6 @@ use Modules\Sirsoft\Ecommerce\Helpers\DeviceDetector;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
-use Plugins\Sirsoft\PayKginicis\Concerns\ResolvesEasyPaySelection;
-use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\AuthCallbackRequest;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\MobileVbankNotifyRequest;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\VbankNotifyRequest;
@@ -33,8 +31,6 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 class PaymentCallbackController
 {
     use PreventsReplayCallback;
-    use ResolvesEasyPaySelection;
-    use SanitizesPgResponse;
 
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
@@ -45,75 +41,6 @@ class PaymentCallbackController
      * 조용히 복귀시킨다 (NHN KCP 의 CANCEL_RES_CODES 패턴과 동일).
      */
     private const CANCEL_RES_CODES = ['2001', '0021', '0022', ''];
-
-    private const PC_AUTH_RESPONSE_KEYS = [
-        'resultCode',
-        'resultMsg',
-        'tid',
-        'payMethod',
-        'applNum',
-        'applDate',
-        'applTime',
-        'TotPrice',
-        'totPrice',
-        'MOID',
-        'moid',
-        'mid',
-        'MID',
-        'cardCode',
-        'cardName',
-        'cardQuota',
-        'cardInterest',
-        'goodName',
-        'goodsName',
-        'currency',
-        'currencyCode',
-    ];
-
-    private const PC_VBANK_ISSUE_RESPONSE_KEYS = [
-        'resultCode',
-        'resultMsg',
-        'tid',
-        'payMethod',
-        'applDate',
-        'applTime',
-        'MOID',
-        'moid',
-        'mid',
-        'MID',
-        'TotPrice',
-        'totPrice',
-        'VACT_BankCode',
-        'VACT_BankName',
-        'vactBankName',
-        'VACT_Date',
-        'VACT_Time',
-        'VACT_Status',
-        'goodName',
-        'goodsName',
-    ];
-
-    private const PC_VBANK_NOTIFY_RESPONSE_KEYS = [
-        'no_tid',
-        'no_oid',
-        'id_merchant',
-        'dt_trans',
-        'tm_trans',
-        'cd_bank',
-        'amt_input',
-        'nm_inputbank',
-    ];
-
-    private const MOBILE_VBANK_NOTIFY_RESPONSE_KEYS = [
-        'P_STATUS',
-        'P_TYPE',
-        'P_TID',
-        'P_OID',
-        'P_AMT',
-        'P_AUTH_DT',
-        'P_FN_CD1',
-        'P_FN_NM',
-    ];
 
     public function __construct(
         private readonly OrderProcessingService $orderService,
@@ -130,7 +57,6 @@ class PaymentCallbackController
     public function authCallback(AuthCallbackRequest $request): \Illuminate\Http\RedirectResponse
     {
         $validated = $request->validated();
-        $selectedEasyPayMethod = $this->resolveSelectedEasyPayMethod($request);
 
         $resultCode = $validated['resultCode'];
 
@@ -146,7 +72,6 @@ class PaymentCallbackController
             'idc_name'    => $validated['idc_name'] ?? null,
             'auth_url'    => $validated['authUrl'] ?? null,
             'all_fields'  => array_keys($request->all()),
-            'easy_pay'    => $this->buildEasyPayLogContext($selectedEasyPayMethod),
         ]);
 
         if (! $moid) {
@@ -272,15 +197,6 @@ class PaymentCallbackController
                 $totPrice = (int) ($pgResponse['TotPrice'] ?? $pgResponse['totPrice'] ?? 0);
             }
 
-            $embeddedPgProvider = $this->resolveEmbeddedPgProvider($selectedEasyPayMethod);
-
-            Log::info('KG Inicis: completing card payment', [
-                'moid' => $moid,
-                'tid' => $tid,
-                'pg_pay_method' => $pgResponse['payMethod'] ?? null,
-                'easy_pay' => $this->buildEasyPayLogContext($selectedEasyPayMethod),
-            ]);
-
             $this->orderService->completePayment($order, [
                 'transaction_id' => $tid,
                 'card_approval_number' => $pgResponse['applNum'] ?? null,
@@ -288,17 +204,16 @@ class PaymentCallbackController
                 'card_name' => $pgResponse['cardName'] ?? null,
                 'card_installment_months' => (int) ($pgResponse['cardQuota'] ?? 0),
                 'is_interest_free' => false,
-                'embedded_pg_provider' => $embeddedPgProvider,
+                'embedded_pg_provider' => null,
                 'receipt_url' => null,
-                'payment_meta' => array_merge([
+                'payment_meta' => [
                     'result_code' => $pgResultCode,
                     'pay_method' => $pgResponse['payMethod'] ?? null,
                     'auth_date' => $pgResponse['applDate'] ?? null,
                     'mid' => $this->apiService->getMid(),
                     'is_test_mode' => $this->apiService->isTestMode(),
-                    'pg_response_sanitized' => true,
-                    'pg_raw_response' => $this->sanitizePgResponse($pgResponse, self::PC_AUTH_RESPONSE_KEYS),
-                ], $this->buildEasyPayPaymentMeta($selectedEasyPayMethod)),
+                    'pg_raw_response' => $pgResponse,
+                ],
                 'payment_device' => DeviceDetector::detect($request),
             ], $totPrice);
 
@@ -380,8 +295,7 @@ class PaymentCallbackController
                     'bank_code'       => $validated['cd_bank'] ?? null,
                     'mid'             => $this->apiService->getMid(),
                     'is_test_mode'    => $this->apiService->isTestMode(),
-                    'pg_response_sanitized' => true,
-                    'pg_raw_response' => $this->sanitizePgResponse($validated, self::PC_VBANK_NOTIFY_RESPONSE_KEYS),
+                    'pg_raw_response' => $validated,
                 ],
             ], $amt);
 
@@ -461,8 +375,7 @@ class PaymentCallbackController
                     'bank_code'       => $validated['P_FN_CD1'] ?? null,
                     'mid'             => $this->apiService->getMid(),
                     'is_test_mode'    => $this->apiService->isTestMode(),
-                    'pg_response_sanitized' => true,
-                    'pg_raw_response' => $this->sanitizePgResponse($validated, self::MOBILE_VBANK_NOTIFY_RESPONSE_KEYS),
+                    'pg_raw_response' => $validated,
                 ],
                 'payment_device' => 'mobile',
             ], $amt);
@@ -564,8 +477,7 @@ class PaymentCallbackController
                 'auth_date'       => $pgResponse['applDate'] ?? null,
                 'mid'             => $this->apiService->getMid(),
                 'is_test_mode'    => $this->apiService->isTestMode(),
-                'pg_response_sanitized' => true,
-                'pg_raw_response' => $this->sanitizePgResponse($pgResponse, self::PC_VBANK_ISSUE_RESPONSE_KEYS),
+                'pg_raw_response' => $pgResponse,
             ],
         ], fn ($v) => $v !== null));
 

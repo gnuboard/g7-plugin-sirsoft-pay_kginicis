@@ -1,10 +1,9 @@
 import { handlerMap } from './handlers';
 import { installOrderResponseInterceptor } from './orderResponseInterceptor';
 import { installMypageOrderShowInjector } from './mypageOrderShowInjector';
-import { installAdminOrderPaymentDisplayInjector } from './adminOrderPaymentDisplayInjector';
 import { installOrderCompleteReceiptInjector } from './orderCompleteReceiptInjector';
 import { installVbankInfoInjector } from './vbankInfoInjector';
-import { installPaymentCloseMessageListener } from './paymentCloseMessageListener';
+import { installCheckoutEasyPayInjector } from './checkoutEasyPayInjector';
 
 const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
@@ -86,10 +85,9 @@ function initPlugin(): void {
 installOrderResponseInterceptor();
 
 installMypageOrderShowInjector();
-installAdminOrderPaymentDisplayInjector();
 installOrderCompleteReceiptInjector();
 installVbankInfoInjector();
-installPaymentCloseMessageListener();
+installCheckoutEasyPayInjector();
 
 initPlugin();
 

@@ -7,10 +7,6 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { requestPaymentHandler } from '../../handlers/requestPayment';
-import {
-    clearMobilePaymentReturnPending,
-    consumeMobilePaymentReturnPending,
-} from '../../paymentDomCleanup';
 
 const PG_PAYMENT = {
     order_number: 'ORD-001',
@@ -37,24 +33,29 @@ describe('requestPaymentHandler', () => {
         vi.restoreAllMocks();
     });
 
-    it('pgPaymentData가 없으면 조기 반환', async () => {
+    it('pgPaymentData가 없으면 console.error 후 조기 반환', async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
         await requestPaymentHandler({ params: {} });
 
+        expect(consoleSpy).toHaveBeenCalledWith(
+            expect.stringContaining('pgPaymentData is required')
+        );
         expect(apiGet).not.toHaveBeenCalled();
         expect(setLocalSpy).not.toHaveBeenCalled();
     });
 
-    it('client config 응답에 data 가 없으면 catch 블록에서 setLocal 복구', async () => {
+    it('client config 응답에 data 가 없으면 console.error 후 조기 반환', async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         apiGet.mockResolvedValue({}); // data 누락
 
         await requestPaymentHandler({ params: { pgPaymentData: PG_PAYMENT } });
 
-        expect(setLocalSpy).toHaveBeenCalledWith(
-            expect.objectContaining({
-                isSubmittingOrder: false,
-                paymentErrorMessage: 'Failed to fetch KG Inicis client config',
-            }),
+        expect(consoleSpy).toHaveBeenCalledWith(
+            expect.stringContaining('Failed to fetch client config'),
+            expect.anything()
         );
+        expect(setLocalSpy).not.toHaveBeenCalled();
     });
 
     it('client config API 자체가 throw 하면 catch 블록에서 setLocal 복구', async () => {
@@ -70,130 +71,6 @@ describe('requestPaymentHandler', () => {
     });
 });
 
-describe('requestPaymentHandler — PC closeUrl', () => {
-    const CLIENT_CONFIG = {
-        data: {
-            mid: 'INIpayTest',
-            sdk_url: 'https://stgstdpay.inicis.com/stdjs/INIStdPay.js',
-            japan_enabled: false,
-            japan_mid: '',
-            use_escrow: false,
-            use_credit_point: false,
-            callback_urls: {
-                signature: '/api/plugins/sirsoft-pay_kginicis/payment/signature',
-                callback: '/plugins/sirsoft-pay_kginicis/payment/callback',
-                close: '/plugins/sirsoft-pay_kginicis/payment/close',
-            },
-        },
-    };
-
-    let apiGet: ReturnType<typeof vi.fn>;
-    let apiPost: ReturnType<typeof vi.fn>;
-    let paySpy: ReturnType<typeof vi.fn>;
-    let originalUserAgent: PropertyDescriptor | undefined;
-
-    beforeEach(() => {
-        apiGet = vi.fn().mockResolvedValue(CLIENT_CONFIG);
-        apiPost = vi.fn().mockResolvedValue({
-            data: {
-                signature: 'signature-stub',
-                verification: 'verification-stub',
-                mKey: 'mkey-stub',
-            },
-        });
-        paySpy = vi.fn();
-        (window as any).INIStdPay = { pay: paySpy };
-        (window as Record<string, unknown>).G7Core = {
-            api: { get: apiGet, post: apiPost },
-            state: { setLocal: vi.fn() },
-            toast: { error: vi.fn() },
-        };
-        originalUserAgent = Object.getOwnPropertyDescriptor(window.navigator, 'userAgent');
-        Object.defineProperty(window.navigator, 'userAgent', {
-            value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)',
-            configurable: true,
-        });
-    });
-
-    afterEach(() => {
-        delete (window as any).INIStdPay;
-        delete (window as Record<string, unknown>).G7Core;
-        document.body.innerHTML = '';
-        if (originalUserAgent) {
-            Object.defineProperty(window.navigator, 'userAgent', originalUserAgent);
-        }
-        vi.restoreAllMocks();
-    });
-
-    function getLastPaymentFormFields(): Record<string, string> {
-        const forms = document.body.querySelectorAll('form');
-        const form = forms[forms.length - 1];
-        if (!form) throw new Error('No payment form was created');
-        const fields: Record<string, string> = {};
-        form.querySelectorAll('input[type="hidden"]').forEach((el) => {
-            const input = el as HTMLInputElement;
-            fields[input.name] = input.value;
-        });
-        return fields;
-    }
-
-    it('X 버튼 취소 시 체크아웃 SPA를 새로고침하지 않도록 닫기 전용 closeUrl 을 전달', async () => {
-        await requestPaymentHandler({
-            params: {
-                pgPaymentData: PG_PAYMENT,
-                paymentMethod: 'card',
-            },
-        });
-
-        expect(paySpy).toHaveBeenCalledTimes(1);
-        const fields = getLastPaymentFormFields();
-        expect(fields.returnUrl).toBe(
-            `${window.location.origin}/plugins/sirsoft-pay_kginicis/payment/callback`,
-        );
-        expect(fields.closeUrl).toBe(
-            `${window.location.origin}/plugins/sirsoft-pay_kginicis/payment/close`,
-        );
-        expect(fields.closeUrl).not.toBe('');
-        expect(fields.payViewType).toBe('overlay');
-    });
-
-    it('이전 KG 결제 폼 잔재를 제거하고 새 폼만 생성한다', async () => {
-        const staleForm = document.createElement('form');
-        staleForm.id = 'kginicis_pay_form_stale';
-        document.body.appendChild(staleForm);
-
-        await requestPaymentHandler({
-            params: {
-                pgPaymentData: PG_PAYMENT,
-                paymentMethod: 'card',
-            },
-        });
-
-        const kginicisForms = document.body.querySelectorAll('form[id^="kginicis_pay_form_"]');
-
-        expect(kginicisForms).toHaveLength(1);
-        expect(document.getElementById('kginicis_pay_form_stale')).toBeNull();
-    });
-
-    it('네이버페이는 KG 이니시스 다이렉트 호출 파라미터로 요청한다', async () => {
-        await requestPaymentHandler({
-            params: {
-                pgPaymentData: PG_PAYMENT,
-                paymentMethod: 'kginicis_naverpay',
-            },
-        });
-
-        const fields = getLastPaymentFormFields();
-
-        expect(fields.gopaymethod).toBe('onlynaverpay');
-        expect(fields.acceptmethod).toContain('cardonly');
-        expect(fields.returnUrl).toBe(
-            `${window.location.origin}/plugins/sirsoft-pay_kginicis/payment/callback` +
-                '?selectedPaymentMethod=kginicis_naverpay',
-        );
-    });
-});
-
 /**
  * CBT (일본 엔 결제, JPPG) 흐름 회귀 테스트
  *
@@ -203,7 +80,7 @@ describe('requestPaymentHandler — PC closeUrl', () => {
  * - cbtType: 'JPPG' 고정 (4 bytes)
  * - timestamp: yyyyMMddHHmmss (14 bytes, epoch ms 사용 금지)
  * - buyerTel: 선택이지만 customer_phone 이 있으면 전송
- * - extraData: JSON String (JPPG 결제창 표시 정보 포함)
+ * - extraData: JSON String (빈 객체 허용)
  * - hashData plainText 순서는 백엔드 책임 (INIAPIKey+mid+timestamp+amount+orderId)
  */
 describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
@@ -221,30 +98,11 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         data: {
             mid: 'INIpayTest',
             japan_enabled: true,
-            japan_configured: true,
             japan_mid: 'CBTTEST001',
             callback_urls: {
-                cbt_checkout_token: '/api/plugins/sirsoft-pay_kginicis/payment/cbt/checkout-token',
                 cbt_hash_data: '/api/plugins/sirsoft-pay_kginicis/payment/cbt/hash-data',
                 cbt_callback: '/api/plugins/sirsoft-pay_kginicis/payment/cbt/callback',
                 cbt_auth_url: 'https://devcbt.inicis.com/cbtauth',
-            },
-            cbt_extra_data: {
-                paymentUI: { language: 'JP', colorTheme: 'blue2' },
-                payment: {
-                    paymethod: ['CARD'],
-                    card: { payType: ['one'], installMonth: [3] },
-                },
-                gmoPayment: {
-                    merchantName: 'サンプルストア',
-                    merchantNameKana: 'サンプルストア',
-                    merchantNameAlphabet: 'Sample Store',
-                    merchantNameShort: 'サンプル',
-                    contactName: 'サポート窓口',
-                    contactEmail: 'support@example.com',
-                    contactPhone: '0120-123-456',
-                    contactOpeningHours: '10:00-18:00',
-                },
             },
         },
     };
@@ -255,13 +113,7 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
 
     beforeEach(() => {
         apiGet = vi.fn().mockResolvedValue(CLIENT_CONFIG);
-        apiPost = vi.fn().mockImplementation((url: string) => {
-            if (url === CLIENT_CONFIG.data.callback_urls.cbt_checkout_token) {
-                return Promise.resolve({ data: { checkout_token: 'checkout-token-stub' } });
-            }
-
-            return Promise.resolve({ data: { hash_data: 'sha512hashstub' } });
-        });
+        apiPost = vi.fn().mockResolvedValue({ data: { hash_data: 'sha512hashstub' } });
         (window as Record<string, unknown>).G7Core = {
             api: { get: apiGet, post: apiPost },
             state: { setLocal: vi.fn() },
@@ -297,22 +149,10 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         await requestPaymentHandler({ params: { pgPaymentData: CBT_PG_PAYMENT } });
 
         expect(apiPost).toHaveBeenCalledWith(
-            CLIENT_CONFIG.data.callback_urls.cbt_checkout_token,
-            expect.objectContaining({
-                oid: CBT_PG_PAYMENT.order_number,
-                price: CBT_PG_PAYMENT.amount,
-                buyer_email: CBT_PG_PAYMENT.customer_email,
-                buyer_phone: CBT_PG_PAYMENT.customer_phone,
-            }),
-        );
-        expect(apiPost).toHaveBeenCalledWith(
             CLIENT_CONFIG.data.callback_urls.cbt_hash_data,
             expect.objectContaining({
                 oid: CBT_PG_PAYMENT.order_number,
                 price: CBT_PG_PAYMENT.amount,
-                buyer_email: CBT_PG_PAYMENT.customer_email,
-                buyer_phone: CBT_PG_PAYMENT.customer_phone,
-                checkout_token: 'checkout-token-stub',
             }),
         );
         expect(submitSpy).toHaveBeenCalledTimes(1);
@@ -326,11 +166,7 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         expect(fields.amount).toBe(String(CBT_PG_PAYMENT.amount));
         expect(fields.goodName).toBe(CBT_PG_PAYMENT.order_name);
         expect(fields.hashData).toBe('sha512hashstub');
-        const extraData = JSON.parse(fields.extraData);
-        expect(extraData.paymentUI.language).toBe('JP');
-        expect(extraData.payment.paymethod).toEqual(['CARD']);
-        expect(extraData.payment.isMobile).toBe('false');
-        expect(extraData.gmoPayment.merchantName).toBe('サンプルストア');
+        expect(fields.extraData).toBe('{}');
     });
 
     it('timestamp 가 yyyyMMddHHmmss 형식 (14자 숫자, epoch ms 아님)', async () => {
@@ -345,8 +181,7 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         // epoch ms (13자) 가 우연히 같은 정규식을 통과하지 않게 길이도 명시
         expect(fields.timestamp).not.toMatch(/^\d{13}$/);
         // hash-data 호출 시에도 같은 timestamp 가 전달되어야 함 (백엔드 hash 일관성)
-        const hashCall = apiPost.mock.calls.find(([url]) => url === CLIENT_CONFIG.data.callback_urls.cbt_hash_data);
-        const hashCallArgs = hashCall?.[1] as { timestamp: string };
+        const hashCallArgs = apiPost.mock.calls[0][1] as { timestamp: string };
         expect(hashCallArgs.timestamp).toBe(fields.timestamp);
     });
 
@@ -368,31 +203,37 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         expect(fields.buyerTel).toBe('');
     });
 
-    it('returnUrl 은 현재 origin + cbt_callback + oid 쿼리', async () => {
+    it('returnUrl 은 현재 origin + cbt_callback + oid/amount 쿼리', async () => {
         await requestPaymentHandler({ params: { pgPaymentData: CBT_PG_PAYMENT } });
 
         const fields = getLastSubmittedFormFields();
         expect(fields.returnUrl).toBe(
             `${window.location.origin}${CLIENT_CONFIG.data.callback_urls.cbt_callback}` +
-                `?oid=${encodeURIComponent(CBT_PG_PAYMENT.order_number)}`,
+                `?oid=${encodeURIComponent(CBT_PG_PAYMENT.order_number)}` +
+                `&amount=${CBT_PG_PAYMENT.amount}`,
         );
     });
 
-    it('JPY 주문에서 CBT 설정이 부족하면 한국 결제로 fallback 하지 않고 중단', async () => {
+    it('japan_mid 누락 시 CBT 분기 진입 안 함 (cbt hash-data API 미호출)', async () => {
+        // japan_enabled=true 라도 japan_mid 가 빈 문자열이면 isJapan 조건이 false
+        // → 한국 분기로 빠지며 cbt_hash_data 가 아닌 signature API 호출됨
         apiGet.mockResolvedValue({
-            data: { ...CLIENT_CONFIG.data, japan_mid: '', japan_configured: false },
+            data: { ...CLIENT_CONFIG.data, japan_mid: '' },
         });
+        // signature API mock (KRW 분기 진입을 막지 않기 위해)
+        apiPost.mockResolvedValue({ data: { signature: 's', verification: 'v', mKey: 'k' } });
+        // INIStdPay SDK 로드 분기를 건너뛰도록 미리 mock
+        (window as Record<string, unknown>).INIStdPay = { pay: vi.fn() };
 
         await requestPaymentHandler({ params: { pgPaymentData: CBT_PG_PAYMENT } });
 
-        expect(apiPost).not.toHaveBeenCalled();
-        expect(submitSpy).not.toHaveBeenCalled();
-        expect((window as any).G7Core.state.setLocal).toHaveBeenCalledWith(
-            expect.objectContaining({
-                isSubmittingOrder: false,
-                paymentErrorMessage: 'KG Inicis Japan CBT payment is not configured.',
-            }),
+        // CBT hash-data endpoint 가 호출되지 않았어야 함
+        const cbtCall = apiPost.mock.calls.find(
+            ([url]) => url === CLIENT_CONFIG.data.callback_urls.cbt_hash_data,
         );
+        expect(cbtCall).toBeUndefined();
+
+        delete (window as Record<string, unknown>).INIStdPay;
     });
 });
 
@@ -474,7 +315,6 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
     afterEach(() => {
         delete (window as Record<string, unknown>).G7Core;
         document.body.innerHTML = '';
-        clearMobilePaymentReturnPending();
         if (originalUserAgent) {
             Object.defineProperty(window.navigator, 'userAgent', originalUserAgent);
         }
@@ -494,16 +334,6 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
         expect(fields.P_INI_PAYMENT).toBe('MOBILE');
         // 회귀 차단: PC 의 HPP 값을 모바일에 잘못 매핑하지 않도록
         expect(fields.P_INI_PAYMENT).not.toBe('HPP');
-    });
-
-    it('모바일 결제 폼 제출 전 복귀 표시를 남겨 뒤로가기 시 blur 상태를 해제할 수 있게 한다', async () => {
-        await requestPaymentHandler({
-            params: { pgPaymentData: PG_PAYMENT, paymentMethod: 'card' },
-        });
-
-        const form = document.body.querySelector('form') as HTMLFormElement | null;
-        expect(form?.id).toMatch(/^kginicis_pay_form_mobile_/);
-        expect(consumeMobilePaymentReturnPending()).toBe(true);
     });
 
     it.each([
@@ -572,24 +402,5 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
         });
         const fields = getLastSubmittedFormFields();
         expect(fields.P_NOTI_URL).toBeUndefined();
-    });
-
-    it('모바일 네이버페이는 wcard 엔드포인트와 선택 결제수단 추적 쿼리를 전송한다', async () => {
-        await requestPaymentHandler({
-            params: { pgPaymentData: PG_PAYMENT, paymentMethod: 'kginicis_naverpay' },
-        });
-
-        const form = document.body.querySelector('form') as HTMLFormElement;
-        const fields = getLastSubmittedFormFields();
-
-        expect(form.action).toBe('https://mobile.inicis.com/smart/wcard/');
-        expect(fields.P_INI_PAYMENT).toBeUndefined();
-        expect(fields.P_RESERVED).toContain('d_npay=Y');
-        expect(fields.P_SKIP_TERMS).toBe('Y');
-        expect(fields.P_NEXT_URL).toBe(
-            `${window.location.origin}/plugins/sirsoft-pay_kginicis/payment/mobile/callback` +
-                `?orderId=${encodeURIComponent(PG_PAYMENT.order_number)}` +
-                '&selectedPaymentMethod=kginicis_naverpay',
-        );
     });
 });

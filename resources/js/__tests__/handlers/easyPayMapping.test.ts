@@ -19,14 +19,6 @@ describe('PC GOPAYMETHOD_MAP (INIStdPay)', () => {
      *
      * 'LPAY' / 'KAKAOPAY' 와 같은 대문자 토큰은 KG 이니시스 표준결제창이 받지 않는다.
      */
-    it('kginicis_samsung_pay 는 onlyssp 로 매핑되어야 한다', () => {
-        expect(GOPAYMETHOD_MAP.kginicis_samsung_pay).toBe('onlyssp');
-    });
-
-    it('kginicis_naverpay 는 onlynaverpay 로 매핑되어야 한다', () => {
-        expect(GOPAYMETHOD_MAP.kginicis_naverpay).toBe('onlynaverpay');
-    });
-
     it('kginicis_lpay 는 onlylpay 로 매핑되어야 한다 (대문자 LPAY 가 아님)', () => {
         expect(GOPAYMETHOD_MAP.kginicis_lpay).toBe('onlylpay');
     });
@@ -46,13 +38,12 @@ describe('PC GOPAYMETHOD_MAP (INIStdPay)', () => {
 describe('모바일 MOBILE_PAYMETHOD_MAP', () => {
     /**
      * 간편결제는 별도 엔드포인트 (/smart/wcard/) 와 P_RESERVED hint 로 식별된다.
-     * P_INI_PAYMENT 토큰으로 SAMSUNG/NPAY/LPAY/KAKAOPAY 를 보내는 방식은 잘못된 호환성
+     * P_INI_PAYMENT 토큰으로 SAMSUNG/LPAY/KAKAOPAY 를 보내는 방식은 잘못된 호환성
      * 가정이었음 — gnuboard5 mobile/shop/samsungpay/orderform.1.php 에는
      * P_INI_PAYMENT 필드 자체가 없다.
      */
     it('간편결제 식별자는 모바일 P_INI_PAYMENT 맵에 존재하지 않아야 한다', () => {
         expect(MOBILE_PAYMETHOD_MAP.kginicis_samsung_pay).toBeUndefined();
-        expect(MOBILE_PAYMETHOD_MAP.kginicis_naverpay).toBeUndefined();
         expect(MOBILE_PAYMETHOD_MAP.kginicis_lpay).toBeUndefined();
         expect(MOBILE_PAYMETHOD_MAP.kginicis_kakaopay).toBeUndefined();
     });
@@ -68,14 +59,10 @@ describe('모바일 MOBILE_PAYMETHOD_MAP', () => {
 describe('모바일 MOBILE_EASY_PAY_RESERVED_HINT', () => {
     /**
      * gnuboard5 mobile/shop/samsungpay/order.script.php 의 hint 토큰:
-     *   d_samsungpay=Y / d_npay=Y / d_lpay=Y / d_kakaopay=Y
+     *   d_samsungpay=Y / d_lpay=Y / d_kakaopay=Y
      */
     it('Samsung Pay hint', () => {
         expect(MOBILE_EASY_PAY_RESERVED_HINT.kginicis_samsung_pay).toBe('d_samsungpay=Y');
-    });
-
-    it('Naver Pay hint', () => {
-        expect(MOBILE_EASY_PAY_RESERVED_HINT.kginicis_naverpay).toBe('d_npay=Y');
     });
 
     it('L.pay hint', () => {

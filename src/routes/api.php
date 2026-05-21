@@ -3,13 +3,11 @@
 use Illuminate\Support\Facades\Route;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCashReceiptController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtConnectivityCheckController;
-use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtReconciliationController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtTestProductController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminEscrowDeliveryController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminEscrowDenyConfirmController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminOrderListController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminTransactionController;
-use Plugins\Sirsoft\PayKginicis\Controllers\CbtCheckoutTokenController;
 use Plugins\Sirsoft\PayKginicis\Controllers\CbtHashDataController;
 use Plugins\Sirsoft\PayKginicis\Controllers\MobileSignatureController;
 use Plugins\Sirsoft\PayKginicis\Controllers\PaymentSignatureController;
@@ -30,9 +28,6 @@ Route::post('/payment/signature', [PaymentSignatureController::class, 'generate'
     ->name('payment.signature');
 
 // CBT 해시 데이터 생성 — 인증 불필요, 프론트엔드에서 직접 호출
-Route::post('/payment/cbt/checkout-token', [CbtCheckoutTokenController::class, 'issue'])
-    ->name('payment.cbt.checkout-token');
-
 Route::post('/payment/cbt/hash-data', [CbtHashDataController::class, 'generate'])
     ->name('payment.cbt.hash-data');
 
@@ -68,11 +63,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
     // 주문번호로 거래 상태 조회 (레이아웃 확장 자동 로드용)
     Route::get('/orders/{orderNumber}/transaction-status', [AdminTransactionController::class, 'queryByOrder'])
         ->name('orders.transaction-status');
-
-    Route::get('/orders/{orderNumber}/cbt-reconciliation', [AdminCbtReconciliationController::class, 'show'])
-        ->name('orders.cbt-reconciliation.show');
-    Route::post('/orders/{orderNumber}/cbt-reconciliation/refund-retry', [AdminCbtReconciliationController::class, 'retryRefund'])
-        ->name('orders.cbt-reconciliation.refund-retry');
 
     // 현금영수증 별도발행
     Route::post('/orders/{orderNumber}/cash-receipt', [AdminCashReceiptController::class, 'issue'])

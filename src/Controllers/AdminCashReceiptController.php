@@ -47,10 +47,6 @@ class AdminCashReceiptController extends AdminBaseController
 
         $payment = DB::table('ecommerce_order_payments as p')
             ->join('ecommerce_orders as o', 'o.id', '=', 'p.order_id')
-            ->leftJoin('ecommerce_order_addresses as oa', function ($join) {
-                $join->on('oa.order_id', '=', 'o.id')
-                    ->where('oa.address_type', '=', 'shipping');
-            })
             ->where('o.order_number', $orderNumber)
             ->where('p.pg_provider', 'kginicis')
             ->whereNotNull('p.transaction_id')
@@ -65,9 +61,6 @@ class AdminCashReceiptController extends AdminBaseController
                 'p.payment_name',
                 'p.payment_meta',
                 'p.is_cash_receipt_issued',
-                'oa.orderer_name as address_orderer_name',
-                'oa.orderer_email as address_orderer_email',
-                'oa.orderer_phone as address_orderer_phone',
             ])
             ->first();
 
@@ -79,14 +72,13 @@ class AdminCashReceiptController extends AdminBaseController
             return ResponseHelper::error('messages.failed', 409, ['message' => [__('sirsoft-pay_kginicis::messages.errors.cash_receipt_already_issued')]]);
         }
 
-        // 구매자 정보는 결제 테이블 → 주문 배송지 순서로 사용한다. PG raw 응답은
-        // 민감정보 최소화를 위해 구매자 연락처 fallback 에 사용하지 않는다.
+        // payment_meta에서 구매자 정보 추출 (buyer_name 등이 null인 경우 raw PG 응답에서 사용)
         $meta = $payment->payment_meta ? json_decode($payment->payment_meta, true) : [];
         $rawResponse = $meta['pg_raw_response'] ?? [];
 
-        $buyerName  = $payment->buyer_name  ?? $payment->address_orderer_name ?? '';
-        $buyerEmail = $payment->buyer_email ?? $payment->address_orderer_email ?? '';
-        $buyerTel   = $payment->buyer_phone ?? $payment->address_orderer_phone ?? '';
+        $buyerName  = $payment->buyer_name  ?? $rawResponse['buyerName'] ?? '';
+        $buyerEmail = $payment->buyer_email ?? $rawResponse['buyerEmail'] ?? $rawResponse['custEmail'] ?? '';
+        $buyerTel   = $payment->buyer_phone ?? $rawResponse['buyerTel'] ?? '';
         $goodName   = $payment->payment_name ?? $rawResponse['goodName'] ?? $rawResponse['goodsName'] ?? __('sirsoft-pay_kginicis::messages.defaults.good_name');
 
         $price = (int) round((float) $payment->paid_amount_local);

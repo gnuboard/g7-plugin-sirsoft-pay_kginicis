@@ -13,11 +13,6 @@ return [
         'missing_tid' => '거래 ID(TID)가 없어 환불을 진행할 수 없습니다.',
         'default_reason' => '구매자 환불 요청',
     ],
-    'cbt_reconciliation' => [
-        'not_retryable' => '재시도 가능한 CBT 환불 대기 건이 아닙니다.',
-        'retry_success' => 'CBT 환불 재시도가 완료되었습니다.',
-        'retry_failed' => 'CBT 환불 재시도에 실패했습니다.',
-    ],
     'defaults' => [
         'good_name' => '상품',
     ],

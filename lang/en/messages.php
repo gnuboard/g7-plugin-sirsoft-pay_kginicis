@@ -13,11 +13,6 @@ return [
         'missing_tid' => 'Cannot process refund: transaction ID (TID) is missing.',
         'default_reason' => 'Buyer refund request',
     ],
-    'cbt_reconciliation' => [
-        'not_retryable' => 'This CBT refund item is not retryable.',
-        'retry_success' => 'CBT refund retry completed.',
-        'retry_failed' => 'CBT refund retry failed.',
-    ],
     'defaults' => [
         'good_name' => 'Goods',
     ],
