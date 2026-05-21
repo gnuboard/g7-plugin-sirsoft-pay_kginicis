@@ -69,6 +69,7 @@ class AdminTransactionController extends AdminBaseController
                 ->select([
                     'is_escrow',
                     'payment_meta',
+                    'embedded_pg_provider',
                     'paid_amount_local',
                     'currency',
                     'card_name',
@@ -96,6 +97,8 @@ class AdminTransactionController extends AdminBaseController
             $localRaw = $this->mergeLocalPaymentFallback($localRaw, $localPayment);
 
             $paymentMid = $this->resolvePaymentMid($localMeta, $localRaw, $tid);
+            $embeddedPgProvider = $localPayment?->embedded_pg_provider
+                ?: ($localMeta['embedded_pg_provider'] ?? null);
 
             // 결제 시점 모드(payment_meta.is_test_mode) 가 있으면 그 모드의 inapi 자격증명으로 조회.
             // 누락 시 MID prefix 로 추정 ('SIR' = live, 그 외 = test).
@@ -114,6 +117,7 @@ class AdminTransactionController extends AdminBaseController
                 $localRaw,
                 (bool) ($localPayment?->is_escrow ?? false),
                 $localPayment?->vbank_due_at,
+                is_string($embeddedPgProvider) ? $embeddedPgProvider : null,
             );
 
             return ResponseHelper::success('messages.success', $result);
@@ -209,7 +213,13 @@ class AdminTransactionController extends AdminBaseController
      * @param  string|null  $localVbankDueAt  로컬 DB 의 vbank_due_at (정확한 cutoff timestamp)
      * @return array 보강된 응답
      */
-    private function enrichResult(array $result, array $localRaw, bool $isEscrow, ?string $localVbankDueAt = null): array
+    private function enrichResult(
+        array $result,
+        array $localRaw,
+        bool $isEscrow,
+        ?string $localVbankDueAt = null,
+        ?string $embeddedPgProvider = null,
+    ): array
     {
         $cardInfo = is_array($result['cardInfo'] ?? null) ? $result['cardInfo'] : [];
 
@@ -232,11 +242,18 @@ class AdminTransactionController extends AdminBaseController
         };
 
         $payMethod = $pick('payMethod', 'PayMethod', 'paymethod') ?? '';
+        $basePayMethodLabel = $this->payMethodLabel($payMethod);
+        $embeddedPgProviderLabel = $this->embeddedPgProviderLabel($embeddedPgProvider);
 
         $result['_is_test_mode']      = $this->apiService->isTestMode();
         $result['_local_is_escrow']   = $isEscrow;
         $result['_pay_method']        = $payMethod;
-        $result['_pay_method_label']  = $this->payMethodLabel($payMethod);
+        $result['_base_pay_method_label'] = $basePayMethodLabel;
+        $result['_embedded_pg_provider'] = $embeddedPgProvider;
+        $result['_embedded_pg_provider_label'] = $embeddedPgProviderLabel;
+        $result['_pay_method_label']  = $embeddedPgProviderLabel
+            ? $embeddedPgProviderLabel.' ('.$basePayMethodLabel.')'
+            : $basePayMethodLabel;
         $result['_auth_code']         = $pick('applNum', 'approvedNumber', 'authCode', 'AuthCode');
         $result['_auth_date']         = $this->formatDateTime(
             $pick('applDate', 'approvedDate', 'AuthDate'),
@@ -331,6 +348,24 @@ class AdminTransactionController extends AdminBaseController
             'tosspay', 'toss'                         => '토스페이',
             'ssgpay'                                  => 'SSG페이',
             default                                   => $code,
+        };
+    }
+
+    private function embeddedPgProviderLabel(?string $provider): ?string
+    {
+        if ($provider === null || $provider === '') {
+            return null;
+        }
+
+        return match (strtolower($provider)) {
+            'samsungpay' => '삼성페이',
+            'kakaopay' => '카카오페이',
+            'lpay' => 'L.pay',
+            'payco' => '페이코',
+            'naverpay' => '네이버페이',
+            'tosspay', 'toss' => '토스페이',
+            'ssgpay' => 'SSG페이',
+            default => $provider,
         };
     }
 

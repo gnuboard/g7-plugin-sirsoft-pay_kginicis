@@ -77,7 +77,7 @@ export function clearMobilePaymentReturnPending(): void {
     delete (window as unknown as Record<string, unknown>)[MOBILE_PAYMENT_RETURN_PENDING_KEY];
 }
 
-export function consumeMobilePaymentReturnPending(now = Date.now()): boolean {
+export function hasMobilePaymentReturnPending(now = Date.now()): boolean {
     if (typeof window === 'undefined') {
         return false;
     }
@@ -101,7 +101,20 @@ export function consumeMobilePaymentReturnPending(now = Date.now()): boolean {
         return false;
     }
 
+    if (now - markedAt > MOBILE_PAYMENT_RETURN_TTL_MS) {
+        clearMobilePaymentReturnPending();
+        return false;
+    }
+
+    return true;
+}
+
+export function consumeMobilePaymentReturnPending(now = Date.now()): boolean {
+    if (!hasMobilePaymentReturnPending(now)) {
+        return false;
+    }
+
     clearMobilePaymentReturnPending();
 
-    return now - markedAt <= MOBILE_PAYMENT_RETURN_TTL_MS;
+    return true;
 }

@@ -18,6 +18,11 @@ interface OrderData {
     payment?: Payment;
 }
 
+interface KginicisOrderPaymentInfo {
+    receipt_url?: string | null;
+    payment_method_display_label?: string | null;
+}
+
 function getOrderFromState(orderNumber: string): OrderData | null {
     try {
         const g7 = (window as Record<string, unknown>).G7Core as Record<string, unknown> | undefined;
@@ -36,7 +41,7 @@ function getToken(): string | null {
     return localStorage.getItem('auth_token');
 }
 
-async function fetchReceiptUrl(orderNumber: string): Promise<string | null> {
+async function fetchOrderPaymentInfo(orderNumber: string): Promise<KginicisOrderPaymentInfo | null> {
     const token = getToken();
     if (!token) return null;
     try {
@@ -44,11 +49,15 @@ async function fetchReceiptUrl(orderNumber: string): Promise<string | null> {
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         });
         if (!res.ok) return null;
-        const data = (await res.json()) as { receipt_url?: string };
-        return data.receipt_url ?? null;
+        return (await res.json()) as KginicisOrderPaymentInfo;
     } catch {
         return null;
     }
+}
+
+async function fetchReceiptUrl(orderNumber: string): Promise<string | null> {
+    const data = await fetchOrderPaymentInfo(orderNumber);
+    return data?.receipt_url ?? null;
 }
 
 function findPaymentContainer(): Element | null {
@@ -66,6 +75,32 @@ function findPaymentContainer(): Element | null {
     if (!panelDiv) return null;
 
     return Array.from(panelDiv.children).find(el => el.className?.includes('space-y')) ?? panelDiv;
+}
+
+export function patchMypagePaymentMethodDisplay(container: Element, displayLabel: string | null | undefined): boolean {
+    if (!displayLabel) return false;
+
+    const rows = Array.from(container.querySelectorAll<HTMLElement>('div'));
+    for (const row of rows) {
+        const spans = Array.from(row.children).filter(
+            (child): child is HTMLElement => child instanceof HTMLElement && child.tagName === 'SPAN',
+        );
+        if (spans.length < 2) continue;
+
+        const label = spans[0].textContent?.trim();
+        if (label !== '결제 방법' && label !== '결제수단') continue;
+
+        const value = spans[spans.length - 1];
+        if (value.textContent?.trim() === displayLabel) {
+            return true;
+        }
+
+        value.textContent = displayLabel;
+        value.dataset.kginicisPaymentMethodPatched = 'true';
+        return true;
+    }
+
+    return false;
 }
 
 function buildReceiptRow(orderNumber: string): HTMLElement {
@@ -108,14 +143,25 @@ async function tryInject(orderNumber: string): Promise<boolean> {
     if (payment.payment_status !== 'paid') return true;
     if (!payment.transaction_id) return true;
 
-    if (document.getElementById(ROW_ID)) return true;
-
     const container = findPaymentContainer();
     if (!container) return false;
 
-    container.appendChild(buildReceiptRow(orderNumber));
-    console.info(`[${PLUGIN_ID}] receipt button injected on mypage order show`);
-    return true;
+    const paymentInfo = await fetchOrderPaymentInfo(orderNumber);
+    const patched = patchMypagePaymentMethodDisplay(
+        container,
+        paymentInfo?.payment_method_display_label,
+    );
+
+    if (!document.getElementById(ROW_ID) && paymentInfo?.receipt_url) {
+        container.appendChild(buildReceiptRow(orderNumber));
+        console.info(`[${PLUGIN_ID}] receipt button injected on mypage order show`);
+    }
+
+    if (patched) {
+        console.info(`[${PLUGIN_ID}] payment method display patched on mypage order show`);
+    }
+
+    return Boolean(document.getElementById(ROW_ID) || patched);
 }
 
 function startPolling(orderNumber: string): void {

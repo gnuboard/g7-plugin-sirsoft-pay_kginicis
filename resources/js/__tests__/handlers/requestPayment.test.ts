@@ -187,6 +187,10 @@ describe('requestPaymentHandler — PC closeUrl', () => {
 
         expect(fields.gopaymethod).toBe('onlynaverpay');
         expect(fields.acceptmethod).toContain('cardonly');
+        expect(fields.returnUrl).toBe(
+            `${window.location.origin}/plugins/sirsoft-pay_kginicis/payment/callback` +
+                '?selectedPaymentMethod=kginicis_naverpay',
+        );
     });
 });
 
@@ -568,5 +572,24 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
         });
         const fields = getLastSubmittedFormFields();
         expect(fields.P_NOTI_URL).toBeUndefined();
+    });
+
+    it('모바일 네이버페이는 wcard 엔드포인트와 선택 결제수단 추적 쿼리를 전송한다', async () => {
+        await requestPaymentHandler({
+            params: { pgPaymentData: PG_PAYMENT, paymentMethod: 'kginicis_naverpay' },
+        });
+
+        const form = document.body.querySelector('form') as HTMLFormElement;
+        const fields = getLastSubmittedFormFields();
+
+        expect(form.action).toBe('https://mobile.inicis.com/smart/wcard/');
+        expect(fields.P_INI_PAYMENT).toBeUndefined();
+        expect(fields.P_RESERVED).toContain('d_npay=Y');
+        expect(fields.P_SKIP_TERMS).toBe('Y');
+        expect(fields.P_NEXT_URL).toBe(
+            `${window.location.origin}/plugins/sirsoft-pay_kginicis/payment/mobile/callback` +
+                `?orderId=${encodeURIComponent(PG_PAYMENT.order_number)}` +
+                '&selectedPaymentMethod=kginicis_naverpay',
+        );
     });
 });
