@@ -682,7 +682,7 @@
                     },
                     {
                         "id": "easy_pay_section",
-                        "_comment_hidden": "간편결제는 차후 오픈 예정 — 현재는 렌더링 차단. 오픈 시 if 키 제거하면 복원됨.",
+                        "_comment_hidden": "간편결제 토글은 이커머스 admin/ecommerce/settings 의 결제수단 목록으로 이동됨 (RegisterEasyPayMethodsListener). 본 카드는 차후 별도 보강 시 if 키 제거하면 복원.",
                         "if": "{{false}}",
                         "type": "basic",
                         "name": "Div",
@@ -756,6 +756,44 @@
                                                 "name": "Toggle",
                                                 "props": {
                                                     "name": "easy_pay_allow_with_other_pg"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "basic",
+                                        "name": "Div",
+                                        "props": {
+                                            "className": "flex items-start justify-between px-6 py-4"
+                                        },
+                                        "children": [
+                                            {
+                                                "type": "basic",
+                                                "name": "Div",
+                                                "children": [
+                                                    {
+                                                        "type": "basic",
+                                                        "name": "Label",
+                                                        "props": {
+                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                        },
+                                                        "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_naverpay"
+                                                    },
+                                                    {
+                                                        "type": "basic",
+                                                        "name": "P",
+                                                        "props": {
+                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                        },
+                                                        "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_naverpay_hint"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "type": "composite",
+                                                "name": "Toggle",
+                                                "props": {
+                                                    "name": "easy_pay_naverpay"
                                                 }
                                             }
                                         ]
@@ -1398,6 +1436,46 @@
                                                                 ]
                                                             },
                                                             {
+                                                                "comment": "APP_URL / callback URL 사전 점검",
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "props": { "className": "p-3 rounded-md bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-700 text-xs space-y-2" },
+                                                                "children": [
+                                                                    {
+                                                                        "type": "basic",
+                                                                        "name": "Div",
+                                                                        "props": { "className": "font-semibold text-gray-800 dark:text-gray-200" },
+                                                                        "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_title"
+                                                                    },
+                                                                    {
+                                                                        "type": "basic",
+                                                                        "name": "Div",
+                                                                        "props": { "className": "grid grid-cols-[150px_1fr] gap-x-3 gap-y-1.5" },
+                                                                        "children": [
+                                                                            { "type": "basic", "name": "Span", "props": { "className": "text-gray-500 dark:text-gray-400" }, "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_app_url_label" },
+                                                                            { "type": "basic", "name": "Span", "props": { "className": "font-mono text-gray-700 dark:text-gray-300 break-all select-all" }, "text": "{{_local.cbtConnCheckResult?.callback?.app_url ?? '-'}}" },
+                                                                            { "type": "basic", "name": "Span", "props": { "className": "text-gray-500 dark:text-gray-400" }, "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_url_label" },
+                                                                            { "type": "basic", "name": "Span", "props": { "className": "font-mono text-gray-700 dark:text-gray-300 break-all select-all" }, "text": "{{_local.cbtConnCheckResult?.callback?.callback_url ?? '-'}}" },
+                                                                            { "type": "basic", "name": "Span", "props": { "className": "text-gray-500 dark:text-gray-400" }, "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_https_label" },
+                                                                            { "type": "basic", "name": "Span", "if": "{{_local.cbtConnCheckResult?.callback?.app_url_https && _local.cbtConnCheckResult?.callback?.callback_url_https}}", "props": { "className": "font-semibold text-green-700 dark:text-green-300" }, "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_ok" },
+                                                                            { "type": "basic", "name": "Span", "if": "{{!(_local.cbtConnCheckResult?.callback?.app_url_https && _local.cbtConnCheckResult?.callback?.callback_url_https)}}", "props": { "className": "font-semibold text-red-700 dark:text-red-300" }, "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_check" },
+                                                                            { "type": "basic", "name": "Span", "props": { "className": "text-gray-500 dark:text-gray-400" }, "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_public_label" },
+                                                                            { "type": "basic", "name": "Span", "if": "{{_local.cbtConnCheckResult?.callback?.app_url_public && _local.cbtConnCheckResult?.callback?.callback_url_public}}", "props": { "className": "font-semibold text-green-700 dark:text-green-300" }, "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_ok" },
+                                                                            { "type": "basic", "name": "Span", "if": "{{!(_local.cbtConnCheckResult?.callback?.app_url_public && _local.cbtConnCheckResult?.callback?.callback_url_public)}}", "props": { "className": "font-semibold text-red-700 dark:text-red-300" }, "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_check" },
+                                                                            { "type": "basic", "name": "Span", "props": { "className": "text-gray-500 dark:text-gray-400" }, "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_host_match_label" },
+                                                                            { "type": "basic", "name": "Span", "if": "{{_local.cbtConnCheckResult?.callback?.host_matches_app_url}}", "props": { "className": "font-semibold text-green-700 dark:text-green-300" }, "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_ok" },
+                                                                            { "type": "basic", "name": "Span", "if": "{{!_local.cbtConnCheckResult?.callback?.host_matches_app_url}}", "props": { "className": "font-semibold text-red-700 dark:text-red-300" }, "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_check" }
+                                                                        ]
+                                                                    },
+                                                                    {
+                                                                        "type": "basic",
+                                                                        "name": "P",
+                                                                        "props": { "className": "text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed" },
+                                                                        "text": "$t:sirsoft-pay_kginicis.settings.cbt_callback_hint"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
                                                                 "comment": "호스트별 진단 결과 (devcbt / cbt)",
                                                                 "type": "basic",
                                                                 "name": "Div",
@@ -1602,6 +1680,111 @@
                                                                     "placeholder": "••••••••••••••••",
                                                                     "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
                                                                 }
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "id": "jppg_merchant_info",
+                                                "type": "basic",
+                                                "name": "Div",
+                                                "props": {
+                                                    "className": "rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 p-4 space-y-4"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "type": "basic",
+                                                        "name": "Div",
+                                                        "children": [
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "H4",
+                                                                "props": {
+                                                                    "className": "text-sm font-semibold text-gray-900 dark:text-gray-100"
+                                                                },
+                                                                "text": "$t:sirsoft-pay_kginicis.settings.jppg_merchant_info_title"
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "P",
+                                                                "props": {
+                                                                    "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                                },
+                                                                "text": "$t:sirsoft-pay_kginicis.settings.jppg_merchant_info_hint"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "type": "basic",
+                                                        "name": "Div",
+                                                        "props": {
+                                                            "className": "grid grid-cols-1 md:grid-cols-2 gap-4"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_merchant_name" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_merchant_name", "placeholder": "サンプルストア", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_merchant_name_kana" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_merchant_name_kana", "placeholder": "サンプルストア", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_merchant_name_alphabet" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_merchant_name_alphabet", "placeholder": "Sample Store", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_merchant_name_short" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_merchant_name_short", "placeholder": "サンプル", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_contact_name" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_contact_name", "placeholder": "サポート窓口", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_contact_email" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "email", "name": "japan_contact_email", "placeholder": "support@example.com", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_contact_phone" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_contact_phone", "placeholder": "0120-123-456", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "basic",
+                                                                "name": "Div",
+                                                                "children": [
+                                                                    { "type": "basic", "name": "Label", "props": { "className": "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1" }, "text": "$t:sirsoft-pay_kginicis.settings.japan_contact_opening_hours" },
+                                                                    { "type": "basic", "name": "Input", "props": { "type": "text", "name": "japan_contact_opening_hours", "placeholder": "10:00-18:00", "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm" } }
+                                                                ]
                                                             }
                                                         ]
                                                     }
