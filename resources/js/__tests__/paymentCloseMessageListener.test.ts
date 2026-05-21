@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     clearMobilePaymentReturnPending,
     consumeStandardPaySdkReloadFlag,
+    hasMobilePaymentReturnPending,
     markMobilePaymentReturnPending,
 } from '../paymentDomCleanup';
 import { installPaymentCloseMessageListener, resetCheckoutSubmittingState } from '../paymentCloseMessageListener';
@@ -112,5 +113,25 @@ describe('paymentCloseMessageListener', () => {
         markMobilePaymentReturnPending();
         window.dispatchEvent(new Event('pageshow'));
         expect(setLocal).toHaveBeenCalledWith({ isSubmittingOrder: false });
+    });
+
+    it('복귀 시점에 G7Core가 준비되지 않았으면 표시를 유지했다가 다음 이벤트에서 해제한다', () => {
+        delete windowRecord().G7Core;
+        markMobilePaymentReturnPending();
+        installPaymentCloseMessageListener();
+
+        window.dispatchEvent(new Event('pageshow'));
+        expect(hasMobilePaymentReturnPending()).toBe(true);
+        expect(setLocal).not.toHaveBeenCalled();
+
+        windowRecord().G7Core = {
+            state: {
+                setLocal,
+            },
+        };
+        window.dispatchEvent(new Event('focus'));
+
+        expect(setLocal).toHaveBeenCalledWith({ isSubmittingOrder: false });
+        expect(hasMobilePaymentReturnPending()).toBe(false);
     });
 });

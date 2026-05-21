@@ -154,6 +154,39 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $this->assertArrayNotHasKey('buyerTel', $meta['pg_raw_response']);
     }
 
+    public function test_auth_callback_stores_selected_easy_pay_context(): void
+    {
+        $order = $this->createTestOrder(50000);
+        $this->mockPluginSettings();
+
+        $tid = 'TID_EASYPAY_' . uniqid();
+        $params = $this->makeCallbackParams($order->order_number, 50000);
+
+        Http::fake([
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(
+                $this->makeAuthorizeResponse($tid, $order->order_number, 50000),
+                200
+            ),
+        ]);
+
+        $response = $this->post(
+            '/plugins/sirsoft-pay_kginicis/payment/callback?selectedPaymentMethod=kginicis_naverpay',
+            $params,
+        );
+
+        $response->assertRedirect("/shop/orders/{$order->order_number}/complete");
+
+        $payment = $order->payment;
+        $payment->refresh();
+
+        $this->assertSame('naverpay', $payment->embedded_pg_provider);
+
+        $meta = $payment->payment_meta;
+        $this->assertSame('kginicis_naverpay', $meta['selected_payment_method'] ?? null);
+        $this->assertSame('naverpay', $meta['embedded_pg_provider'] ?? null);
+        $this->assertSame('네이버페이', $meta['embedded_pg_provider_label'] ?? null);
+    }
+
     public function test_auth_callback_user_cancel_2001_redirects_without_error_query(): void
     {
         // 사용자가 결제창을 X 또는 '취소' 버튼으로 종료한 경우 — 에러 토스트 노출 X.
@@ -380,6 +413,7 @@ class PaymentCallbackControllerTest extends PluginTestCase
 
         $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/mobile/callback?' . http_build_query([
             'orderId' => $order->order_number,
+            'selectedPaymentMethod' => 'kginicis_naverpay',
         ]), [
             'P_STATUS' => '00',
             'P_TID' => $tid,
@@ -397,9 +431,13 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $this->assertEquals($tid, $payment->transaction_id);
         $this->assertEquals('MAPP123', $payment->card_approval_number);
         $this->assertEquals('4330-****-****-1234', $payment->card_number_masked);
+        $this->assertSame('naverpay', $payment->embedded_pg_provider);
 
         $meta = $payment->payment_meta;
         $this->assertTrue($meta['pg_response_sanitized'] ?? false);
+        $this->assertSame('kginicis_naverpay', $meta['selected_payment_method'] ?? null);
+        $this->assertSame('naverpay', $meta['embedded_pg_provider'] ?? null);
+        $this->assertSame('네이버페이', $meta['embedded_pg_provider_label'] ?? null);
         $this->assertSame($tid, $meta['pg_raw_response']['P_TID'] ?? null);
         $this->assertArrayNotHasKey('P_CARD_NUM', $meta['pg_raw_response']);
         $this->assertArrayNotHasKey('P_UNAME', $meta['pg_raw_response']);

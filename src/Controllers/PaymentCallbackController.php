@@ -16,6 +16,7 @@ use Modules\Sirsoft\Ecommerce\Helpers\DeviceDetector;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
+use Plugins\Sirsoft\PayKginicis\Concerns\ResolvesEasyPaySelection;
 use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\AuthCallbackRequest;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\MobileVbankNotifyRequest;
@@ -32,6 +33,7 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 class PaymentCallbackController
 {
     use PreventsReplayCallback;
+    use ResolvesEasyPaySelection;
     use SanitizesPgResponse;
 
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
@@ -128,6 +130,7 @@ class PaymentCallbackController
     public function authCallback(AuthCallbackRequest $request): \Illuminate\Http\RedirectResponse
     {
         $validated = $request->validated();
+        $selectedEasyPayMethod = $this->resolveSelectedEasyPayMethod($request);
 
         $resultCode = $validated['resultCode'];
 
@@ -143,6 +146,7 @@ class PaymentCallbackController
             'idc_name'    => $validated['idc_name'] ?? null,
             'auth_url'    => $validated['authUrl'] ?? null,
             'all_fields'  => array_keys($request->all()),
+            'easy_pay'    => $this->buildEasyPayLogContext($selectedEasyPayMethod),
         ]);
 
         if (! $moid) {
@@ -268,6 +272,15 @@ class PaymentCallbackController
                 $totPrice = (int) ($pgResponse['TotPrice'] ?? $pgResponse['totPrice'] ?? 0);
             }
 
+            $embeddedPgProvider = $this->resolveEmbeddedPgProvider($selectedEasyPayMethod);
+
+            Log::info('KG Inicis: completing card payment', [
+                'moid' => $moid,
+                'tid' => $tid,
+                'pg_pay_method' => $pgResponse['payMethod'] ?? null,
+                'easy_pay' => $this->buildEasyPayLogContext($selectedEasyPayMethod),
+            ]);
+
             $this->orderService->completePayment($order, [
                 'transaction_id' => $tid,
                 'card_approval_number' => $pgResponse['applNum'] ?? null,
@@ -275,9 +288,9 @@ class PaymentCallbackController
                 'card_name' => $pgResponse['cardName'] ?? null,
                 'card_installment_months' => (int) ($pgResponse['cardQuota'] ?? 0),
                 'is_interest_free' => false,
-                'embedded_pg_provider' => null,
+                'embedded_pg_provider' => $embeddedPgProvider,
                 'receipt_url' => null,
-                'payment_meta' => [
+                'payment_meta' => array_merge([
                     'result_code' => $pgResultCode,
                     'pay_method' => $pgResponse['payMethod'] ?? null,
                     'auth_date' => $pgResponse['applDate'] ?? null,
@@ -285,7 +298,7 @@ class PaymentCallbackController
                     'is_test_mode' => $this->apiService->isTestMode(),
                     'pg_response_sanitized' => true,
                     'pg_raw_response' => $this->sanitizePgResponse($pgResponse, self::PC_AUTH_RESPONSE_KEYS),
-                ],
+                ], $this->buildEasyPayPaymentMeta($selectedEasyPayMethod)),
                 'payment_device' => DeviceDetector::detect($request),
             ], $totPrice);
 

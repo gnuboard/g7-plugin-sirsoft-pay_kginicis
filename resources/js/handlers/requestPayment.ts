@@ -110,6 +110,17 @@ function loadScript(src: string): Promise<void> {
     });
 }
 
+function appendSelectedPaymentMethod(url: string, paymentMethod: string): string {
+    if (!paymentMethod.startsWith('kginicis_')) {
+        return url;
+    }
+
+    const resolved = new URL(url, window.location.origin);
+    resolved.searchParams.set('selectedPaymentMethod', paymentMethod);
+
+    return resolved.toString();
+}
+
 function submitForm(action: string, fields: Record<string, string>, charset = 'utf-8', formId?: string): void {
     const form = document.createElement('form');
     if (formId) {
@@ -211,10 +222,12 @@ async function requestMobileKoreanPayment(
     const { chkfake, mobile_payment_url: mobilePaymentUrl } = sigJson.data;
 
     // 메뉴얼(STEP 2) 표준 응답에는 P_OID 가 없음 — 주문번호를 쿼리스트링으로 echo 받아 회수.
-    const nextUrl =
+    const nextUrl = appendSelectedPaymentMethod(
         window.location.origin +
-        config.callback_urls.mobile_callback +
-        '?orderId=' + encodeURIComponent(pgPaymentData.order_number);
+            config.callback_urls.mobile_callback +
+            '?orderId=' + encodeURIComponent(pgPaymentData.order_number),
+        paymentMethod,
+    );
 
     const easyPayHint = MOBILE_EASY_PAY_RESERVED_HINT[paymentMethod];
     const isEasyPay = easyPayHint !== undefined;
@@ -321,7 +334,10 @@ async function requestKoreanPayment(
         throw new Error('INIStdPay SDK not available');
     }
 
-    const callbackUrl = window.location.origin + config.callback_urls.callback;
+    const callbackUrl = appendSelectedPaymentMethod(
+        window.location.origin + config.callback_urls.callback,
+        paymentMethod,
+    );
     // KG 이니시스 공식 closeUrl 페이지에서 결제창만 닫게 하여 체크아웃 SPA를 유지한다.
     const orderCloseUrl = window.location.origin + config.callback_urls.close;
     removeKoreanPaymentForms();

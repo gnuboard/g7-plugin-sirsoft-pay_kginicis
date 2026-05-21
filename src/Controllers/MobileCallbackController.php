@@ -12,6 +12,7 @@ use Modules\Sirsoft\Ecommerce\Exceptions\PaymentAmountMismatchException;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
+use Plugins\Sirsoft\PayKginicis\Concerns\ResolvesEasyPaySelection;
 use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\MobileCallbackRequest;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
@@ -28,6 +29,7 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 class MobileCallbackController
 {
     use PreventsReplayCallback;
+    use ResolvesEasyPaySelection;
     use SanitizesPgResponse;
 
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
@@ -87,6 +89,7 @@ class MobileCallbackController
     public function handle(MobileCallbackRequest $request): \Illuminate\Http\RedirectResponse
     {
         $validated = $request->validated();
+        $selectedEasyPayMethod = $this->resolveSelectedEasyPayMethod($request);
 
         $pStatus   = $validated['P_STATUS'];
         // KG 이니시스 모바일 메뉴얼(STEP 2) 표준 응답에는 P_OID 가 없으므로 P_NEXT_URL 쿼리스트링의
@@ -101,6 +104,7 @@ class MobileCallbackController
             'P_REQ_URL' => $validated['P_REQ_URL'] ?? null,
             'input_keys' => array_keys($request->all()),
             'query_keys' => array_keys($request->query()),
+            'easy_pay' => $this->buildEasyPayLogContext($selectedEasyPayMethod),
         ]);
 
         if (! $moid) {
@@ -218,6 +222,14 @@ class MobileCallbackController
             // PG 측 승인이 확정된 시점 — 후속 처리 실패 시 cancel 필요. catch 에서 참조.
             $approvedTid = $tid;
             $approvedTotPrice = $totPrice;
+            $embeddedPgProvider = $this->resolveEmbeddedPgProvider($selectedEasyPayMethod);
+
+            Log::info('KG Inicis mobile: completing card payment', [
+                'P_OID' => $moid,
+                'P_TID' => $tid,
+                'P_TYPE' => $payType ?: null,
+                'easy_pay' => $this->buildEasyPayLogContext($selectedEasyPayMethod),
+            ]);
 
             $this->orderService->completePayment($order, [
                 'transaction_id'          => $tid,
@@ -226,9 +238,9 @@ class MobileCallbackController
                 'card_name'               => $result['P_CARD_ISSUER_NAME'] ?? null,
                 'card_installment_months' => (int) ($result['P_CARD_QUOTA'] ?? 0),
                 'is_interest_free'        => false,
-                'embedded_pg_provider'    => null,
+                'embedded_pg_provider'    => $embeddedPgProvider,
                 'receipt_url'             => null,
-                'payment_meta'            => [
+                'payment_meta'            => array_merge([
                     'result_code'    => $resultStatus,
                     'pay_method'     => $payType ?: null,
                     'auth_date'      => $result['P_AUTH_DT'] ?? null,
@@ -236,7 +248,7 @@ class MobileCallbackController
                     'is_test_mode'   => $this->apiService->isTestMode(),
                     'pg_response_sanitized' => true,
                     'pg_raw_response' => $this->sanitizePgResponse($result, self::MOBILE_APPROVE_RESPONSE_KEYS),
-                ],
+                ], $this->buildEasyPayPaymentMeta($selectedEasyPayMethod)),
                 'payment_device'          => 'mobile',
             ], $totPrice);
 

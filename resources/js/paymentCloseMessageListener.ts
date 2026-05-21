@@ -1,5 +1,6 @@
 import {
-    consumeMobilePaymentReturnPending,
+    clearMobilePaymentReturnPending,
+    hasMobilePaymentReturnPending,
     markStandardPaySdkForReload,
     removeKoreanPaymentForms,
 } from './paymentDomCleanup';
@@ -60,13 +61,20 @@ export function resetCheckoutSubmittingState(
     return true;
 }
 
-function scheduleCheckoutSubmittingStateReset(reason: string): void {
+function scheduleCheckoutSubmittingStateReset(reason: string, clearPendingOnSuccess = false): void {
     let attempts = 0;
 
     const tryReset = (): void => {
         attempts++;
 
+        if (clearPendingOnSuccess && !hasMobilePaymentReturnPending()) {
+            return;
+        }
+
         if (resetCheckoutSubmittingState(reason, attempts >= RESET_RETRY_LIMIT)) {
+            if (clearPendingOnSuccess) {
+                clearMobilePaymentReturnPending();
+            }
             return;
         }
 
@@ -81,11 +89,11 @@ function scheduleCheckoutSubmittingStateReset(reason: string): void {
 }
 
 function resetAfterMobilePaymentReturn(reason: string): void {
-    if (!consumeMobilePaymentReturnPending()) {
+    if (!hasMobilePaymentReturnPending()) {
         return;
     }
 
-    scheduleCheckoutSubmittingStateReset(reason);
+    scheduleCheckoutSubmittingStateReset(reason, true);
 }
 
 export function installPaymentCloseMessageListener(): void {
