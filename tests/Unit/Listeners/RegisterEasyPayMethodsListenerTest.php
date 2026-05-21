@@ -24,6 +24,7 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
             'card',
             'phone',
             'kginicis_samsung_pay',
+            'kginicis_naverpay',
             'kginicis_lpay',
             'kginicis_kakaopay',
             'point',
@@ -45,7 +46,7 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
             fn (array $method): bool => str_starts_with((string) ($method['id'] ?? ''), 'kginicis_')
         );
 
-        $this->assertCount(3, $easyPayMethods);
+        $this->assertCount(4, $easyPayMethods);
 
         foreach ($easyPayMethods as $method) {
             $this->assertArrayHasKey('defaults', $method);

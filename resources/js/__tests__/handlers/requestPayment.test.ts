@@ -7,6 +7,10 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { requestPaymentHandler } from '../../handlers/requestPayment';
+import {
+    clearMobilePaymentReturnPending,
+    consumeMobilePaymentReturnPending,
+} from '../../paymentDomCleanup';
 
 const PG_PAYMENT = {
     order_number: 'ORD-001',
@@ -169,6 +173,20 @@ describe('requestPaymentHandler — PC closeUrl', () => {
 
         expect(kginicisForms).toHaveLength(1);
         expect(document.getElementById('kginicis_pay_form_stale')).toBeNull();
+    });
+
+    it('네이버페이는 KG 이니시스 다이렉트 호출 파라미터로 요청한다', async () => {
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: PG_PAYMENT,
+                paymentMethod: 'kginicis_naverpay',
+            },
+        });
+
+        const fields = getLastPaymentFormFields();
+
+        expect(fields.gopaymethod).toBe('onlynaverpay');
+        expect(fields.acceptmethod).toContain('cardonly');
     });
 });
 
@@ -452,6 +470,7 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
     afterEach(() => {
         delete (window as Record<string, unknown>).G7Core;
         document.body.innerHTML = '';
+        clearMobilePaymentReturnPending();
         if (originalUserAgent) {
             Object.defineProperty(window.navigator, 'userAgent', originalUserAgent);
         }
@@ -471,6 +490,16 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
         expect(fields.P_INI_PAYMENT).toBe('MOBILE');
         // 회귀 차단: PC 의 HPP 값을 모바일에 잘못 매핑하지 않도록
         expect(fields.P_INI_PAYMENT).not.toBe('HPP');
+    });
+
+    it('모바일 결제 폼 제출 전 복귀 표시를 남겨 뒤로가기 시 blur 상태를 해제할 수 있게 한다', async () => {
+        await requestPaymentHandler({
+            params: { pgPaymentData: PG_PAYMENT, paymentMethod: 'card' },
+        });
+
+        const form = document.body.querySelector('form') as HTMLFormElement | null;
+        expect(form?.id).toMatch(/^kginicis_pay_form_mobile_/);
+        expect(consumeMobilePaymentReturnPending()).toBe(true);
     });
 
     it.each([

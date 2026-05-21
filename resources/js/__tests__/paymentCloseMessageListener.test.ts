@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { consumeStandardPaySdkReloadFlag } from '../paymentDomCleanup';
+import {
+    clearMobilePaymentReturnPending,
+    consumeStandardPaySdkReloadFlag,
+    markMobilePaymentReturnPending,
+} from '../paymentDomCleanup';
 import { installPaymentCloseMessageListener, resetCheckoutSubmittingState } from '../paymentCloseMessageListener';
 
 function windowRecord(): Record<string, unknown> {
@@ -24,6 +28,7 @@ describe('paymentCloseMessageListener', () => {
     afterEach(() => {
         delete windowRecord().G7Core;
         delete windowRecord().__sirsoftKginicisPaymentCloseListenerInstalled;
+        clearMobilePaymentReturnPending();
         vi.restoreAllMocks();
     });
 
@@ -68,5 +73,44 @@ describe('paymentCloseMessageListener', () => {
         resetCheckoutSubmittingState();
 
         expect(setLocal).not.toHaveBeenCalled();
+    });
+
+    it('모바일 결제 페이지에서 브라우저 뒤로 돌아오면 체크아웃 제출 상태를 해제한다', () => {
+        markMobilePaymentReturnPending();
+        installPaymentCloseMessageListener();
+
+        window.dispatchEvent(new Event('pageshow'));
+
+        expect(setLocal).toHaveBeenCalledWith({ isSubmittingOrder: false });
+    });
+
+    it('모바일 결제 복귀 표시가 이미 있으면 listener 설치 시점에도 제출 상태를 해제한다', () => {
+        markMobilePaymentReturnPending();
+
+        installPaymentCloseMessageListener();
+
+        expect(setLocal).toHaveBeenCalledWith({ isSubmittingOrder: false });
+    });
+
+    it('모바일 결제 복귀 표시가 없으면 pageshow 에서 상태를 건드리지 않는다', () => {
+        installPaymentCloseMessageListener();
+
+        window.dispatchEvent(new Event('pageshow'));
+
+        expect(setLocal).not.toHaveBeenCalled();
+    });
+
+    it('모바일 결제 복귀를 여러 번 반복해도 매번 표시를 소비하고 상태를 해제한다', () => {
+        installPaymentCloseMessageListener();
+
+        markMobilePaymentReturnPending();
+        window.dispatchEvent(new Event('pageshow'));
+        expect(setLocal).toHaveBeenCalledWith({ isSubmittingOrder: false });
+
+        setLocal.mockClear();
+
+        markMobilePaymentReturnPending();
+        window.dispatchEvent(new Event('pageshow'));
+        expect(setLocal).toHaveBeenCalledWith({ isSubmittingOrder: false });
     });
 });

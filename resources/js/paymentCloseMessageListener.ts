@@ -1,9 +1,15 @@
-import { markStandardPaySdkForReload, removeKoreanPaymentForms } from './paymentDomCleanup';
+import {
+    consumeMobilePaymentReturnPending,
+    markStandardPaySdkForReload,
+    removeKoreanPaymentForms,
+} from './paymentDomCleanup';
 
 const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 const CLOSE_MESSAGE_SOURCE = PLUGIN_IDENTIFIER;
 const CLOSE_MESSAGE_TYPE = 'payment-window-closed';
 const LISTENER_INSTALLED_KEY = '__sirsoftKginicisPaymentCloseListenerInstalled';
+const RESET_RETRY_LIMIT = 20;
+const RESET_RETRY_INTERVAL_MS = 100;
 
 const logger = {
     info: (...args: unknown[]) => console.info(`[${PLUGIN_IDENTIFIER}]`, ...args),
@@ -29,23 +35,57 @@ function isCheckoutPage(): boolean {
     return /\/shop\/checkout\/?$/.test(window.location.pathname);
 }
 
-export function resetCheckoutSubmittingState(reason = 'payment-window-closed'): void {
+export function resetCheckoutSubmittingState(
+    reason = 'payment-window-closed',
+    warnOnMissingCore = true,
+): boolean {
     if (!isCheckoutPage()) {
-        return;
+        return false;
     }
 
     const g7Core = (window as any).G7Core;
     const setLocal = g7Core?.state?.setLocal;
 
     if (typeof setLocal !== 'function') {
-        logger.warn('G7Core.state.setLocal not available while resetting payment submit state');
-        return;
+        if (warnOnMissingCore) {
+            logger.warn('G7Core.state.setLocal not available while resetting payment submit state');
+        }
+        return false;
     }
 
     removeKoreanPaymentForms();
     markStandardPaySdkForReload();
     setLocal({ isSubmittingOrder: false });
     logger.info('checkout submit state reset after KG payment close', { reason });
+    return true;
+}
+
+function scheduleCheckoutSubmittingStateReset(reason: string): void {
+    let attempts = 0;
+
+    const tryReset = (): void => {
+        attempts++;
+
+        if (resetCheckoutSubmittingState(reason, attempts >= RESET_RETRY_LIMIT)) {
+            return;
+        }
+
+        if (!isCheckoutPage() || attempts >= RESET_RETRY_LIMIT) {
+            return;
+        }
+
+        window.setTimeout(tryReset, RESET_RETRY_INTERVAL_MS);
+    };
+
+    tryReset();
+}
+
+function resetAfterMobilePaymentReturn(reason: string): void {
+    if (!consumeMobilePaymentReturnPending()) {
+        return;
+    }
+
+    scheduleCheckoutSubmittingStateReset(reason);
 }
 
 export function installPaymentCloseMessageListener(): void {
@@ -70,5 +110,24 @@ export function installPaymentCloseMessageListener(): void {
         resetCheckoutSubmittingState(event.data.reason);
     });
 
+    window.addEventListener('pageshow', (event: PageTransitionEvent) => {
+        resetAfterMobilePaymentReturn(event.persisted
+            ? 'mobile-payment-bfcache-return'
+            : 'mobile-payment-page-show');
+    });
+
+    window.addEventListener('focus', () => {
+        resetAfterMobilePaymentReturn('mobile-payment-window-focus');
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') {
+            return;
+        }
+
+        resetAfterMobilePaymentReturn('mobile-payment-visibility-return');
+    });
+
     w[LISTENER_INSTALLED_KEY] = true;
+    resetAfterMobilePaymentReturn('mobile-payment-listener-installed');
 }

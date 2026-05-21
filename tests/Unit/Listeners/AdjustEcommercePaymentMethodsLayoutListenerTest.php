@@ -50,6 +50,7 @@ class AdjustEcommercePaymentMethodsLayoutListenerTest extends TestCase
 
         $this->assertIsString($json);
         $this->assertStringContainsString('kginicis_samsung_pay', $json);
+        $this->assertStringContainsString('kginicis_naverpay', $json);
         $this->assertStringContainsString('kginicis_lpay', $json);
         $this->assertStringContainsString('kginicis_kakaopay', $json);
         $this->assertStringNotContainsString("['point','deposit','free','dbank'].includes", $json);

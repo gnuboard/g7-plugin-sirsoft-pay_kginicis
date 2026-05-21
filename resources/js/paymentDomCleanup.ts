@@ -1,5 +1,7 @@
 export const KOREAN_PAYMENT_FORM_ID_PREFIX = 'kginicis_pay_form_';
 const RELOAD_STANDARD_PAY_SDK_KEY = '__sirsoftKginicisReloadStandardPaySdk';
+const MOBILE_PAYMENT_RETURN_PENDING_KEY = '__sirsoftKginicisMobilePaymentReturnPending';
+const MOBILE_PAYMENT_RETURN_TTL_MS = 30 * 60 * 1000;
 
 export function removeKoreanPaymentForms(): number {
     if (typeof document === 'undefined') {
@@ -47,4 +49,59 @@ export function resetStandardPaySdk(sdkUrl: string): void {
             `script[src="${sdkUrl}"], script[src*="/INIStdPay_third-party.js"]`,
         )
         .forEach((script) => script.remove());
+}
+
+export function markMobilePaymentReturnPending(now = Date.now()): void {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        window.sessionStorage.setItem(MOBILE_PAYMENT_RETURN_PENDING_KEY, String(now));
+    } catch {
+        (window as unknown as Record<string, unknown>)[MOBILE_PAYMENT_RETURN_PENDING_KEY] = now;
+    }
+}
+
+export function clearMobilePaymentReturnPending(): void {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        window.sessionStorage.removeItem(MOBILE_PAYMENT_RETURN_PENDING_KEY);
+    } catch {
+        // sessionStorage 접근이 막힌 환경에서는 window fallback 만 정리한다.
+    }
+
+    delete (window as unknown as Record<string, unknown>)[MOBILE_PAYMENT_RETURN_PENDING_KEY];
+}
+
+export function consumeMobilePaymentReturnPending(now = Date.now()): boolean {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    let markedAt: number | null = null;
+
+    try {
+        const stored = window.sessionStorage.getItem(MOBILE_PAYMENT_RETURN_PENDING_KEY);
+        markedAt = stored ? Number(stored) : null;
+    } catch {
+        markedAt = null;
+    }
+
+    if (!Number.isFinite(markedAt)) {
+        const fallback = (window as unknown as Record<string, unknown>)[MOBILE_PAYMENT_RETURN_PENDING_KEY];
+        markedAt = typeof fallback === 'number' ? fallback : Number(fallback);
+    }
+
+    if (!Number.isFinite(markedAt)) {
+        clearMobilePaymentReturnPending();
+        return false;
+    }
+
+    clearMobilePaymentReturnPending();
+
+    return now - markedAt <= MOBILE_PAYMENT_RETURN_TTL_MS;
 }

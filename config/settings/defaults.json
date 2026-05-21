@@ -32,6 +32,7 @@
         "redirect_fail_url": "/shop/checkout",
         "easy_pay_allow_with_other_pg": false,
         "easy_pay_samsung_pay": false,
+        "easy_pay_naverpay": false,
         "easy_pay_lpay": false,
         "easy_pay_kakaopay": false,
         "use_credit_point": false
@@ -65,6 +66,7 @@
         "redirect_fail_url": { "expose": false },
         "easy_pay_allow_with_other_pg": { "expose": false },
         "easy_pay_samsung_pay": { "expose": false },
+        "easy_pay_naverpay": { "expose": false },
         "easy_pay_lpay": { "expose": false },
         "easy_pay_kakaopay": { "expose": false },
         "use_credit_point": { "expose": false }

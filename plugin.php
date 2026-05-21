@@ -221,6 +221,11 @@ class Plugin extends AbstractPlugin
                 'default' => false,
                 'label' => ['ko' => 'KG이니시스 삼성페이 사용', 'en' => 'Enable Samsung Pay (KG Inicis)'],
             ],
+            'easy_pay_naverpay' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => 'KG이니시스 네이버페이 사용', 'en' => 'Enable Naver Pay (KG Inicis)'],
+            ],
             'easy_pay_lpay' => [
                 'type' => 'boolean',
                 'default' => false,
@@ -270,6 +275,7 @@ class Plugin extends AbstractPlugin
             'redirect_fail_url' => '/shop/checkout',
             'easy_pay_allow_with_other_pg' => false,
             'easy_pay_samsung_pay' => false,
+            'easy_pay_naverpay' => false,
             'easy_pay_lpay' => false,
             'easy_pay_kakaopay' => false,
             'use_credit_point' => false,

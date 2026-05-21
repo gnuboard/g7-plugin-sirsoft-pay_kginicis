@@ -3,6 +3,7 @@
 import {
     KOREAN_PAYMENT_FORM_ID_PREFIX,
     consumeStandardPaySdkReloadFlag,
+    markMobilePaymentReturnPending,
     removeKoreanPaymentForms,
     resetStandardPaySdk,
 } from '../paymentDomCleanup';
@@ -109,11 +110,15 @@ function loadScript(src: string): Promise<void> {
     });
 }
 
-function submitForm(action: string, fields: Record<string, string>, charset = 'utf-8'): void {
+function submitForm(action: string, fields: Record<string, string>, charset = 'utf-8', formId?: string): void {
     const form = document.createElement('form');
+    if (formId) {
+        form.id = formId;
+    }
     form.method = 'POST';
     form.action = action;
     form.acceptCharset = charset;
+    form.style.display = 'none';
 
     for (const [name, value] of Object.entries(fields)) {
         const input = document.createElement('input');
@@ -135,13 +140,18 @@ function submitForm(action: string, fields: Record<string, string>, charset = 'u
  *
  * gnuboard5 shop/inicis/lpay_order.script.php 참조:
  *   gopaymethod = (inicis_settle_case === 'inicis_kakaopay') ? 'onlykakaopay' : 'onlylpay'
+ *
+ * KG 이니시스 간편결제 다이렉트 호출 옵션:
+ *   - Samsung Pay: onlyssp
+ *   - Naver Pay: onlynaverpay
  */
 export const GOPAYMETHOD_MAP: Record<string, string> = {
     card:                 'Card',
     vbank:                'VBank',
     bank:                 'DirectBank',
     phone:                'HPP',
-    kginicis_samsung_pay: 'onlysamsungpay',
+    kginicis_samsung_pay: 'onlyssp',
+    kginicis_naverpay:    'onlynaverpay',
     kginicis_lpay:        'onlylpay',
     kginicis_kakaopay:    'onlykakaopay',
 };
@@ -149,9 +159,9 @@ export const GOPAYMETHOD_MAP: Record<string, string> = {
 /**
  * 모바일 결제수단 → P_INI_PAYMENT 매핑 (manual.inicis.com/pay/stdpay_m.html#popup_7).
  *
- * 일반 결제수단만 P_INI_PAYMENT 로 분기 가능. 간편결제 (Samsung Pay / L.pay /
- * 카카오페이) 는 모바일에서 *완전히 다른 엔드포인트* 를 사용하며 P_INI_PAYMENT
- * 가 아닌 P_RESERVED 의 'd_samsungpay=Y' / 'd_lpay=Y' / 'd_kakaopay=Y' 힌트로
+ * 일반 결제수단만 P_INI_PAYMENT 로 분기 가능. 간편결제 (Samsung Pay / Naver Pay /
+ * L.pay / 카카오페이) 는 모바일에서 *완전히 다른 엔드포인트* 를 사용하며 P_INI_PAYMENT
+ * 가 아닌 P_RESERVED 의 'd_samsungpay=Y' / 'd_npay=Y' / 'd_lpay=Y' / 'd_kakaopay=Y' 힌트로
  * 식별된다. 따라서 본 맵은 일반 결제수단만 보유한다.
  *
  * 휴대폰결제 코드는 PC 의 'HPP' 가 아닌 'MOBILE' — 잘못된 P_INI_PAYMENT 응답 회귀 차단.
@@ -167,13 +177,14 @@ export const MOBILE_PAYMETHOD_MAP: Record<string, string> = {
  * 모바일 간편결제 → P_RESERVED 에 추가할 hint 토큰 매핑.
  *
  * gnuboard5 mobile/shop/samsungpay/order.script.php 참조:
- *   d_samsungpay=Y / d_lpay=Y / d_kakaopay=Y
+ *   d_samsungpay=Y / d_npay=Y / d_lpay=Y / d_kakaopay=Y
  *
  * 모바일 간편결제는 https://mobile.inicis.com/smart/wcard/ 로 폼 제출하며
  * P_INI_PAYMENT 를 보내지 않는다.
  */
 export const MOBILE_EASY_PAY_RESERVED_HINT: Record<string, string> = {
     kginicis_samsung_pay: 'd_samsungpay=Y',
+    kginicis_naverpay:    'd_npay=Y',
     kginicis_lpay:        'd_lpay=Y',
     kginicis_kakaopay:    'd_kakaopay=Y',
 };
@@ -208,7 +219,7 @@ async function requestMobileKoreanPayment(
     const easyPayHint = MOBILE_EASY_PAY_RESERVED_HINT[paymentMethod];
     const isEasyPay = easyPayHint !== undefined;
 
-    // 모바일 간편결제 (Samsung Pay / L.pay / 카카오페이) 는 별도 엔드포인트 사용.
+    // 모바일 간편결제 (Samsung Pay / Naver Pay / L.pay / 카카오페이) 는 별도 엔드포인트 사용.
     // gnuboard5 mobile/shop/samsungpay/order.script.php 참조:
     //   form.action = 'https://mobile.inicis.com/smart/wcard/'
     // 백엔드가 반환한 mobilePaymentUrl (/smart/payment/) 의 마지막 path segment 를
@@ -267,7 +278,13 @@ async function requestMobileKoreanPayment(
             window.location.origin + config.callback_urls.mobile_vbank_notify;
     }
 
-    submitForm(submitUrl, fields, 'euc-kr');
+    markMobilePaymentReturnPending();
+    submitForm(
+        submitUrl,
+        fields,
+        'euc-kr',
+        KOREAN_PAYMENT_FORM_ID_PREFIX + 'mobile_' + Date.now(),
+    );
 }
 
 /**
@@ -341,12 +358,13 @@ async function requestKoreanPayment(
                 ? `HPP(1):${escrow}${creditPoint}centerCd(Y)`
                 : `${escrow}${creditPoint}centerCd(Y)`;
 
-            // 간편결제 (삼성페이 / LPAY / 카카오페이) 는 base 뒤에 ':cardonly' 를 append.
+            // 간편결제 (삼성페이 / 네이버페이 / LPAY / 카카오페이) 는 base 뒤에 ':cardonly' 를 append.
             // gnuboard5 orderform.4.php 의
             //   f.acceptmethod.value = f.acceptmethod.value + ":cardonly"
             // 와 일치 — 에스크로 옵션 등 base 를 보존하고 cardonly 만 추가.
             if (
                 paymentMethod === 'kginicis_samsung_pay'
+                || paymentMethod === 'kginicis_naverpay'
                 || paymentMethod === 'kginicis_lpay'
                 || paymentMethod === 'kginicis_kakaopay'
             ) {
