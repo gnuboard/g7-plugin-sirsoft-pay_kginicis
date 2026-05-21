@@ -60,7 +60,7 @@ function extractPaymentMethodFromBody(body: string): string | undefined {
 }
 
 /**
- * KG 이니시스 간편결제 (LPAY/카카오페이/삼성페이) 선택 시 _local.paymentMethod 가
+ * KG 이니시스 간편결제 (삼성페이/네이버페이/LPAY/카카오페이) 선택 시 _local.paymentMethod 가
  * 'kginicis_lpay' 등의 PG 식별자로 설정된다. 그러나 코어 PaymentMethodEnum 은
  * card/vbank/bank/phone 등 일반 결제수단만 허용하므로 백엔드 validation 에서
  * 'kginicis_*' 가 거부된다.
@@ -267,7 +267,7 @@ export function installOrderResponseInterceptor(): void {
         const data = body?.data;
         if (!data) return response;
 
-        // 'kginicis_*' 간편결제 (samsung_pay / lpay / kakaopay) 선택 시 기본 PG 가 다른 PG
+        // 'kginicis_*' 간편결제 (samsung_pay / naverpay / lpay / kakaopay) 선택 시 기본 PG 가 다른 PG
         // 라도 KG 이니시스 결제창을 강제로 열어야 한다. 이때 backend 가 requires_pg_payment
         // 를 false 로 응답하거나 pg_provider 를 다른 PG 로 응답해도 KG 흐름으로 강제.
         const isKginicisEasyPay = typeof paymentMethod === 'string' && paymentMethod.startsWith('kginicis_');

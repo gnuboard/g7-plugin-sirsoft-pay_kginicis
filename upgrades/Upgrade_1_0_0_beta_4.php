@@ -11,19 +11,19 @@ use Illuminate\Support\Facades\File;
 /**
  * v1.0.0-beta.4 업그레이드 스텝
  *
- * KG 이니시스 간편결제 3종 (kginicis_samsung_pay / kginicis_lpay / kginicis_kakaopay) 를
+ * KG 이니시스 간편결제 4종 (kginicis_samsung_pay / kginicis_naverpay / kginicis_lpay / kginicis_kakaopay) 를
  * 이커머스 모듈의 saved order_settings.payment_methods 에 정확한 위치로 삽입.
  *
  * 배경:
- *   RegisterEasyPayMethodsListener 는 코어의 builtin 결제수단 배열에 3개 entry 를 inject
+ *   RegisterEasyPayMethodsListener 는 코어의 builtin 결제수단 배열에 4개 entry 를 inject
  *   하지만 mergePaymentMethodSettings 는 saved 의 sort_order 를 우선시 → 신규 entry 에는
  *   sort_order 를 동적으로 부여 → 기존 point/deposit/free 의 sort_order 와 충돌. PHP usort
  *   (unstable) 결과 화면 표시 순서가 어긋남.
  *
  * 본 step 은 saved order_settings.json 의 payment_methods 배열을 직접 수정:
  *   - 현재 sort_order 기준으로 정렬된 배열에서 'phone' 의 위치를 동적으로 찾기
- *   - 우리 3개 결제수단 중 saved 에 이미 있는 것 skip (멱등)
- *   - phone 직후에 누락된 결제수단을 순서대로 삽입 (samsung_pay → lpay → kakaopay)
+ *   - 우리 4개 결제수단 중 saved 에 이미 있는 것 skip (멱등)
+ *   - phone 직후에 누락된 결제수단을 순서대로 삽입 (samsung_pay → naverpay → lpay → kakaopay)
  *   - phone 이 없으면 배열 마지막에 append
  *   - 전체 sort_order 를 1부터 재할당
  *
@@ -31,7 +31,7 @@ use Illuminate\Support\Facades\File;
  * 다른 plugin 이 추가한 결제수단이 끼어있어도 동적 위치 계산이라 안전.
  *
  * 멱등성:
- *   - 이미 3개 결제수단이 모두 saved 에 있으면 변경 없이 통과
+ *   - 이미 4개 결제수단이 모두 saved 에 있으면 변경 없이 통과
  *   - 일부만 있으면 누락된 것만 추가
  *   - settings 파일이 없으면 (이커머스 미설치 또는 첫 진입) skip
  */
@@ -41,6 +41,7 @@ class Upgrade_1_0_0_beta_4 implements UpgradeStepInterface
 
     private const EASY_PAY_IDS = [
         'kginicis_samsung_pay',
+        'kginicis_naverpay',
         'kginicis_lpay',
         'kginicis_kakaopay',
     ];
@@ -74,7 +75,7 @@ class Upgrade_1_0_0_beta_4 implements UpgradeStepInterface
         $missingIds = array_values(array_diff(self::EASY_PAY_IDS, $existingIds));
 
         if (empty($missingIds)) {
-            $context->logger->info('[v1.0.0-beta.4] 3개 결제수단 모두 이미 saved 에 있음 — 변경 없음 (멱등)');
+            $context->logger->info('[v1.0.0-beta.4] 4개 결제수단 모두 이미 saved 에 있음 — 변경 없음 (멱등)');
 
             return;
         }

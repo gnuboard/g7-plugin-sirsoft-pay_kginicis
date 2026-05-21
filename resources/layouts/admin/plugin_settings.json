@@ -777,6 +777,44 @@
                                                         "props": {
                                                             "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
                                                         },
+                                                        "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_naverpay"
+                                                    },
+                                                    {
+                                                        "type": "basic",
+                                                        "name": "P",
+                                                        "props": {
+                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                        },
+                                                        "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_naverpay_hint"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "type": "composite",
+                                                "name": "Toggle",
+                                                "props": {
+                                                    "name": "easy_pay_naverpay"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "basic",
+                                        "name": "Div",
+                                        "props": {
+                                            "className": "flex items-start justify-between px-6 py-4"
+                                        },
+                                        "children": [
+                                            {
+                                                "type": "basic",
+                                                "name": "Div",
+                                                "children": [
+                                                    {
+                                                        "type": "basic",
+                                                        "name": "Label",
+                                                        "props": {
+                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                        },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_samsung_pay"
                                                     },
                                                     {

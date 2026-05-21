@@ -15,7 +15,7 @@ class AdjustEcommercePaymentMethodsLayoutListener implements HookListenerInterfa
 
     private const CORE_NO_PG_METHODS = "['point','deposit','free','dbank']";
 
-    private const KGINICIS_NO_PG_METHODS = "['point','deposit','free','dbank','kginicis_samsung_pay','kginicis_lpay','kginicis_kakaopay']";
+    private const KGINICIS_NO_PG_METHODS = "['point','deposit','free','dbank','kginicis_samsung_pay','kginicis_naverpay','kginicis_lpay','kginicis_kakaopay']";
 
     public static function getSubscribedHooks(): array
     {

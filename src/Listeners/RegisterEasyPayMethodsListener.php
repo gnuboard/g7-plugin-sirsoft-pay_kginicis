@@ -7,16 +7,17 @@ namespace Plugins\Sirsoft\PayKginicis\Listeners;
 use App\Contracts\Extension\HookListenerInterface;
 
 /**
- * KG 이니시스 간편결제 (삼성페이 / L.pay / 카카오페이) 를 이커머스 결제수단 목록에 등록한다.
+ * KG 이니시스 간편결제 (삼성페이 / 네이버페이 / L.pay / 카카오페이) 를 이커머스 결제수단 목록에 등록한다.
  *
  * 코어 sirsoft-ecommerce.settings.filter_available_payment_methods 필터 훅을 구독해
  * builtin 결제수단 배열의 'phone' (휴대폰결제) 항목 뒤, 'point' (포인트결제) 항목 앞에
- * 3개 결제수단을 삽입한다. 각 entry 의 defaults.pg_provider 는 null — 코어/이커머스의
+ * 4개 결제수단을 삽입한다. 각 entry 의 defaults.pg_provider 는 null — 코어/이커머스의
  * "PG 선택 불필요" 상태로 표시되며, 기본 PG 사 설정과 무관하게 KG 이니시스 결제창이
  * 열린다 (orderResponseInterceptor 가 'kginicis_*' prefix 를 인식하여 KG 흐름으로 강제).
  *
  * 결제수단 ID 는 requestPayment handler 의 EasyPayMethod / DirectShowOpt 매핑과 일치:
- *   - kginicis_samsung_pay  → 'd_samsungpay=Y'
+ *   - kginicis_samsung_pay  → 'onlyssp' / 'd_samsungpay=Y'
+ *   - kginicis_naverpay     → 'onlynaverpay' / 'd_npay=Y'
  *   - kginicis_lpay         → 'onlylpay'
  *   - kginicis_kakaopay     → 'onlykakaopay'
  */
@@ -46,10 +47,10 @@ class RegisterEasyPayMethodsListener implements HookListenerInterface
     public function handle(...$args): void {}
 
     /**
-     * 이커머스 결제수단 목록에 KG 이니시스 간편결제 3종 inject.
+     * 이커머스 결제수단 목록에 KG 이니시스 간편결제 4종 inject.
      *
      * @param  array  $methods  builtin 결제수단 배열 (코어 EcommerceSettingsService::getBuiltinPaymentMethods)
-     * @return array  3개 entry 가 phone~point 사이에 삽입된 배열
+     * @return array  4개 entry 가 phone~point 사이에 삽입된 배열
      */
     public function injectEasyPayMethods(array $methods): array
     {
@@ -59,6 +60,12 @@ class RegisterEasyPayMethodsListener implements HookListenerInterface
                 nameKey: 'sirsoft-pay_kginicis::payment_methods.samsung_pay.name',
                 descriptionKey: 'sirsoft-pay_kginicis::payment_methods.samsung_pay.description',
                 icon: 'mobile-screen-button',
+            ),
+            $this->buildEntry(
+                id: 'kginicis_naverpay',
+                nameKey: 'sirsoft-pay_kginicis::payment_methods.naverpay.name',
+                descriptionKey: 'sirsoft-pay_kginicis::payment_methods.naverpay.description',
+                icon: 'wallet',
             ),
             $this->buildEntry(
                 id: 'kginicis_lpay',
