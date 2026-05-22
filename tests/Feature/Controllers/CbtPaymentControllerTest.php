@@ -151,6 +151,48 @@ class CbtPaymentControllerTest extends PluginTestCase
         $this->assertStringNotContainsString('ユーザーキャンセル', $location, '사용자 취소 문구를 체크아웃 URL에 노출하지 않음');
     }
 
+    public function test_cbt_callback_paypay_processing_failure_hides_upstream_message_from_checkout(): void
+    {
+        $order = $this->makePendingJpyOrder('JP-ORDER-PAYPAY-FAIL-001', 100);
+
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldReceive('findByOrderNumber')
+            ->with('JP-ORDER-PAYPAY-FAIL-001')
+            ->andReturn($order);
+        $orderService->shouldReceive('failPayment')
+            ->once()
+            ->with($order, 'processing_failure', 'Processing failed upstream.')
+            ->andReturn($order);
+
+        $apiService = Mockery::mock(KgInicisApiService::class);
+        $apiService->shouldNotReceive('approveCbtPayment');
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+        $this->app->instance(KgInicisApiService::class, $apiService);
+
+        $response = $this->get('/plugins/sirsoft-pay_kginicis/payment/cbt/callback?'
+            . http_build_query([
+                'oid' => 'JP-ORDER-PAYPAY-FAIL-001',
+                'sid' => 'SID-PAYPAY-FAIL-001',
+                'resultCode' => 'processing_failure',
+                'resultMsg' => 'Processing failed upstream.',
+                'mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'paymethod' => 'PAYpay',
+            ]));
+
+        $response->assertRedirect();
+        $location = $response->headers->get('Location');
+        parse_str(parse_url($location, PHP_URL_QUERY) ?: '', $query);
+
+        $this->assertStringContainsString('/shop/checkout', $location);
+        $this->assertSame('paypay_processing_failed', $query['error'] ?? null);
+        $this->assertSame('PayPay 결제를 완료하지 못했습니다. 다시 시도하거나 다른 결제수단을 선택해 주세요.', $query['message'] ?? null);
+        $this->assertSame('JP-ORDER-PAYPAY-FAIL-001', $query['orderId'] ?? null);
+        $this->assertStringNotContainsString('processing_failure', parse_url($location, PHP_URL_QUERY) ?: '');
+        $this->assertStringNotContainsString('Processing+failed+upstream', $location);
+        $this->assertStringNotContainsString('Processing%20failed%20upstream', $location);
+    }
+
     public function test_cbt_cvs_notify_completes_waiting_deposit_payment(): void
     {
         $order = $this->createPersistedPendingJpyOrder('JP-ORDER-CVS-002', 100);
