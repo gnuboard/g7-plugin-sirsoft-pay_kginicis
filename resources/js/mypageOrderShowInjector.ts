@@ -1,3 +1,12 @@
+import {
+    canOpenKginicisReceipt,
+    fetchKginicisReceiptInfo,
+    KginicisReceiptInfo,
+    openKginicisReceipt,
+    receiptButtonLabel,
+    receiptRowLabel,
+} from './receiptPopup';
+
 const PLUGIN_ID = 'sirsoft-pay_kginicis';
 const FLAG = '__kginicisOrderShowInjectorInstalled';
 const ROW_ID = 'kginicis-mp-receipt-row';
@@ -18,11 +27,6 @@ interface OrderData {
     payment?: Payment;
 }
 
-interface KginicisOrderPaymentInfo {
-    receipt_url?: string | null;
-    payment_method_display_label?: string | null;
-}
-
 function getOrderFromState(orderNumber: string): OrderData | null {
     try {
         const g7 = (window as Record<string, unknown>).G7Core as Record<string, unknown> | undefined;
@@ -35,29 +39,6 @@ function getOrderFromState(orderNumber: string): OrderData | null {
     } catch {
         return null;
     }
-}
-
-function getToken(): string | null {
-    return localStorage.getItem('auth_token');
-}
-
-async function fetchOrderPaymentInfo(orderNumber: string): Promise<KginicisOrderPaymentInfo | null> {
-    const token = getToken();
-    if (!token) return null;
-    try {
-        const res = await fetch(`/api/plugins/${PLUGIN_ID}/user/orders/${orderNumber}/receipt`, {
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-        });
-        if (!res.ok) return null;
-        return (await res.json()) as KginicisOrderPaymentInfo;
-    } catch {
-        return null;
-    }
-}
-
-async function fetchReceiptUrl(orderNumber: string): Promise<string | null> {
-    const data = await fetchOrderPaymentInfo(orderNumber);
-    return data?.receipt_url ?? null;
 }
 
 function findPaymentContainer(): Element | null {
@@ -103,29 +84,29 @@ export function patchMypagePaymentMethodDisplay(container: Element, displayLabel
     return false;
 }
 
-function buildReceiptRow(orderNumber: string): HTMLElement {
+function buildReceiptRow(orderNumber: string, receiptInfo: KginicisReceiptInfo): HTMLElement {
     const row = document.createElement('div');
     row.id = ROW_ID;
     row.className = 'flex items-center justify-between';
 
     const label = document.createElement('span');
     label.className = 'text-gray-500 dark:text-gray-400 text-sm';
-    label.textContent = '영수증';
+    label.textContent = receiptRowLabel(receiptInfo);
 
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className =
         'inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50';
-    btn.textContent = '영수증 조회';
+    btn.textContent = receiptButtonLabel(receiptInfo);
 
     btn.addEventListener('click', async () => {
         btn.disabled = true;
         btn.textContent = '로딩 중...';
-        const url = await fetchReceiptUrl(orderNumber);
+        const latestReceiptInfo = await fetchKginicisReceiptInfo(orderNumber);
         btn.disabled = false;
-        btn.textContent = '영수증 조회';
-        if (url) {
-            window.open(url, 'kginicis_receipt', 'width=800,height=600,scrollbars=yes,resizable=yes');
+        btn.textContent = receiptButtonLabel(latestReceiptInfo ?? receiptInfo);
+        if (canOpenKginicisReceipt(latestReceiptInfo)) {
+            openKginicisReceipt(latestReceiptInfo);
         }
     });
 
@@ -140,20 +121,23 @@ async function tryInject(orderNumber: string): Promise<boolean> {
 
     const { payment } = orderData;
     if (!payment || payment.pg_provider !== 'kginicis') return true;
-    if (payment.payment_status !== 'paid') return true;
     if (!payment.transaction_id) return true;
 
     const container = findPaymentContainer();
     if (!container) return false;
 
-    const paymentInfo = await fetchOrderPaymentInfo(orderNumber);
+    const paymentInfo = await fetchKginicisReceiptInfo(orderNumber);
+    const isPaid = payment.payment_status === 'paid';
+    const isCbtConfirmation = paymentInfo?.receipt_type === 'cbt_confirmation';
+    if (!isPaid && !isCbtConfirmation) return true;
+
     const patched = patchMypagePaymentMethodDisplay(
         container,
         paymentInfo?.payment_method_display_label,
     );
 
-    if (!document.getElementById(ROW_ID) && paymentInfo?.receipt_url) {
-        container.appendChild(buildReceiptRow(orderNumber));
+    if (!document.getElementById(ROW_ID) && canOpenKginicisReceipt(paymentInfo)) {
+        container.appendChild(buildReceiptRow(orderNumber, paymentInfo));
         console.info(`[${PLUGIN_ID}] receipt button injected on mypage order show`);
     }
 
