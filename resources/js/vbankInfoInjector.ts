@@ -1,3 +1,5 @@
+import { fetchKginicisReceiptInfo, KginicisReceiptInfo } from './receiptPopup';
+
 const PLUGIN_ID = 'sirsoft-pay_kginicis';
 const FLAG = '__kginicisVbankInfoInjectorInstalled';
 const MP_SECTION_ID = 'kginicis-mp-vbank-info';
@@ -179,6 +181,48 @@ function buildVbankSection(payment: Payment, dueDateStr: string): HTMLElement {
     return section;
 }
 
+function receiptField(receiptInfo: KginicisReceiptInfo | null, label: string): string {
+    return receiptInfo?.receipt_fields?.find(field => field.label === label)?.value ?? '';
+}
+
+function isCbtCvsPayment(payment: Payment, receiptInfo: KginicisReceiptInfo | null): boolean {
+    if (receiptInfo?.receipt_type !== 'cbt_confirmation') return false;
+
+    const methodLabel = receiptField(receiptInfo, '결제수단');
+    if (methodLabel.includes('편의점')) return true;
+
+    const tid = String(payment.transaction_id ?? '');
+    return String(payment.currency ?? '').toUpperCase() === 'JPY'
+        && (String(payment.vbank_name ?? '').toUpperCase() === 'CVS' || tid.startsWith('INIJPGCVS'));
+}
+
+function buildCbtCvsSection(payment: Payment, receiptInfo: KginicisReceiptInfo | null, dueDateStr: string): HTMLElement {
+    const section = document.createElement('div');
+    section.id = MP_SECTION_ID;
+    section.className = 'mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2';
+
+    const title = document.createElement('p');
+    title.className = 'text-sm font-semibold text-gray-700 dark:text-gray-300';
+    title.textContent = '일본 편의점 입금 안내';
+    section.appendChild(title);
+
+    const status = receiptField(receiptInfo, '입금 상태');
+    const amount = receiptField(receiptInfo, '입금예정금액') || receiptField(receiptInfo, '결제금액');
+    const convenienceCode = receiptField(receiptInfo, '편의점 코드');
+    const confirmationNo = receiptField(receiptInfo, '편의점 확인번호') || String(payment.vbank_number ?? '');
+    const receiptNo = receiptField(receiptInfo, '편의점 접수번호');
+    const paymentTerm = receiptField(receiptInfo, '입금 마감일시') || dueDateStr;
+
+    if (status) section.appendChild(buildInfoRow('상태', status));
+    if (amount) section.appendChild(buildInfoRow('입금예정금액', amount, true));
+    if (convenienceCode) section.appendChild(buildInfoRow('편의점 코드', convenienceCode));
+    if (confirmationNo) section.appendChild(buildInfoRow('편의점 확인번호', confirmationNo));
+    if (receiptNo) section.appendChild(buildInfoRow('편의점 접수번호', receiptNo));
+    if (paymentTerm) section.appendChild(buildInfoRow('입금 마감일시', paymentTerm, true));
+
+    return section;
+}
+
 async function tryInjectMypage(orderNumber: string): Promise<boolean> {
     const orderData = getOrderFromState(orderNumber);
     if (!orderData) return false;
@@ -194,8 +238,13 @@ async function tryInjectMypage(orderNumber: string): Promise<boolean> {
     const container = findPaymentContainer();
     if (!container) return false;
 
+    const receiptInfo = await fetchKginicisReceiptInfo(orderNumber);
     const dueDateStr = payment.vbank_due_at ? formatKoreanDate(payment.vbank_due_at as string) : '';
-    container.appendChild(buildVbankSection(payment, dueDateStr));
+    container.appendChild(
+        isCbtCvsPayment(payment, receiptInfo)
+            ? buildCbtCvsSection(payment, receiptInfo, dueDateStr)
+            : buildVbankSection(payment, dueDateStr),
+    );
 
     console.info(`[${PLUGIN_ID}] vbank info injected on mypage`);
     return true;

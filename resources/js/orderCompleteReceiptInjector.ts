@@ -1,3 +1,10 @@
+import {
+    canOpenKginicisReceipt,
+    fetchKginicisReceiptInfo,
+    openKginicisReceipt,
+    receiptButtonLabel,
+} from './receiptPopup';
+
 const PLUGIN_ID = 'sirsoft-pay_kginicis';
 const FLAG = '__kginicisOcReceiptInjectorInstalled';
 const BTN_ID = 'kginicis-oc-receipt-btn';
@@ -31,20 +38,30 @@ async function fetchPayment(orderNumber: string): Promise<Payment | null> {
     }
 }
 
-async function fetchReceiptUrl(orderNumber: string): Promise<string | null> {
-    const token = getToken();
-    if (!token) return null;
+function patchPaymentMethodDisplay(displayLabel: string | null | undefined): boolean {
+    if (!displayLabel) return false;
 
-    try {
-        const res = await fetch(`/api/plugins/${PLUGIN_ID}/user/orders/${orderNumber}/receipt`, {
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-        });
-        if (!res.ok) return null;
-        const data = (await res.json()) as { receipt_url?: string };
-        return data.receipt_url ?? null;
-    } catch {
-        return null;
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('div'));
+    for (const row of rows) {
+        const spans = Array.from(row.children).filter(
+            (child): child is HTMLElement => child instanceof HTMLElement && child.tagName === 'SPAN',
+        );
+        if (spans.length < 2) continue;
+
+        const label = spans[0].textContent?.trim();
+        if (label !== '결제 방법' && label !== '결제수단' && label !== '결제 방식') continue;
+
+        const value = spans[spans.length - 1];
+        if (value.textContent?.trim() === displayLabel) {
+            return true;
+        }
+
+        value.textContent = displayLabel;
+        value.dataset.kginicisPaymentMethodPatched = 'true';
+        return true;
     }
+
+    return false;
 }
 
 async function injectOnOrderComplete(orderNumber: string): Promise<void> {
@@ -52,8 +69,15 @@ async function injectOnOrderComplete(orderNumber: string): Promise<void> {
 
     const payment = await fetchPayment(orderNumber);
     if (!payment || payment.pg_provider !== 'kginicis') return;
-    if (payment.payment_status !== 'paid') return;
     if (!payment.transaction_id) return;
+
+    const receiptInfo = await fetchKginicisReceiptInfo(orderNumber);
+    const isPaid = payment.payment_status === 'paid';
+    const isCbtConfirmation = receiptInfo?.receipt_type === 'cbt_confirmation';
+    if (!isPaid && !isCbtConfirmation) return;
+    if (!canOpenKginicisReceipt(receiptInfo)) return;
+
+    patchPaymentMethodDisplay(receiptInfo.payment_method_display_label);
 
     const blueBtn = Array.from(document.querySelectorAll<HTMLButtonElement>('button[type="button"]'))
         .find(b => b.className.includes('bg-blue-600'));
@@ -68,16 +92,16 @@ async function injectOnOrderComplete(orderNumber: string): Promise<void> {
     receiptBtn.className = blueBtn.className
         .replace(/bg-blue-\d+/g, 'bg-green-600')
         .replace(/hover:bg-blue-\d+/g, 'hover:bg-green-700');
-    receiptBtn.textContent = '영수증 조회';
+    receiptBtn.textContent = receiptButtonLabel(receiptInfo);
 
     receiptBtn.addEventListener('click', async () => {
         receiptBtn.disabled = true;
         receiptBtn.textContent = '로딩 중...';
-        const url = await fetchReceiptUrl(orderNumber);
+        const latestReceiptInfo = await fetchKginicisReceiptInfo(orderNumber);
         receiptBtn.disabled = false;
-        receiptBtn.textContent = '영수증 조회';
-        if (url) {
-            window.open(url, 'kginicis_receipt', 'width=800,height=600,scrollbars=yes,resizable=yes');
+        receiptBtn.textContent = receiptButtonLabel(latestReceiptInfo ?? receiptInfo);
+        if (canOpenKginicisReceipt(latestReceiptInfo)) {
+            openKginicisReceipt(latestReceiptInfo);
         }
     });
 
