@@ -7,12 +7,12 @@ namespace Plugins\Sirsoft\PayKginicis\Controllers;
 use App\Services\PluginSettingsService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
+use Plugins\Sirsoft\PayKginicis\Http\Requests\CbtCallbackRequest;
 use Plugins\Sirsoft\PayKginicis\Services\CbtReconciliationService;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
@@ -42,6 +42,8 @@ class CbtCallbackController
         '사용자 취소',
         '취소',
     ];
+
+    private const CBT_PAYPAY_PROCESSING_FAILURE_MESSAGE = 'PayPay 결제를 완료하지 못했습니다. 다시 시도하거나 다른 결제수단을 선택해 주세요.';
 
     private const CBT_AUTH_RESPONSE_KEYS = [
         'resultCode',
@@ -102,10 +104,10 @@ class CbtCallbackController
     /**
      * handle
      *
-     * @param  Request  $request
+     * @param  CbtCallbackRequest  $request
      * @return RedirectResponse
      */
-    public function handle(Request $request): RedirectResponse
+    public function handle(CbtCallbackRequest $request): RedirectResponse
     {
         $sid = (string) $request->input('sid', '');
         $oid = $this->resolveOrderId($request);
@@ -141,11 +143,12 @@ class CbtCallbackController
                 'result_msg' => $authResultMsg,
             ]);
 
-            return redirect($this->resolveFailUrl([
-                'error' => $authResultCode !== '' ? $authResultCode : 'cbt_auth_failed',
-                'message' => $authResultMsg,
-                'orderId' => $oid,
-            ]));
+            return redirect($this->resolveFailUrl($this->buildCbtFailureRedirectParams(
+                $authResultCode !== '' ? $authResultCode : 'cbt_auth_failed',
+                $authResultMsg,
+                (string) $request->input('paymethod', ''),
+                $oid,
+            )));
         }
 
         if ($authMid !== '' && $authMid !== $this->apiService->getJapanMid()) {
@@ -187,11 +190,12 @@ class CbtCallbackController
 
                 $this->orderService->failPayment($order, $resultCode, $resultMsg);
 
-                return redirect($this->resolveFailUrl([
-                    'error' => $resultCode,
-                    'message' => $resultMsg,
-                    'orderId' => $oid,
-                ]));
+                return redirect($this->resolveFailUrl($this->buildCbtFailureRedirectParams(
+                    (string) $resultCode,
+                    (string) $resultMsg,
+                    (string) ($pgResponse['paymethod'] ?? $request->input('paymethod', '')),
+                    $oid,
+                )));
             }
 
             $tid = $pgResponse['tid'] ?? ($pgResponse['transactionId'] ?? '');
@@ -266,7 +270,7 @@ class CbtCallbackController
         }
     }
 
-    private function resolveOrderId(Request $request): string
+    private function resolveOrderId(CbtCallbackRequest $request): string
     {
         return (string) (
             $request->input('orderID')
@@ -294,6 +298,41 @@ class CbtCallbackController
         }
 
         return false;
+    }
+
+    private function buildCbtFailureRedirectParams(
+        string $resultCode,
+        string $resultMsg,
+        string $payMethod,
+        string $orderId,
+    ): array {
+        if ($this->isPayPayProcessingFailure($resultCode, $resultMsg, $payMethod)) {
+            return [
+                'error' => 'paypay_processing_failed',
+                'message' => self::CBT_PAYPAY_PROCESSING_FAILURE_MESSAGE,
+                'orderId' => $orderId,
+            ];
+        }
+
+        return [
+            'error' => $resultCode,
+            'message' => $resultMsg,
+            'orderId' => $orderId,
+        ];
+    }
+
+    private function isPayPayProcessingFailure(string $resultCode, string $resultMsg, string $payMethod): bool
+    {
+        $normalizedPayMethod = strtoupper($payMethod);
+        $normalizedResultCode = strtolower($resultCode);
+        $normalizedResultMsg = strtolower($resultMsg);
+        $isPayPay = str_contains($normalizedPayMethod, 'PAYPAY');
+
+        return $isPayPay
+            && (
+                $normalizedResultCode === 'processing_failure'
+                || str_contains($normalizedResultMsg, 'processing failed upstream')
+            );
     }
 
     private function assertPayableCbtOrder(Order $order): void
