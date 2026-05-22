@@ -290,6 +290,7 @@ class Plugin extends AbstractPlugin
             Listeners\CancelActivityLogListener::class,
             Listeners\RegisterEasyPayMethodsListener::class,
             Listeners\AdjustEcommercePaymentMethodsLayoutListener::class,
+            Listeners\ValidateCbtSettingsListener::class,
         ];
     }
 

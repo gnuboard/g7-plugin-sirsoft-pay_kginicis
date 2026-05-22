@@ -6,6 +6,7 @@ namespace Plugins\Sirsoft\PayKginicis\Controllers;
 
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
 use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
@@ -98,6 +99,18 @@ class CbtCvsNotifyController
             $existingMeta = is_array($payment?->payment_meta) ? $payment->payment_meta : [];
             $expectedMid = (string) ($existingMeta['cbt_mid'] ?? $this->apiService->getJapanMid());
 
+            $expectedAmount = $this->resolveExpectedCvsAmount($order, $existingMeta);
+            if ($expectedAmount > 0 && $amount !== $expectedAmount) {
+                Log::warning('KG Inicis CBT CVS: amount mismatch', [
+                    'order_id' => $orderId,
+                    'tid' => $tid,
+                    'received_amount' => $amount,
+                    'expected_amount' => $expectedAmount,
+                ]);
+
+                return $this->plain('FAIL');
+            }
+
             if ($expectedMid !== '' && $mid !== $expectedMid) {
                 Log::warning('KG Inicis CBT CVS: MID mismatch', [
                     'order_id' => $orderId,
@@ -158,5 +171,15 @@ class CbtCvsNotifyController
     private function plain(string $body): Response
     {
         return response($body, 200)->header('Content-Type', 'text/plain');
+    }
+
+    private function resolveExpectedCvsAmount(Order $order, array $paymentMeta): int
+    {
+        $metaAmount = (int) ($paymentMeta['cvs_amount'] ?? 0);
+        if ($metaAmount > 0) {
+            return $metaAmount;
+        }
+
+        return (int) round((float) $order->total_due_amount);
     }
 }
