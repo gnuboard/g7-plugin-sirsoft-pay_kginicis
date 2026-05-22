@@ -406,6 +406,24 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         );
     });
 
+    it('JPY 주문에서 한국 KG 간편결제 선택 시 CBT 전체 paymethod 로 fallback 하지 않고 중단', async () => {
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: CBT_PG_PAYMENT,
+                paymentMethod: 'kginicis_kakaopay',
+            },
+        });
+
+        expect(apiPost).not.toHaveBeenCalled();
+        expect(submitSpy).not.toHaveBeenCalled();
+        expect((window as any).G7Core.state.setLocal).toHaveBeenCalledWith(
+            expect.objectContaining({
+                isSubmittingOrder: false,
+                paymentErrorMessage: 'JPY orders can only use KG Inicis Japan CBT payment methods.',
+            }),
+        );
+    });
+
     it('timestamp 가 yyyyMMddHHmmss 형식 (14자 숫자, epoch ms 아님)', async () => {
         await requestPaymentHandler({ params: { pgPaymentData: CBT_PG_PAYMENT } });
 
@@ -447,7 +465,8 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         const fields = getLastSubmittedFormFields();
         expect(fields.returnUrl).toBe(
             `${window.location.origin}${CLIENT_CONFIG.data.callback_urls.cbt_callback}` +
-                `?oid=${encodeURIComponent(CBT_PG_PAYMENT.order_number)}`,
+                `?oid=${encodeURIComponent(CBT_PG_PAYMENT.order_number)}` +
+                '&selectedPaymentMethod=card',
         );
     });
 

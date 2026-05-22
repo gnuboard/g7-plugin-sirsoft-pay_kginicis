@@ -31,9 +31,11 @@ class MobileSignatureRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'oid'       => ['required', 'string'],
+            'oid'       => ['required', 'string', 'max:40'],
             'price'     => ['required', 'integer', 'min:1'],
-            'timestamp' => ['required', 'string'],
+            'timestamp' => ['required', 'string', 'max:20'],
+            'buyer_email' => ['nullable', 'string', 'max:255'],
+            'buyer_phone' => ['nullable', 'string', 'max:30'],
         ];
     }
 }

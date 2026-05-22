@@ -286,6 +286,82 @@ class CbtPaymentControllerTest extends PluginTestCase
         $this->assertSame('waiting_deposit', $payment->payment_meta['cvs_status'] ?? 'waiting_deposit');
     }
 
+    public function test_cbt_cvs_notify_rejects_sid_mismatch(): void
+    {
+        $order = $this->createPersistedPendingJpyOrder('JP-ORDER-CVS-SID-001', 100);
+        $order->payment()->update([
+            'payment_status' => PaymentStatusEnum::WAITING_DEPOSIT,
+            'transaction_id' => 'CBT_CVS_TID_SID_001',
+            'payment_meta' => [
+                'is_cbt' => true,
+                'cbt_type' => 'JPPG',
+                'cbt_mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'cbt_sid' => 'SID-CVS-EXPECTED',
+                'is_test_mode' => true,
+                'pay_method' => 'CVS',
+                'cvs_amount' => 100,
+            ],
+        ]);
+
+        $response = $this->postJson('/plugins/sirsoft-pay_kginicis/payment/cbt/cvs-notify', [
+            'tid' => 'CBT_CVS_TID_SID_001',
+            'mid' => KgInicisApiService::JAPAN_TEST_MID,
+            'applDt' => '20260521',
+            'applTm' => '120000',
+            'status' => '00',
+            'payNm' => 'CBT',
+            'orderId' => 'JP-ORDER-CVS-SID-001',
+            'applNo' => 'APP-CVS',
+            'sid' => 'SID-CVS-ATTACKER',
+            'amount' => '100',
+            'currencyCd' => 'JPY',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('FAIL', $response->getContent());
+
+        $payment = OrderPayment::query()->where('order_id', $order->id)->firstOrFail();
+        $this->assertEquals(PaymentStatusEnum::WAITING_DEPOSIT, $payment->payment_status);
+    }
+
+    public function test_cbt_cvs_notify_rejects_non_jpy_currency(): void
+    {
+        $order = $this->createPersistedPendingJpyOrder('JP-ORDER-CVS-CURRENCY-001', 100);
+        $order->payment()->update([
+            'payment_status' => PaymentStatusEnum::WAITING_DEPOSIT,
+            'transaction_id' => 'CBT_CVS_TID_CURRENCY_001',
+            'payment_meta' => [
+                'is_cbt' => true,
+                'cbt_type' => 'JPPG',
+                'cbt_mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'cbt_sid' => 'SID-CVS-CURRENCY-001',
+                'is_test_mode' => true,
+                'pay_method' => 'CVS',
+                'cvs_amount' => 100,
+            ],
+        ]);
+
+        $response = $this->postJson('/plugins/sirsoft-pay_kginicis/payment/cbt/cvs-notify', [
+            'tid' => 'CBT_CVS_TID_CURRENCY_001',
+            'mid' => KgInicisApiService::JAPAN_TEST_MID,
+            'applDt' => '20260521',
+            'applTm' => '120000',
+            'status' => '00',
+            'payNm' => 'CBT',
+            'orderId' => 'JP-ORDER-CVS-CURRENCY-001',
+            'applNo' => 'APP-CVS',
+            'sid' => 'SID-CVS-CURRENCY-001',
+            'amount' => '100',
+            'currencyCd' => 'KRW',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('FAIL', $response->getContent());
+
+        $payment = OrderPayment::query()->where('order_id', $order->id)->firstOrFail();
+        $this->assertEquals(PaymentStatusEnum::WAITING_DEPOSIT, $payment->payment_status);
+    }
+
     public function test_cbt_callback_auto_refunds_approved_payment_when_local_completion_fails(): void
     {
         $order = $this->makePendingJpyOrder('JP-ORDER-003', 100);
@@ -374,6 +450,55 @@ class CbtPaymentControllerTest extends PluginTestCase
             ]));
 
         $response->assertRedirect('http://localhost/shop/checkout?error=cbt_failed&orderId=JP-ORDER-004');
+    }
+
+    public function test_cbt_callback_auto_refunds_when_approved_order_id_mismatches_order(): void
+    {
+        $order = $this->makePendingJpyOrder('JP-ORDER-012', 100);
+
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldReceive('findByOrderNumber')
+            ->with('JP-ORDER-012')
+            ->andReturn($order);
+        $orderService->shouldNotReceive('completePayment');
+
+        $apiService = Mockery::mock(KgInicisApiService::class);
+        $apiService->shouldReceive('getJapanMid')->andReturn(KgInicisApiService::JAPAN_TEST_MID);
+        $apiService->shouldReceive('isTestMode')->andReturn(true);
+        $apiService->shouldReceive('approveCbtPayment')
+            ->with('SID012')
+            ->andReturn([
+                'resultCode' => 'OK',
+                'tid' => 'CBT_TID_012',
+                'orderId' => 'JP-ORDER-ATTACKER',
+                'mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'currencyCd' => 'JPY',
+                'paymethod' => 'CARD',
+                'amount' => 100,
+            ]);
+        $apiService->shouldReceive('refundCbtPayment')
+            ->once()
+            ->with(
+                'CBT_TID_012',
+                null,
+                Mockery::on(fn (string $msg): bool => str_contains($msg, 'order id mismatch')),
+            )
+            ->andReturn(['resultCode' => '00']);
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+        $this->app->instance(KgInicisApiService::class, $apiService);
+
+        $response = $this->get('/plugins/sirsoft-pay_kginicis/payment/cbt/callback?'
+            . http_build_query([
+                'oid' => 'JP-ORDER-012',
+                'sid' => 'SID012',
+                'resultCode' => 'OK',
+                'mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'paymethod' => 'CARD',
+                'selectedPaymentMethod' => 'card',
+            ]));
+
+        $response->assertRedirect('http://localhost/shop/checkout?error=cbt_failed&orderId=JP-ORDER-012');
     }
 
     public function test_cbt_hash_data_rejects_amount_mismatch(): void

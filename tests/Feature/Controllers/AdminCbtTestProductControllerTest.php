@@ -2,7 +2,14 @@
 
 namespace Plugins\Sirsoft\PayKginicis\Tests\Feature\Controllers;
 
+use Illuminate\Support\Facades\Http;
+use Modules\Sirsoft\Ecommerce\Database\Factories\OrderFactory;
+use Modules\Sirsoft\Ecommerce\Database\Factories\OrderPaymentFactory;
+use Modules\Sirsoft\Ecommerce\Enums\OrderStatusEnum;
+use Modules\Sirsoft\Ecommerce\Enums\PaymentMethodEnum;
+use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Product;
+use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 use Plugins\Sirsoft\PayKginicis\Tests\PluginTestCase;
 
 class AdminCbtTestProductControllerTest extends PluginTestCase
@@ -49,5 +56,90 @@ class AdminCbtTestProductControllerTest extends PluginTestCase
             [401, 403, 302],
             '비인증 호출은 401/403/302 중 하나여야 한다',
         );
+    }
+
+    public function test_admin_transaction_status_uses_local_cbt_confirmation_instead_of_korean_inquiry(): void
+    {
+        Http::fake();
+
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin);
+
+        $order = OrderFactory::new()->create([
+            'order_number' => 'JP-ORDER-ADMIN-CBT-001',
+            'order_status' => OrderStatusEnum::PAYMENT_COMPLETE,
+            'currency' => 'JPY',
+            'currency_snapshot' => ['JPY' => 1.0],
+            'subtotal_amount' => 100,
+            'total_amount' => 100,
+            'total_due_amount' => 100,
+            'total_paid_amount' => 100,
+            'item_count' => 1,
+        ]);
+
+        OrderPaymentFactory::new()->create([
+            'order_id' => $order->id,
+            'payment_status' => PaymentStatusEnum::PAID,
+            'payment_method' => PaymentMethodEnum::VBANK,
+            'pg_provider' => 'kginicis',
+            'transaction_id' => 'INIJPGCVS_CBTTEST00120260522160833186429',
+            'paid_amount_local' => 100,
+            'paid_amount_base' => 100,
+            'currency' => 'JPY',
+            'currency_snapshot' => ['JPY' => 1.0],
+            'payment_meta' => [
+                'is_cbt' => true,
+                'cbt_type' => 'JPPG',
+                'cbt_mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'cbt_sid' => 'SID-ADMIN-CBT-001',
+                'mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'currency' => 'JPY',
+                'pay_method' => 'CVS',
+                'cvs_status' => 'paid',
+                'pg_raw_response' => [
+                    'resultCode' => '00',
+                    'paymethod' => 'CVS',
+                    'amount' => '100',
+                    'currencyCd' => 'JPY',
+                    'orderId' => 'JP-ORDER-ADMIN-CBT-001',
+                    'applDt' => '20260522',
+                    'applTm' => '160833',
+                    'confNo' => '999999999999999999',
+                    'paymentTerm' => '20260530235959',
+                ],
+            ],
+        ]);
+
+        $response = $this->getJson('/api/plugins/sirsoft-pay_kginicis/admin/orders/JP-ORDER-ADMIN-CBT-001/transaction-status');
+
+        $response->assertOk()
+            ->assertJsonPath('data._is_cbt', true)
+            ->assertJsonPath('data._is_local_confirmation', true)
+            ->assertJsonPath('data._pay_method', 'CVS')
+            ->assertJsonPath('data._pay_method_label', '일본 편의점결제')
+            ->assertJsonPath('data._currency', 'JPY')
+            ->assertJsonPath('data._moid', 'JP-ORDER-ADMIN-CBT-001');
+
+        Http::assertNothingSent();
+    }
+
+    public function test_admin_direct_cbt_tid_query_does_not_call_korean_inquiry_without_local_row(): void
+    {
+        Http::fake();
+
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/admin/transaction/query', [
+            'tid' => 'INIJPGCARDCBTTEST00120260522160833186429',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data._is_cbt', true)
+            ->assertJsonPath('data._is_local_confirmation', true)
+            ->assertJsonPath('data.tid', 'INIJPGCARDCBTTEST00120260522160833186429')
+            ->assertJsonPath('data._currency', 'JPY');
+
+        Http::assertNothingSent();
     }
 }

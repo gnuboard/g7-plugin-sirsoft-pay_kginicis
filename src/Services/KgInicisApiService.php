@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Plugins\Sirsoft\PayKginicis\Services;
 
 use App\Services\PluginSettingsService;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use App\Extension\HookManager;
 use Illuminate\Support\Facades\Log;
@@ -78,6 +79,14 @@ class KgInicisApiService
     private const CBT_CONNECT_TIMEOUT_SECONDS = 5;
 
     private const CBT_REQUEST_TIMEOUT_SECONDS = 20;
+
+    private const PG_CONNECT_TIMEOUT_SECONDS = 5;
+
+    private const PG_REQUEST_TIMEOUT_SECONDS = 20;
+
+    private const PG_RETRY_TIMES = 2;
+
+    private const PG_RETRY_SLEEP_MILLISECONDS = 200;
 
     /** KG 이니시스 일본결제(CBT) 공식 테스트 MID — 고정값, 변경 불가 */
     public const JAPAN_TEST_MID = 'CBTTEST001';
@@ -449,6 +458,18 @@ class KgInicisApiService
         return hash('sha512', $plain);
     }
 
+    private function pgHttp(): PendingRequest
+    {
+        return Http::connectTimeout(self::PG_CONNECT_TIMEOUT_SECONDS)
+            ->timeout(self::PG_REQUEST_TIMEOUT_SECONDS);
+    }
+
+    private function pgInquiryHttp(): PendingRequest
+    {
+        return $this->pgHttp()
+            ->retry(self::PG_RETRY_TIMES, self::PG_RETRY_SLEEP_MILLISECONDS);
+    }
+
     /**
      * authorizePayment
      *
@@ -466,7 +487,7 @@ class KgInicisApiService
         // 알파벳순 정렬: authToken < signKey < timestamp
         $verification = hash('sha256', 'authToken=' . $authToken . '&signKey=' . $this->signKey . '&timestamp=' . $timestamp);
 
-        $response = Http::asForm()->post($authUrl, [
+        $response = $this->pgHttp()->asForm()->post($authUrl, [
             'mid'          => $this->mid,
             'authToken'    => $authToken,
             'signature'    => $signature,
@@ -595,7 +616,7 @@ class KgInicisApiService
     public function sendNetCancel(string $netCancelUrl, string $authToken): void
     {
         try {
-            Http::asForm()->post($netCancelUrl, [
+            $this->pgHttp()->asForm()->post($netCancelUrl, [
                 'authToken' => $authToken,
             ]);
         } catch (\Throwable $e) {
@@ -637,7 +658,7 @@ class KgInicisApiService
      */
     public function authorizeMobilePayment(string $reqUrl, string $tid): array
     {
-        $response = Http::asForm()->post($reqUrl, [
+        $response = $this->pgHttp()->asForm()->post($reqUrl, [
             'P_MID' => $this->mid,
             'P_TID' => $tid,
         ]);
@@ -684,7 +705,8 @@ class KgInicisApiService
             'hashData'  => $hashData,
         ];
 
-        $response = Http::withHeaders(['Content-Type' => 'application/json;charset=utf-8'])
+        $response = $this->pgInquiryHttp()
+            ->withHeaders(['Content-Type' => 'application/json;charset=utf-8'])
             ->post($apiUrl, $payload);
 
         if ($response->failed()) {
@@ -748,7 +770,8 @@ class KgInicisApiService
         // 훅: 결제 취소 전 (본인인증 등 확장 지점)
         HookManager::doAction('sirsoft-pay_kginicis.payment.before_cancel', $tid, $payMethod, $cancelPrice, $msg);
 
-        $response = Http::withHeaders(['Content-Type' => 'application/json;charset=utf-8'])
+        $response = $this->pgHttp()
+            ->withHeaders(['Content-Type' => 'application/json;charset=utf-8'])
             ->post($apiUrl, $payload);
 
         if ($response->failed()) {

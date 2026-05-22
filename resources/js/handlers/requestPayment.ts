@@ -212,6 +212,8 @@ const CBT_PAYMETHODS_BY_PAYMENT_METHOD: Record<string, string[]> = {
     kginicis_japan_cvs:    ['CVS'],
 };
 
+const CBT_ALLOWED_PAYMENT_METHODS = new Set(Object.keys(CBT_PAYMETHODS_BY_PAYMENT_METHOD));
+
 /**
  * KG 이니시스 한국 모바일 결제
  *
@@ -228,7 +230,13 @@ async function requestMobileKoreanPayment(
 
     const sigJson: { data: MobileSignatureResponse } = await G7Core.api.post(
         config.callback_urls.mobile_signature,
-        { oid: pgPaymentData.order_number, price: pgPaymentData.amount, timestamp },
+        {
+            oid: pgPaymentData.order_number,
+            price: pgPaymentData.amount,
+            timestamp,
+            buyer_email: pgPaymentData.customer_email ?? '',
+            buyer_phone: pgPaymentData.customer_phone ?? '',
+        },
     );
 
     const { chkfake, mobile_payment_url: mobilePaymentUrl } = sigJson.data;
@@ -325,7 +333,13 @@ async function requestKoreanPayment(
 
     const signatureJson: { data: SignatureResponse } = await G7Core.api.post(
         config.callback_urls.signature,
-        { oid: pgPaymentData.order_number, price: pgPaymentData.amount, timestamp },
+        {
+            oid: pgPaymentData.order_number,
+            price: pgPaymentData.amount,
+            timestamp,
+            buyer_email: pgPaymentData.customer_email ?? '',
+            buyer_phone: pgPaymentData.customer_phone ?? '',
+        },
     );
 
     const { signature, verification, mKey } = signatureJson.data;
@@ -505,7 +519,8 @@ async function requestCbtPayment(
     const returnUrl =
         window.location.origin +
         config.callback_urls.cbt_callback +
-        `?oid=${encodeURIComponent(pgPaymentData.order_number)}`;
+        `?oid=${encodeURIComponent(pgPaymentData.order_number)}` +
+        `&selectedPaymentMethod=${encodeURIComponent(paymentMethod ?? 'card')}`;
 
     submitForm(config.callback_urls.cbt_auth_url, {
         cbtType:     'JPPG',
@@ -565,6 +580,10 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
 
         if (isJpy && !isJapanConfigured) {
             throw new Error('KG Inicis Japan CBT payment is not configured.');
+        }
+
+        if (isJpy && !CBT_ALLOWED_PAYMENT_METHODS.has(paymentMethod)) {
+            throw new Error('JPY orders can only use KG Inicis Japan CBT payment methods.');
         }
 
         if (isJpy) {

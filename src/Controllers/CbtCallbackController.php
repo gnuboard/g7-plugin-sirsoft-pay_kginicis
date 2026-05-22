@@ -54,6 +54,7 @@ class CbtCallbackController
         'mid',
         'sid',
         'paymethod',
+        'selectedPaymentMethod',
     ];
 
     private const CBT_APPROVE_RESPONSE_KEYS = [
@@ -80,9 +81,12 @@ class CbtCallbackController
         'receiptNo',
         'paymentTerm',
         'currencyCd',
+        'currencyCode',
         'mid',
+        'MID',
         'oid',
         'orderId',
+        'orderID',
     ];
 
     private const CBT_REFUND_RESPONSE_KEYS = [
@@ -216,6 +220,7 @@ class CbtCallbackController
                 $approvedTid = $tid;
             }
 
+            $this->assertCbtApproveResponseMatchesOrder($order, $pgResponse, $request, $payMethod);
             $approvedAmount = $this->resolveApprovedAmount($pgResponse, $order);
             $authResponse = $this->sanitizePgResponse($request->except(['_token']), self::CBT_AUTH_RESPONSE_KEYS);
             $approveResponse = $this->sanitizePgResponse($pgResponse, self::CBT_APPROVE_RESPONSE_KEYS);
@@ -361,6 +366,78 @@ class CbtCallbackController
         }
 
         return $approvedAmount;
+    }
+
+    private function assertCbtApproveResponseMatchesOrder(
+        Order $order,
+        array $pgResponse,
+        CbtCallbackRequest $request,
+        string $approvedPayMethod,
+    ): void {
+        $receivedOrderId = $this->firstNonEmptyString($pgResponse, ['orderId', 'orderID', 'oid']);
+        if ($receivedOrderId !== null && $receivedOrderId !== (string) $order->order_number) {
+            throw new \RuntimeException('KG Inicis CBT approved order id mismatch.');
+        }
+
+        $receivedMid = $this->firstNonEmptyString($pgResponse, ['mid', 'MID']);
+        $expectedMid = $this->apiService->getJapanMid();
+        if ($receivedMid !== null && $receivedMid !== $expectedMid) {
+            throw new \RuntimeException('KG Inicis CBT approved MID mismatch.');
+        }
+
+        $receivedCurrency = strtoupper((string) $this->firstNonEmptyString($pgResponse, ['currencyCd', 'currencyCode', 'currency']));
+        if ($receivedCurrency !== '' && $receivedCurrency !== 'JPY') {
+            throw new \RuntimeException('KG Inicis CBT approved currency mismatch.');
+        }
+
+        $expectedPayMethod = $this->resolveExpectedCbtPayMethod($request);
+        $receivedPayMethod = $this->normalizeCbtPayMethod($approvedPayMethod);
+        if ($expectedPayMethod !== null && $receivedPayMethod !== '' && $receivedPayMethod !== $expectedPayMethod) {
+            throw new \RuntimeException('KG Inicis CBT approved paymethod mismatch.');
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $source
+     * @param array<int,string> $keys
+     */
+    private function firstNonEmptyString(array $source, array $keys): ?string
+    {
+        foreach ($keys as $key) {
+            if (! array_key_exists($key, $source)) {
+                continue;
+            }
+
+            $value = trim((string) $source[$key]);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveExpectedCbtPayMethod(CbtCallbackRequest $request): ?string
+    {
+        $selectedPaymentMethod = (string) $request->input('selectedPaymentMethod', '');
+        $expectedBySelectedMethod = [
+            'card' => 'CARD',
+            'kginicis_japan_paypay' => 'PAYPAY',
+            'kginicis_japan_cvs' => 'CVS',
+        ];
+
+        if ($selectedPaymentMethod !== '' && isset($expectedBySelectedMethod[$selectedPaymentMethod])) {
+            return $expectedBySelectedMethod[$selectedPaymentMethod];
+        }
+
+        $authPayMethod = $this->normalizeCbtPayMethod((string) $request->input('paymethod', ''));
+
+        return $authPayMethod !== '' ? $authPayMethod : null;
+    }
+
+    private function normalizeCbtPayMethod(string $payMethod): string
+    {
+        return strtoupper(trim($payMethod));
     }
 
     private function normalizeInstallmentMonths(mixed $value): ?int

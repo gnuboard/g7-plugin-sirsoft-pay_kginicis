@@ -10,12 +10,17 @@ use Modules\Sirsoft\Ecommerce\Models\OrderAddress;
 
 trait ValidatesCbtOrderContext
 {
-    protected function cbtExpectedPrice(Order $order): int
+    protected function expectedPaymentPrice(Order $order): int
     {
         return (int) round((float) $order->total_due_amount);
     }
 
-    protected function cbtRequestMatchesOrderBuyer(Request $request, Order $order): bool
+    protected function cbtExpectedPrice(Order $order): int
+    {
+        return $this->expectedPaymentPrice($order);
+    }
+
+    protected function requestMatchesOrderBuyer(Request $request, Order $order): bool
     {
         /** @var OrderAddress|null $address */
         $address = $order->shippingAddress;
@@ -31,9 +36,9 @@ trait ValidatesCbtOrderContext
             }
         }
 
-        $expectedPhone = $this->cbtDigitsOnly((string) $address->orderer_phone);
+        $expectedPhone = $this->digitsOnly((string) $address->orderer_phone);
         if ($expectedPhone !== '') {
-            $receivedPhone = $this->cbtDigitsOnly((string) $request->input('buyer_phone', ''));
+            $receivedPhone = $this->digitsOnly((string) $request->input('buyer_phone', ''));
             if ($receivedPhone === '' || $receivedPhone !== $expectedPhone) {
                 return false;
             }
@@ -42,8 +47,18 @@ trait ValidatesCbtOrderContext
         return true;
     }
 
-    protected function cbtDigitsOnly(string $value): string
+    protected function cbtRequestMatchesOrderBuyer(Request $request, Order $order): bool
+    {
+        return $this->requestMatchesOrderBuyer($request, $order);
+    }
+
+    protected function digitsOnly(string $value): string
     {
         return preg_replace('/[^0-9]/', '', $value) ?? '';
+    }
+
+    protected function cbtDigitsOnly(string $value): string
+    {
+        return $this->digitsOnly($value);
     }
 }

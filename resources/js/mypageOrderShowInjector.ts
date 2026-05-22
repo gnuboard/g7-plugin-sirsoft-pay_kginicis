@@ -73,11 +73,13 @@ export function patchMypagePaymentMethodDisplay(container: Element, displayLabel
 
         const value = spans[spans.length - 1];
         if (value.textContent?.trim() === displayLabel) {
+            row.dataset.kginicisPaymentMethodRow = 'true';
             return true;
         }
 
         value.textContent = displayLabel;
         value.dataset.kginicisPaymentMethodPatched = 'true';
+        row.dataset.kginicisPaymentMethodRow = 'true';
         return true;
     }
 
@@ -88,6 +90,7 @@ function buildReceiptRow(orderNumber: string, receiptInfo: KginicisReceiptInfo):
     const row = document.createElement('div');
     row.id = ROW_ID;
     row.className = 'flex items-center justify-between';
+    row.dataset.kginicisReceiptRow = 'mypage-order';
 
     const label = document.createElement('span');
     label.className = 'text-gray-500 dark:text-gray-400 text-sm';
@@ -95,6 +98,7 @@ function buildReceiptRow(orderNumber: string, receiptInfo: KginicisReceiptInfo):
 
     const btn = document.createElement('button');
     btn.type = 'button';
+    btn.dataset.kginicisReceiptButton = 'mypage-order';
     btn.className =
         'inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50';
     btn.textContent = receiptButtonLabel(receiptInfo);
