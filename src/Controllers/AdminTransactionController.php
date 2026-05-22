@@ -347,6 +347,8 @@ class AdminTransactionController extends AdminBaseController
             'naverpay'                                => '네이버페이',
             'tosspay', 'toss'                         => '토스페이',
             'ssgpay'                                  => 'SSG페이',
+            'paypay'                                  => 'PayPay',
+            'cvs'                                     => '일본 편의점결제',
             default                                   => $code,
         };
     }

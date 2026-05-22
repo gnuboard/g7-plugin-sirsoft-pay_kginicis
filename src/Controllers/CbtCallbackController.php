@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Plugins\Sirsoft\PayKginicis\Controllers;
 
 use App\Services\PluginSettingsService;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
@@ -28,6 +30,18 @@ class CbtCallbackController
     use PreventsReplayCallback;
 
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
+
+    private const CBT_USER_CANCEL_RESULT_CODES = ['2001', '0021', '0022'];
+
+    private const CBT_USER_CANCEL_MESSAGE_PATTERNS = [
+        'ユーザーキャンセル',
+        'キャンセル',
+        '사용자가 결제를 취소',
+        '결제를 취소',
+        '사용자가 취소',
+        '사용자 취소',
+        '취소',
+    ];
 
     private const CBT_AUTH_RESPONSE_KEYS = [
         'resultCode',
@@ -58,6 +72,12 @@ class CbtCallbackController
         'installMonth',
         'cardCode',
         'cardName',
+        'applNo',
+        'convenience',
+        'confNo',
+        'receiptNo',
+        'paymentTerm',
+        'currencyCd',
         'mid',
         'oid',
         'orderId',
@@ -92,6 +112,16 @@ class CbtCallbackController
         $authResultCode = (string) $request->input('resultCode', '');
         $authResultMsg = (string) $request->input('resultMsg', '');
         $authMid = (string) $request->input('mid', '');
+
+        if ($authResultCode !== '' && $authResultCode !== 'OK' && $this->isCbtAuthUserCancel($authResultCode, $authResultMsg)) {
+            Log::info('KG Inicis CBT: auth cancelled by user', [
+                'oid' => $oid,
+                'result_code' => $authResultCode,
+                'result_msg' => $authResultMsg,
+            ]);
+
+            return redirect($this->resolveFailUrl());
+        }
 
         if ($sid === '' || $oid === '') {
             Log::warning('KG Inicis CBT: missing sid or oid', ['oid' => $oid, 'sid' => $sid]);
@@ -169,9 +199,6 @@ class CbtCallbackController
                 throw new \RuntimeException('KG Inicis CBT approve response missing tid.');
             }
 
-            // PG 승인이 확정된 직후부터는 어떤 후속 예외라도 자동 취소 대상이다.
-            $approvedTid = $tid;
-
             // Replay 가드: 동일 tid 가 이미 paid 상태면 중복 처리하지 않고 성공 페이지로 복귀
             if ($this->wasAlreadyPaid($tid)) {
                 $this->logReplayDetected($tid, $oid, 'CBT authCallback');
@@ -180,9 +207,22 @@ class CbtCallbackController
             }
 
             $payMethod = (string) ($pgResponse['paymethod'] ?? $request->input('paymethod', 'CBT'));
+            if (! $this->isCbtCvsPayMethod($payMethod)) {
+                // PG 승인이 확정된 직후부터는 어떤 후속 예외라도 자동 취소 대상이다.
+                $approvedTid = $tid;
+            }
+
             $approvedAmount = $this->resolveApprovedAmount($pgResponse, $order);
             $authResponse = $this->sanitizePgResponse($request->except(['_token']), self::CBT_AUTH_RESPONSE_KEYS);
             $approveResponse = $this->sanitizePgResponse($pgResponse, self::CBT_APPROVE_RESPONSE_KEYS);
+
+            if ($this->isCbtCvsPayMethod($payMethod)) {
+                $this->handleCbtCvsIssued($order, $pgResponse, $tid, $sid, $approvedAmount, $authResponse, $approveResponse);
+
+                Log::info('KG Inicis CBT: CVS payment issued', ['oid' => $oid, 'tid' => $tid]);
+
+                return redirect($this->resolveSuccessUrl($oid));
+            }
 
             $this->orderService->completePayment($order, [
                 'transaction_id' => $tid,
@@ -241,6 +281,21 @@ class CbtCallbackController
         return in_array($resultCode, ['OK', '00', '0000'], true);
     }
 
+    private function isCbtAuthUserCancel(string $resultCode, string $resultMsg): bool
+    {
+        if (in_array($resultCode, self::CBT_USER_CANCEL_RESULT_CODES, true)) {
+            return true;
+        }
+
+        foreach (self::CBT_USER_CANCEL_MESSAGE_PATTERNS as $pattern) {
+            if ($resultMsg !== '' && str_contains($resultMsg, $pattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function assertPayableCbtOrder(Order $order): void
     {
         if (! $order->order_status->isBeforePayment()) {
@@ -276,6 +331,65 @@ class CbtCallbackController
         }
 
         return (int) $value;
+    }
+
+    private function isCbtCvsPayMethod(string $payMethod): bool
+    {
+        return strtoupper($payMethod) === 'CVS';
+    }
+
+    private function handleCbtCvsIssued(
+        Order $order,
+        array $pgResponse,
+        string $tid,
+        string $sid,
+        int $amount,
+        array $authResponse,
+        array $approveResponse,
+    ): void {
+        $paymentTerm = (string) ($pgResponse['paymentTerm'] ?? '');
+        $dueAt = null;
+
+        if (preg_match('/^\d{14}$/', $paymentTerm) === 1) {
+            try {
+                $dueAt = Carbon::createFromFormat('YmdHis', $paymentTerm, 'Asia/Tokyo')
+                    ->setTimezone(config('app.timezone', 'UTC'));
+            } catch (\Throwable) {
+                $dueAt = null;
+            }
+        }
+
+        $order->payment()->update(array_filter([
+            'pg_provider' => 'kginicis',
+            'payment_status' => PaymentStatusEnum::WAITING_DEPOSIT,
+            'transaction_id' => $tid,
+            'vbank_code' => $pgResponse['convenience'] ?? null,
+            'vbank_name' => 'CVS',
+            'vbank_number' => $pgResponse['confNo'] ?? ($pgResponse['receiptNo'] ?? null),
+            'vbank_due_at' => $dueAt,
+            'vbank_issued_at' => now(),
+            'payment_meta' => [
+                'result_code' => $pgResponse['resultCode'] ?? 'OK',
+                'pay_method' => 'CVS',
+                'cbt_type' => 'JPPG',
+                'cbt_mid' => $this->apiService->getJapanMid(),
+                'cbt_sid' => $sid,
+                'mid' => $this->apiService->getJapanMid(),
+                'currency' => 'JPY',
+                'is_cbt' => true,
+                'is_test_mode' => $this->apiService->isTestMode(),
+                'pg_response_sanitized' => true,
+                'pg_auth_response' => $authResponse,
+                'pg_approve_response' => $approveResponse,
+                'pg_raw_response' => $approveResponse,
+                'cvs_status' => 'waiting_deposit',
+                'cvs_amount' => $amount,
+                'cvs_convenience' => $pgResponse['convenience'] ?? null,
+                'cvs_conf_no' => $pgResponse['confNo'] ?? null,
+                'cvs_receipt_no' => $pgResponse['receiptNo'] ?? null,
+                'cvs_payment_term' => $paymentTerm !== '' ? $paymentTerm : null,
+            ],
+        ], fn ($value) => $value !== null));
     }
 
     private function refundApprovedCbtPaymentOrFlagManualReconciliation(

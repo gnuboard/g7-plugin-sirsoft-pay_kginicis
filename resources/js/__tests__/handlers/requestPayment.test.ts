@@ -227,13 +227,23 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
                 cbt_checkout_token: '/api/plugins/sirsoft-pay_kginicis/payment/cbt/checkout-token',
                 cbt_hash_data: '/api/plugins/sirsoft-pay_kginicis/payment/cbt/hash-data',
                 cbt_callback: '/api/plugins/sirsoft-pay_kginicis/payment/cbt/callback',
+                cbt_cvs_notify: '/plugins/sirsoft-pay_kginicis/payment/cbt/cvs-notify',
                 cbt_auth_url: 'https://devcbt.inicis.com/cbtauth',
             },
             cbt_extra_data: {
                 paymentUI: { language: 'JP', colorTheme: 'blue2' },
                 payment: {
-                    paymethod: ['CARD'],
+                    paymethod: ['CARD', 'CVS', 'PAYpay'],
                     card: { payType: ['one'], installMonth: [3] },
+                    cvs: {
+                        notiUrl: 'https://configured.example.test/cvs-notify',
+                        contactInfo: 'サンプル',
+                        contactTelNum: '0120-123-456',
+                        contactHours: '10:00-18:00',
+                        customerKana: 'テスト',
+                        customerFirstKana: 'タロウ',
+                        paymentTermDay: 5,
+                    },
                 },
                 gmoPayment: {
                     merchantName: 'サンプルストア',
@@ -330,7 +340,70 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         expect(extraData.paymentUI.language).toBe('JP');
         expect(extraData.payment.paymethod).toEqual(['CARD']);
         expect(extraData.payment.isMobile).toBe('false');
+        expect(extraData.payment.cvs.notiUrl).toBe(
+            `${window.location.origin}${CLIENT_CONFIG.data.callback_urls.cbt_cvs_notify}`,
+        );
         expect(extraData.gmoPayment.merchantName).toBe('サンプルストア');
+    });
+
+    it('일본 CBT 신용카드 선택 시 결제창 paymethod 를 CARD 로 제한', async () => {
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: CBT_PG_PAYMENT,
+                paymentMethod: 'card',
+            },
+        });
+
+        const fields = getLastSubmittedFormFields();
+        const extraData = JSON.parse(fields.extraData);
+        expect(extraData.payment.paymethod).toEqual(['CARD']);
+    });
+
+    it('일본 PayPay 결제수단 선택 시 CBT 결제창 paymethod 를 PAYpay 로 제한', async () => {
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: CBT_PG_PAYMENT,
+                paymentMethod: 'kginicis_japan_paypay',
+            },
+        });
+
+        const fields = getLastSubmittedFormFields();
+        const extraData = JSON.parse(fields.extraData);
+        expect(extraData.payment.paymethod).toEqual(['PAYpay']);
+    });
+
+    it('일본 편의점 결제수단 선택 시 CBT 결제창 paymethod 를 CVS 로 제한', async () => {
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: CBT_PG_PAYMENT,
+                paymentMethod: 'kginicis_japan_cvs',
+            },
+        });
+
+        const fields = getLastSubmittedFormFields();
+        const extraData = JSON.parse(fields.extraData);
+        expect(extraData.payment.paymethod).toEqual(['CVS']);
+        expect(extraData.payment.cvs.notiUrl).toBe(
+            `${window.location.origin}${CLIENT_CONFIG.data.callback_urls.cbt_cvs_notify}`,
+        );
+    });
+
+    it('일본 전용 결제수단은 JPY 주문에서만 허용', async () => {
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: { ...CBT_PG_PAYMENT, currency: 'KRW' },
+                paymentMethod: 'kginicis_japan_paypay',
+            },
+        });
+
+        expect(apiPost).not.toHaveBeenCalled();
+        expect(submitSpy).not.toHaveBeenCalled();
+        expect((window as any).G7Core.state.setLocal).toHaveBeenCalledWith(
+            expect.objectContaining({
+                isSubmittingOrder: false,
+                paymentErrorMessage: 'KG Inicis Japan payment methods require a JPY order.',
+            }),
+        );
     });
 
     it('timestamp 가 yyyyMMddHHmmss 형식 (14자 숫자, epoch ms 아님)', async () => {

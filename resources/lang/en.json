@@ -133,7 +133,9 @@
             "payco": "Payco",
             "naverpay": "Naver Pay",
             "tosspay": "Toss Pay",
-            "ssgpay": "SSG Pay"
+            "ssgpay": "SSG Pay",
+            "paypay": "PayPay",
+            "cvs": "Japan Convenience Store"
         },
         "cash_receipt_title": "Cash Receipt Issuance",
         "cash_receipt_description": "Issue a cash receipt via KG Inicis INIAPI.",

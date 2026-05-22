@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Plugins\Sirsoft\PayKginicis\Controllers\CbtCallbackController;
+use Plugins\Sirsoft\PayKginicis\Controllers\CbtCvsNotifyController;
 use Plugins\Sirsoft\PayKginicis\Controllers\MobileCallbackController;
 use Plugins\Sirsoft\PayKginicis\Controllers\PaymentCallbackController;
 use Plugins\Sirsoft\PayKginicis\Controllers\PaymentCloseController;
@@ -35,6 +36,10 @@ Route::get('/payment/close', [PaymentCloseController::class, 'show'])
 Route::withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class])->group(function () {
     Route::match(['get', 'post'], '/payment/cbt/callback', [CbtCallbackController::class, 'handle'])
         ->name('payment.cbt.callback');
+
+    Route::post('/payment/cbt/cvs-notify', [CbtCvsNotifyController::class, 'handle'])
+        ->middleware(InicisNotifyIpWhitelist::class)
+        ->name('payment.cbt.cvs-notify');
 
     Route::post('/payment/callback', [PaymentCallbackController::class, 'authCallback'])
         ->name('payment.callback');

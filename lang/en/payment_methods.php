@@ -17,4 +17,12 @@ return [
         'name' => 'Kakao Pay (KG Inicis)',
         'description' => 'Pay with Kakao Pay via KG Inicis',
     ],
+    'japan_paypay' => [
+        'name' => 'PayPay (KG Inicis Japan)',
+        'description' => 'Pay JPY orders with KG Inicis CBT PayPay',
+    ],
+    'japan_cvs' => [
+        'name' => 'Japan Convenience Store (KG Inicis)',
+        'description' => 'Accept JPY orders with KG Inicis CBT convenience store payment',
+    ],
 ];

@@ -111,6 +111,7 @@ class RegisterPgProviderListener implements HookListenerInterface
                 'cbt_checkout_token'  => '/plugins/sirsoft-pay_kginicis/payment/cbt/checkout-token',
                 'cbt_hash_data'       => '/plugins/sirsoft-pay_kginicis/payment/cbt/hash-data',
                 'cbt_callback'        => '/plugins/sirsoft-pay_kginicis/payment/cbt/callback',
+                'cbt_cvs_notify'      => '/plugins/sirsoft-pay_kginicis/payment/cbt/cvs-notify',
                 'cbt_auth_url'        => $isTest ? self::CBT_AUTH_URL_TEST : self::CBT_AUTH_URL_LIVE,
                 'mobile_signature'    => '/plugins/sirsoft-pay_kginicis/payment/mobile/signature',
                 'mobile_callback'     => '/plugins/sirsoft-pay_kginicis/payment/mobile/callback',
@@ -136,11 +137,20 @@ class RegisterPgProviderListener implements HookListenerInterface
                 'colorTheme' => 'blue2',
             ],
             'payment' => [
-                // CVS 는 별도 NOTI/환불계좌 플로우가 필요하므로 현재 JPPG 카드만 노출한다.
-                'paymethod' => ['CARD'],
+                'paymethod' => ['CARD', 'CVS', 'PAYpay'],
                 'card' => [
                     'payType' => ['one', 'installments'],
                     'installMonth' => [3, 5, 6, 10, 12],
+                ],
+                'cvs' => [
+                    'notiUrl' => url('/plugins/sirsoft-pay_kginicis/payment/cbt/cvs-notify'),
+                    'contactInfo' => $this->setting($settings, 'japan_merchant_name_short', 'サンプル'),
+                    'contactTelNum' => $this->setting($settings, 'japan_contact_phone', '0120-123-456'),
+                    'contactHours' => $this->setting($settings, 'japan_contact_opening_hours', '10:00-18:00'),
+                    'customerKana' => 'テスト',
+                    'customerLastKana' => 'テスト',
+                    'customerFirstKana' => 'タロウ',
+                    'paymentTermDay' => 5,
                 ],
             ],
             'gmoPayment' => [

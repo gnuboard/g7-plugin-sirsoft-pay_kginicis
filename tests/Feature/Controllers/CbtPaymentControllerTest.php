@@ -4,8 +4,13 @@ namespace Plugins\Sirsoft\PayKginicis\Tests\Feature\Controllers;
 
 use Mockery;
 use Illuminate\Support\Facades\DB;
+use Modules\Sirsoft\Ecommerce\Database\Factories\OrderFactory;
+use Modules\Sirsoft\Ecommerce\Database\Factories\OrderPaymentFactory;
 use Modules\Sirsoft\Ecommerce\Enums\OrderStatusEnum;
+use Modules\Sirsoft\Ecommerce\Enums\PaymentMethodEnum;
+use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
+use Modules\Sirsoft\Ecommerce\Models\OrderPayment;
 use Modules\Sirsoft\Ecommerce\Models\OrderAddress;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Services\CbtCheckoutTokenService;
@@ -64,6 +69,133 @@ class CbtPaymentControllerTest extends PluginTestCase
             ]));
 
         $response->assertRedirect('http://localhost/shop/orders/JP-ORDER-001/complete');
+    }
+
+    public function test_cbt_callback_for_cvs_marks_payment_waiting_deposit(): void
+    {
+        $order = $this->createPersistedPendingJpyOrder('JP-ORDER-CVS-001', 100);
+
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldReceive('findByOrderNumber')
+            ->with('JP-ORDER-CVS-001')
+            ->andReturn($order);
+        $orderService->shouldNotReceive('completePayment');
+
+        $apiService = Mockery::mock(KgInicisApiService::class);
+        $apiService->shouldReceive('getJapanMid')->andReturn(KgInicisApiService::JAPAN_TEST_MID);
+        $apiService->shouldReceive('isTestMode')->andReturn(true);
+        $apiService->shouldNotReceive('refundCbtPayment');
+        $apiService->shouldReceive('approveCbtPayment')
+            ->with('SID-CVS-001')
+            ->andReturn([
+                'resultCode' => 'OK',
+                'resultMsg' => 'SUCCESS',
+                'tid' => 'CBT_CVS_TID_001',
+                'paymethod' => 'CVS',
+                'amount' => 100,
+                'convenience' => '00007',
+                'confNo' => '999999999999999999',
+                'receiptNo' => '1634795292905',
+                'paymentTerm' => '20260530235959',
+            ]);
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+        $this->app->instance(KgInicisApiService::class, $apiService);
+
+        $response = $this->get('/plugins/sirsoft-pay_kginicis/payment/cbt/callback?'
+            . http_build_query([
+                'oid' => 'JP-ORDER-CVS-001',
+                'sid' => 'SID-CVS-001',
+                'resultCode' => 'OK',
+                'mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'paymethod' => 'CVS',
+            ]));
+
+        $response->assertRedirect('http://localhost/shop/orders/JP-ORDER-CVS-001/complete');
+
+        $payment = OrderPayment::query()->where('order_id', $order->id)->firstOrFail();
+        $this->assertEquals(PaymentStatusEnum::WAITING_DEPOSIT, $payment->payment_status);
+        $this->assertSame('CBT_CVS_TID_001', $payment->transaction_id);
+        $this->assertSame('CVS', $payment->payment_meta['pay_method'] ?? null);
+        $this->assertSame('00007', $payment->payment_meta['cvs_convenience'] ?? null);
+        $this->assertSame('999999999999999999', $payment->vbank_number);
+    }
+
+    public function test_cbt_callback_user_cancel_returns_to_checkout_without_error_query(): void
+    {
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldNotReceive('findByOrderNumber');
+        $orderService->shouldNotReceive('failPayment');
+
+        $apiService = Mockery::mock(KgInicisApiService::class);
+        $apiService->shouldNotReceive('approveCbtPayment');
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+        $this->app->instance(KgInicisApiService::class, $apiService);
+
+        $response = $this->get('/plugins/sirsoft-pay_kginicis/payment/cbt/callback?'
+            . http_build_query([
+                'oid' => 'JP-ORDER-CANCEL-001',
+                'sid' => 'SID-CANCEL-001',
+                'resultCode' => 'FAIL',
+                'resultMsg' => 'ユーザーキャンセル',
+                'mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'paymethod' => 'CARD',
+            ]));
+
+        $response->assertRedirect();
+        $location = $response->headers->get('Location');
+        $this->assertStringContainsString('/shop/checkout', $location);
+        $this->assertStringNotContainsString('error=', $location, '사용자 취소는 error 쿼리 미부착으로 모달 미노출');
+        $this->assertStringNotContainsString('message=', $location, '사용자 취소는 message 쿼리 미부착');
+        $this->assertStringNotContainsString('ユーザーキャンセル', $location, '사용자 취소 문구를 체크아웃 URL에 노출하지 않음');
+    }
+
+    public function test_cbt_cvs_notify_completes_waiting_deposit_payment(): void
+    {
+        $order = $this->createPersistedPendingJpyOrder('JP-ORDER-CVS-002', 100);
+        $order->payment()->update([
+            'payment_status' => PaymentStatusEnum::WAITING_DEPOSIT,
+            'transaction_id' => 'CBT_CVS_TID_002',
+            'payment_meta' => [
+                'is_cbt' => true,
+                'cbt_type' => 'JPPG',
+                'cbt_mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'cbt_sid' => 'SID-CVS-002',
+                'is_test_mode' => true,
+                'pay_method' => 'CVS',
+            ],
+        ]);
+
+        $response = $this->postJson('/plugins/sirsoft-pay_kginicis/payment/cbt/cvs-notify', [
+            'tid' => 'CBT_CVS_TID_002',
+            'mid' => KgInicisApiService::JAPAN_TEST_MID,
+            'applDt' => '20260521',
+            'applTm' => '120000',
+            'status' => '00',
+            'payNm' => 'CBT',
+            'orderId' => 'JP-ORDER-CVS-002',
+            'applNo' => 'APP-CVS',
+            'sid' => 'SID-CVS-002',
+            'convenience' => '00007',
+            'confNo' => '999999999999999999',
+            'receiptNo' => '1634795292905',
+            'paymentTerm' => '20260530235959',
+            'amount' => '100',
+            'currencyCd' => 'JPY',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('OK', $response->getContent());
+
+        $order->refresh();
+        $payment = OrderPayment::query()->where('order_id', $order->id)->firstOrFail();
+
+        $this->assertEquals(OrderStatusEnum::PAYMENT_COMPLETE, $order->order_status);
+        $this->assertEquals(PaymentStatusEnum::PAID, $payment->payment_status);
+        $this->assertSame('CVS', $payment->payment_meta['pay_method'] ?? null);
+        $this->assertSame('paid', $payment->payment_meta['cvs_status'] ?? null);
+        $this->assertSame('CBT_CVS_TID_002', $payment->transaction_id);
     }
 
     public function test_cbt_callback_auto_refunds_approved_payment_when_local_completion_fails(): void
@@ -480,6 +612,53 @@ class CbtPaymentControllerTest extends PluginTestCase
         $order->total_due_amount = $amount;
 
         return $order;
+    }
+
+    private function createPersistedPendingJpyOrder(string $orderNumber, int $amount): Order
+    {
+        $order = OrderFactory::new()->create([
+            'order_number' => $orderNumber,
+            'order_status' => OrderStatusEnum::PENDING_ORDER,
+            'currency' => 'JPY',
+            'currency_snapshot' => ['JPY' => 1.0],
+            'subtotal_amount' => $amount,
+            'total_discount_amount' => 0,
+            'total_coupon_discount_amount' => 0,
+            'total_product_coupon_discount_amount' => 0,
+            'total_order_coupon_discount_amount' => 0,
+            'total_code_discount_amount' => 0,
+            'base_shipping_amount' => 0,
+            'extra_shipping_amount' => 0,
+            'shipping_discount_amount' => 0,
+            'total_shipping_amount' => 0,
+            'total_amount' => $amount,
+            'total_tax_amount' => 0,
+            'total_tax_free_amount' => 0,
+            'total_points_used_amount' => 0,
+            'total_deposit_used_amount' => 0,
+            'total_paid_amount' => 0,
+            'total_due_amount' => $amount,
+            'total_cancelled_amount' => 0,
+            'total_refunded_amount' => 0,
+            'total_refunded_points_amount' => 0,
+            'total_earned_points_amount' => 0,
+            'item_count' => 1,
+        ]);
+
+        OrderPaymentFactory::new()->create([
+            'order_id' => $order->id,
+            'payment_status' => PaymentStatusEnum::READY,
+            'payment_method' => PaymentMethodEnum::CARD,
+            'pg_provider' => 'kginicis',
+            'transaction_id' => null,
+            'paid_amount_local' => 0,
+            'paid_amount_base' => 0,
+            'currency' => 'JPY',
+            'currency_snapshot' => ['JPY' => 1.0],
+            'paid_at' => null,
+        ]);
+
+        return $order->fresh();
     }
 
     private function insertOrderRow(string $orderNumber, int $amount, array $orderMeta = []): void
