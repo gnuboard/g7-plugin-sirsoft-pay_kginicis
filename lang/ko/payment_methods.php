@@ -17,4 +17,12 @@ return [
         'name' => '카카오페이 (KG이니시스)',
         'description' => '카카오페이로 결제 — KG 이니시스를 통해 처리',
     ],
+    'japan_paypay' => [
+        'name' => 'PayPay (일본 KG이니시스)',
+        'description' => '일본 엔(JPY) 주문을 KG 이니시스 CBT PayPay로 결제',
+    ],
+    'japan_cvs' => [
+        'name' => '일본 편의점결제 (KG이니시스)',
+        'description' => '일본 엔(JPY) 주문을 KG 이니시스 CBT 편의점 결제로 접수',
+    ],
 ];

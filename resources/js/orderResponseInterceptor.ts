@@ -60,14 +60,14 @@ function extractPaymentMethodFromBody(body: string): string | undefined {
 }
 
 /**
- * KG 이니시스 간편결제 (삼성페이/네이버페이/LPAY/카카오페이) 선택 시 _local.paymentMethod 가
- * 'kginicis_lpay' 등의 PG 식별자로 설정된다. 그러나 코어 PaymentMethodEnum 은
+ * KG 이니시스 전용 결제수단 선택 시 _local.paymentMethod 가
+ * 'kginicis_lpay', 'kginicis_japan_paypay' 등의 PG 식별자로 설정된다. 그러나 코어 PaymentMethodEnum 은
  * card/vbank/bank/phone 등 일반 결제수단만 허용하므로 백엔드 validation 에서
  * 'kginicis_*' 가 거부된다.
  *
  * 본 헬퍼는 요청 body 의 payment_method 가 'kginicis_*' 형태이면 'card' 로
  * 치환한 새 body 를 반환한다 — UI/local state 는 PG 식별자를 그대로 유지해
- * requestPayment 핸들러의 gopaymethod 매핑이 정상 동작한다.
+ * requestPayment 핸들러의 gopaymethod/CBT paymethod 매핑이 정상 동작한다.
  *
  * gnuboard5 shop/inicis/lpay_form.1.php 의 P_INI_PAYMENT/gopaymethod 패턴과
  * 동일한 의미: '결제수단 = 신용카드, 간편결제 변종 = gopaymethod=LPAY'.
@@ -267,7 +267,7 @@ export function installOrderResponseInterceptor(): void {
         const data = body?.data;
         if (!data) return response;
 
-        // 'kginicis_*' 간편결제 (samsung_pay / naverpay / lpay / kakaopay) 선택 시 기본 PG 가 다른 PG
+        // 'kginicis_*' 결제수단 선택 시 기본 PG 가 다른 PG
         // 라도 KG 이니시스 결제창을 강제로 열어야 한다. 이때 backend 가 requires_pg_payment
         // 를 false 로 응답하거나 pg_provider 를 다른 PG 로 응답해도 KG 흐름으로 강제.
         const isKginicisEasyPay = typeof paymentMethod === 'string' && paymentMethod.startsWith('kginicis_');
@@ -296,7 +296,11 @@ export function installOrderResponseInterceptor(): void {
                     order_number: orderData.order_number,
                     order_name: orderName,
                     amount: Math.floor(Number(orderData.total_amount ?? 0)),
-                    currency: 'KRW',
+                    currency: String(
+                        orderData.currency
+                            ?? orderData.currency_code
+                            ?? (paymentMethod?.startsWith('kginicis_japan_') ? 'JPY' : 'KRW')
+                    ),
                     customer_name: orderData.orderer_name ?? null,
                     customer_email: orderData.orderer_email ?? null,
                     customer_phone: String(orderData.orderer_phone ?? '').replace(/[^0-9]/g, ''),

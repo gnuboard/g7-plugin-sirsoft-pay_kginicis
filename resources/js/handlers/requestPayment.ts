@@ -37,6 +37,7 @@ interface ClientConfig {
         cbt_checkout_token: string;
         cbt_hash_data: string;
         cbt_callback: string;
+        cbt_cvs_notify: string;
         cbt_auth_url: string;
         mobile_signature: string;
         mobile_callback: string;
@@ -56,7 +57,10 @@ interface CbtExtraData {
         paymethod?: string[];
         isMobile?: string;
         card?: Record<string, unknown>;
+        cvs?: Record<string, unknown>;
+        linepay?: Record<string, unknown>;
     };
+    sbpsPayment?: Record<string, string>;
     gmoPayment?: Record<string, string>;
 }
 
@@ -198,6 +202,14 @@ export const MOBILE_EASY_PAY_RESERVED_HINT: Record<string, string> = {
     kginicis_naverpay:    'd_npay=Y',
     kginicis_lpay:        'd_lpay=Y',
     kginicis_kakaopay:    'd_kakaopay=Y',
+};
+
+const DEFAULT_CBT_PAYMETHODS = ['CARD', 'CVS', 'PAYpay'];
+
+const CBT_PAYMETHODS_BY_PAYMENT_METHOD: Record<string, string[]> = {
+    card:                   ['CARD'],
+    kginicis_japan_paypay: ['PAYpay'],
+    kginicis_japan_cvs:    ['CVS'],
 };
 
 /**
@@ -427,8 +439,13 @@ function formatCbtTimestamp(date: Date = new Date()): string {
     );
 }
 
-function buildCbtExtraData(config: ClientConfig): CbtExtraData {
+function buildCbtExtraData(config: ClientConfig, paymentMethod?: string): CbtExtraData {
     const base: CbtExtraData = config.cbt_extra_data ?? {};
+    const selectedPaymethods = paymentMethod
+        ? CBT_PAYMETHODS_BY_PAYMENT_METHOD[paymentMethod]
+        : undefined;
+    const paymethod = selectedPaymethods ?? base.payment?.paymethod ?? DEFAULT_CBT_PAYMETHODS;
+    const cvsNotifyUrl = window.location.origin + config.callback_urls.cbt_cvs_notify;
 
     return {
         ...base,
@@ -437,9 +454,13 @@ function buildCbtExtraData(config: ClientConfig): CbtExtraData {
             ...(base.paymentUI ?? {}),
         },
         payment: {
-            paymethod: ['CARD'],
             ...(base.payment ?? {}),
+            paymethod,
             isMobile: isMobileUserAgent() ? 'true' : 'false',
+            cvs: {
+                ...(base.payment?.cvs ?? {}),
+                notiUrl: cvsNotifyUrl,
+            },
         },
     };
 }
@@ -448,6 +469,7 @@ async function requestCbtPayment(
     G7Core: any,
     config: ClientConfig,
     pgPaymentData: PgPaymentData,
+    paymentMethod?: string,
 ): Promise<void> {
     const japanMid = config.japan_mid;
     const timestamp = formatCbtTimestamp();
@@ -497,7 +519,7 @@ async function requestCbtPayment(
         amount:      String(pgPaymentData.amount),
         orderId:     pgPaymentData.order_number,
         hashData,
-        extraData:   JSON.stringify(buildCbtExtraData(config)),
+        extraData:   JSON.stringify(buildCbtExtraData(config, paymentMethod)),
     });
 }
 
@@ -531,17 +553,22 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
         const config: ClientConfig = configJson.data;
         const currency = pgPaymentData.currency ?? 'WON';
         const isJpy = currency === 'JPY';
+        const isJapanPaymentMethod = paymentMethod.startsWith('kginicis_japan_');
         const isJapanConfigured =
             config.japan_enabled &&
             !!config.japan_mid &&
             config.japan_configured !== false;
+
+        if (isJapanPaymentMethod && !isJpy) {
+            throw new Error('KG Inicis Japan payment methods require a JPY order.');
+        }
 
         if (isJpy && !isJapanConfigured) {
             throw new Error('KG Inicis Japan CBT payment is not configured.');
         }
 
         if (isJpy) {
-            await requestCbtPayment(G7Core, config, pgPaymentData);
+            await requestCbtPayment(G7Core, config, pgPaymentData, paymentMethod);
         } else if (isMobileUserAgent()) {
             await requestMobileKoreanPayment(G7Core, config, pgPaymentData, paymentMethod);
         } else {

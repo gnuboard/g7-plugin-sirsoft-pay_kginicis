@@ -92,6 +92,7 @@ KG 이니시스 가맹점 관리자에 아래 URL을 등록합니다. 도메인�
 | 모바일 결제 결과 `P_NEXT_URL` | `https://your-domain.com/plugins/sirsoft-pay_kginicis/payment/mobile/callback` |
 | 모바일 가상계좌 입금통보 URL | `https://your-domain.com/plugins/sirsoft-pay_kginicis/payment/mobile/vbank-notify` |
 | CBT 콜백 URL | `https://your-domain.com/plugins/sirsoft-pay_kginicis/payment/cbt/callback` |
+| CBT 편의점 입금 NOTI URL | `https://your-domain.com/plugins/sirsoft-pay_kginicis/payment/cbt/cvs-notify` |
 | 에스크로 구매결정 화면 | `https://your-domain.com/plugins/sirsoft-pay_kginicis/payment/escrow-confirm/{orderNumber}` |
 
 PC 결제 결과 Return URL과 모바일 `P_NEXT_URL`은 사용자 브라우저를 통해 호출됩니다. 가상계좌 입금통보 URL은 KG 이니시스 서버가 직접 호출하므로 운영 환경에서 IP 화이트리스트가 적용됩니다.
@@ -161,14 +162,15 @@ JPY 주문 생성
 → CBT 인증 URL로 form POST
 → KG 이니시스가 /payment/cbt/callback 으로 sid 전달
 → 서버가 cbtapprove API 호출
-→ 주문 결제 완료 처리
+→ 카드/PayPay는 주문 결제 완료 처리
+→ 편의점(CVS)은 입금대기 저장 후 /payment/cbt/cvs-notify 입금 NOTI 수신 시 결제 완료 처리
 ```
 
 CBT 승인 이후 로컬 후속 처리에 실패하면 CBT 전용 취소 API로 자동 취소를 시도합니다. 자동 취소까지 실패한 경우에는 운영자 수동 취소가 필요하다는 오류 로그를 남깁니다.
 
 일본 엔(JPY) 주문은 일본 결제 설정이 완료된 경우에만 CBT 결제창으로 진입합니다. 설정이 부족하면 한국 표준결제 흐름으로 대체하지 않고 결제를 중단합니다.
 
-현재 CBT 결제창에는 카드(`CARD`)만 노출합니다. 편의점(`CVS`)은 별도 입금 NOTI, 환불계좌 등록, 환불 결과 NOTI 흐름이 필요하므로 아직 사용자 결제수단으로 노출하지 않습니다.
+현재 CBT 결제창은 선택한 결제수단에 맞춰 지불수단을 제한합니다. 신용카드는 `CARD`만, PayPay는 `PAYpay`만, 일본 편의점결제는 `CVS`만 열립니다.
 
 운영 모드에서 일본 결제를 활성화하려면 라이브 일본 MID/CBT 해시키와 실제 JPPG 가맹점 표시 정보가 필요합니다. 기본 샘플값이 남아 있으면 설정 저장 단계에서 차단됩니다.
 
