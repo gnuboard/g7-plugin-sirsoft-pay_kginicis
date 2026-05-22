@@ -65,26 +65,34 @@ class AdminTransactionController extends AdminBaseController
     {
         try {
             $localPayment = DB::table('ecommerce_order_payments')
-                ->where('transaction_id', $tid)
+                ->leftJoin('ecommerce_orders', 'ecommerce_orders.id', '=', 'ecommerce_order_payments.order_id')
+                ->where('ecommerce_order_payments.transaction_id', $tid)
                 ->select([
-                    'is_escrow',
-                    'payment_meta',
-                    'embedded_pg_provider',
-                    'paid_amount_local',
-                    'currency',
-                    'card_name',
-                    'card_number_masked',
-                    'card_approval_number',
-                    'card_installment_months',
-                    'vbank_code',
-                    'vbank_name',
-                    'vbank_number',
-                    'vbank_holder',
-                    'vbank_due_at',
-                    'buyer_name',
-                    'buyer_email',
-                    'buyer_phone',
-                    'payment_name',
+                    'ecommerce_order_payments.transaction_id',
+                    'ecommerce_order_payments.payment_status',
+                    'ecommerce_order_payments.is_escrow',
+                    'ecommerce_order_payments.payment_meta',
+                    'ecommerce_order_payments.embedded_pg_provider',
+                    'ecommerce_order_payments.paid_amount_local',
+                    'ecommerce_order_payments.currency',
+                    'ecommerce_order_payments.card_name',
+                    'ecommerce_order_payments.card_number_masked',
+                    'ecommerce_order_payments.card_approval_number',
+                    'ecommerce_order_payments.card_installment_months',
+                    'ecommerce_order_payments.vbank_code',
+                    'ecommerce_order_payments.vbank_name',
+                    'ecommerce_order_payments.vbank_number',
+                    'ecommerce_order_payments.vbank_holder',
+                    'ecommerce_order_payments.vbank_due_at',
+                    'ecommerce_order_payments.buyer_name',
+                    'ecommerce_order_payments.buyer_email',
+                    'ecommerce_order_payments.buyer_phone',
+                    'ecommerce_order_payments.payment_name',
+                    'ecommerce_order_payments.paid_at',
+                    'ecommerce_orders.order_number',
+                    'ecommerce_orders.order_status',
+                    'ecommerce_orders.currency as order_currency',
+                    'ecommerce_orders.total_due_amount',
                 ])
                 ->first();
 
@@ -99,6 +107,18 @@ class AdminTransactionController extends AdminBaseController
             $paymentMid = $this->resolvePaymentMid($localMeta, $localRaw, $tid);
             $embeddedPgProvider = $localPayment?->embedded_pg_provider
                 ?: ($localMeta['embedded_pg_provider'] ?? null);
+
+            if ($this->isCbtLocalPayment($localPayment, $localMeta, $localRaw, $tid)) {
+                $result = $this->buildLocalCbtTransactionResult(
+                    $tid,
+                    $localPayment,
+                    $localMeta,
+                    $localRaw,
+                    is_string($embeddedPgProvider) ? $embeddedPgProvider : null,
+                );
+
+                return ResponseHelper::success('messages.success', $result);
+            }
 
             // 결제 시점 모드(payment_meta.is_test_mode) 가 있으면 그 모드의 inapi 자격증명으로 조회.
             // 누락 시 MID prefix 로 추정 ('SIR' = live, 그 외 = test).
@@ -200,6 +220,170 @@ class AdminTransactionController extends AdminBaseController
         }
 
         return $localRaw;
+    }
+
+    private function isCbtLocalPayment(mixed $localPayment, array $localMeta, array $localRaw, string $tid): bool
+    {
+        if (($localMeta['is_cbt'] ?? false) === true || ($localMeta['cbt_type'] ?? '') !== '') {
+            return true;
+        }
+
+        if (str_starts_with($tid, 'INIJPG')) {
+            return true;
+        }
+
+        $currency = strtoupper((string) (
+            $localMeta['currency']
+            ?? $localRaw['currencyCd']
+            ?? $localRaw['currency']
+            ?? $localPayment?->currency
+            ?? $localPayment?->order_currency
+            ?? ''
+        ));
+
+        return $currency === 'JPY' && str_starts_with($tid, 'INIJPG');
+    }
+
+    private function buildLocalCbtTransactionResult(
+        string $tid,
+        mixed $localPayment,
+        array $localMeta,
+        array $localRaw,
+        ?string $embeddedPgProvider,
+    ): array {
+        $pick = function (string ...$keys) use ($localMeta, $localRaw, $localPayment): ?string {
+            foreach ($keys as $key) {
+                if (isset($localRaw[$key]) && $localRaw[$key] !== '') {
+                    return (string) $localRaw[$key];
+                }
+                if (isset($localMeta[$key]) && $localMeta[$key] !== '') {
+                    return (string) $localMeta[$key];
+                }
+            }
+
+            $fallbacks = [
+                'tid' => $localPayment?->transaction_id ?? null,
+                'order_number' => $localPayment?->order_number ?? null,
+                'payment_status' => $localPayment?->payment_status ?? null,
+                'paid_amount_local' => $localPayment?->paid_amount_local ?? null,
+                'currency' => $localPayment?->currency ?? $localPayment?->order_currency ?? null,
+                'paid_at' => $localPayment?->paid_at ?? null,
+            ];
+
+            foreach ($keys as $key) {
+                if (isset($fallbacks[$key]) && $fallbacks[$key] !== '') {
+                    return (string) $fallbacks[$key];
+                }
+            }
+
+            return null;
+        };
+
+        $payMethod = $this->normalizeCbtPayMethod($pick('pay_method', 'paymethod', 'payMethod') ?? '');
+        $basePayMethodLabel = $this->payMethodLabel($payMethod);
+        $embeddedPgProviderLabel = $this->embeddedPgProviderLabel($embeddedPgProvider);
+        $currency = strtoupper($pick('currencyCd', 'currencyCode', 'currency') ?? 'JPY');
+
+        $result = [
+            'resultCode' => $pick('resultCode', 'result_code', 'code') ?? 'LOCAL_CBT',
+            'resultMsg' => $pick('resultMsg', 'message') ?? 'CBT 거래는 로컬 결제 확인 정보로 표시됩니다.',
+            'tid' => $tid,
+            '_is_cbt' => true,
+            '_is_local_confirmation' => true,
+            '_is_test_mode' => (bool) ($localMeta['is_test_mode'] ?? $this->apiService->isTestMode()),
+            '_local_is_escrow' => (bool) ($localPayment?->is_escrow ?? false),
+            '_pay_method' => $payMethod,
+            '_base_pay_method_label' => $basePayMethodLabel,
+            '_embedded_pg_provider' => $embeddedPgProvider,
+            '_embedded_pg_provider_label' => $embeddedPgProviderLabel,
+            '_pay_method_label' => $embeddedPgProviderLabel
+                ? $embeddedPgProviderLabel . ' (' . $basePayMethodLabel . ')'
+                : $basePayMethodLabel,
+            '_auth_code' => $pick('approve', 'applNo', 'approvalNo', 'authCode', 'confNo', 'receiptNo'),
+            '_auth_date' => $this->formatCbtDateTime(
+                $pick('auth_date', 'applDate', 'applDt'),
+                $pick('applTime', 'applTm'),
+            ) ?? $this->formatTimestamp((string) ($localPayment?->paid_at ?? '')),
+            '_total_price' => $pick('amount', 'price', 'cvs_amount', 'paid_amount_local'),
+            '_currency' => $currency !== '' ? $currency : 'JPY',
+            '_moid' => $pick('orderId', 'orderID', 'oid', 'order_number'),
+            '_buyer_name' => $pick('buyerName', 'buyer_name'),
+            '_buyer_email' => $pick('buyerEmail', 'buyer_email'),
+            '_buyer_tel' => $pick('buyerTel', 'buyer_phone'),
+            '_status' => $pick('payment_status', 'cvs_status', 'status'),
+            '_cancel_price' => $pick('cancelPrice', 'cancel_price'),
+            '_cancel_date' => $this->formatCbtDateTime($pick('cancelDate'), $pick('cancelTime')),
+            '_part_cancel_list' => $this->normalizePartCancelList(is_array($localRaw['partCancelList'] ?? null) ? $localRaw['partCancelList'] : []),
+            '_card_name' => $pick('cardName', 'card_name'),
+            '_card_num' => $pick('cardNum', 'card_number_masked'),
+            '_card_code' => $pick('cardCode'),
+            '_card_quota' => $this->formatQuota($pick('installMonth', 'cardQuota', 'card_installment_months')),
+            '_card_interest' => null,
+            '_vbank_num' => $pick('confNo', 'receiptNo', 'vbank_number'),
+            '_vbank_bank_code' => $pick('convenience', 'vbank_code'),
+            '_vbank_bank_name' => $pick('vbank_name') ?? ($payMethod === 'CVS' ? 'CVS' : null),
+            '_vbank_holder' => $pick('vbank_holder'),
+            '_vbank_expire_date' => $this->formatCompactDateTime($pick('paymentTerm', 'cvs_payment_term'))
+                ?? $this->formatTimestamp((string) ($localPayment?->vbank_due_at ?? '')),
+            '_vbank_status' => $pick('cvs_status'),
+            '_vbank_paid_at' => $this->formatCbtDateTime($pick('applDt'), $pick('applTm')),
+            '_bank_code' => null,
+            '_bank_name' => null,
+            '_bank_acnt_num' => null,
+            '_hpp_num' => null,
+            '_hpp_corp' => null,
+            '_escrow_status' => null,
+            '_escrow_confirm' => null,
+            '_inquiry_at' => date('Y-m-d H:i:s'),
+            '_local_notice' => 'CBT 거래는 한국 INIAPI 거래조회 대상이 아니므로 저장된 승인/입금 확인 정보로 표시됩니다.',
+        ];
+
+        return $result;
+    }
+
+    private function normalizeCbtPayMethod(string $code): string
+    {
+        return strtoupper(trim($code));
+    }
+
+    private function formatCbtDateTime(?string $date, ?string $time): ?string
+    {
+        if ($date === null || $date === '') {
+            return null;
+        }
+
+        if (strlen($date) === 14 && preg_match('/^\d{14}$/', $date) === 1) {
+            return $this->formatCompactDateTime($date);
+        }
+
+        return $this->formatDateTime($date, $time);
+    }
+
+    private function formatCompactDateTime(?string $value): ?string
+    {
+        if ($value === null || preg_match('/^\d{14}$/', $value) !== 1) {
+            return null;
+        }
+
+        return substr($value, 0, 4) . '-'
+            . substr($value, 4, 2) . '-'
+            . substr($value, 6, 2) . ' '
+            . substr($value, 8, 2) . ':'
+            . substr($value, 10, 2) . ':'
+            . substr($value, 12, 2);
+    }
+
+    private function formatTimestamp(string $value): ?string
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return \Carbon\Carbon::parse($value)->format('Y-m-d H:i:s');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**

@@ -18,15 +18,15 @@ class SignatureRequest extends FormRequest
         return true;
     }
 
-/**
+	/**
 
- * rules
+	 * rules
 
  *
 
  * @return array
 
- */
+	 */
 
     public function rules(): array
     {
@@ -34,6 +34,8 @@ class SignatureRequest extends FormRequest
             'oid' => ['required', 'string', 'max:40'],
             'price' => ['required', 'integer', 'min:100'],
             'timestamp' => ['required', 'string', 'max:20'],
+            'buyer_email' => ['nullable', 'string', 'max:255'],
+            'buyer_phone' => ['nullable', 'string', 'max:30'],
         ];
     }
 }

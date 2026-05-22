@@ -53,11 +53,13 @@ function patchPaymentMethodDisplay(displayLabel: string | null | undefined): boo
 
         const value = spans[spans.length - 1];
         if (value.textContent?.trim() === displayLabel) {
+            row.dataset.kginicisPaymentMethodRow = 'true';
             return true;
         }
 
         value.textContent = displayLabel;
         value.dataset.kginicisPaymentMethodPatched = 'true';
+        row.dataset.kginicisPaymentMethodRow = 'true';
         return true;
     }
 
@@ -85,10 +87,12 @@ async function injectOnOrderComplete(orderNumber: string): Promise<void> {
     if (!blueBtn?.parentElement) return;
 
     const container = blueBtn.parentElement;
+    container.dataset.kginicisReceiptContainer = 'order-complete';
 
     const receiptBtn = document.createElement('button');
     receiptBtn.id = BTN_ID;
     receiptBtn.type = 'button';
+    receiptBtn.dataset.kginicisReceiptButton = 'order-complete';
     receiptBtn.className = blueBtn.className
         .replace(/bg-blue-\d+/g, 'bg-green-600')
         .replace(/hover:bg-blue-\d+/g, 'hover:bg-green-700');

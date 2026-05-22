@@ -6,6 +6,7 @@ namespace Plugins\Sirsoft\PayKginicis\Controllers;
 
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
@@ -99,6 +100,60 @@ class CbtCvsNotifyController
             $existingMeta = is_array($payment?->payment_meta) ? $payment->payment_meta : [];
             $expectedMid = (string) ($existingMeta['cbt_mid'] ?? $this->apiService->getJapanMid());
 
+            if (! $payment) {
+                Log::warning('KG Inicis CBT CVS: payment row not found', [
+                    'order_id' => $orderId,
+                    'tid' => $tid,
+                ]);
+
+                return $this->plain('FAIL');
+            }
+
+            if (! $this->paymentStatusEquals($payment->payment_status, PaymentStatusEnum::WAITING_DEPOSIT)) {
+                Log::warning('KG Inicis CBT CVS: payment status is not waiting_deposit', [
+                    'order_id' => $orderId,
+                    'tid' => $tid,
+                    'payment_status' => $this->paymentStatusValue($payment->payment_status),
+                ]);
+
+                return $this->plain('FAIL');
+            }
+
+            $expectedPayMethod = strtoupper((string) ($existingMeta['pay_method'] ?? ''));
+            if ($expectedPayMethod !== 'CVS') {
+                Log::warning('KG Inicis CBT CVS: existing payment method is not CVS', [
+                    'order_id' => $orderId,
+                    'tid' => $tid,
+                    'pay_method' => $existingMeta['pay_method'] ?? null,
+                ]);
+
+                return $this->plain('FAIL');
+            }
+
+            $expectedSid = trim((string) ($existingMeta['cbt_sid'] ?? ''));
+            $receivedSid = trim((string) ($payload['sid'] ?? ''));
+            if ($expectedSid !== '' && $receivedSid !== $expectedSid) {
+                Log::warning('KG Inicis CBT CVS: sid mismatch', [
+                    'order_id' => $orderId,
+                    'tid' => $tid,
+                    'received_sid' => $receivedSid,
+                    'expected_sid' => $expectedSid,
+                ]);
+
+                return $this->plain('FAIL');
+            }
+
+            $currency = strtoupper(trim((string) ($payload['currencyCd'] ?? '')));
+            if ($currency !== 'JPY') {
+                Log::warning('KG Inicis CBT CVS: currency mismatch', [
+                    'order_id' => $orderId,
+                    'tid' => $tid,
+                    'currency' => $payload['currencyCd'] ?? null,
+                ]);
+
+                return $this->plain('FAIL');
+            }
+
             $expectedAmount = $this->resolveExpectedCvsAmount($order, $existingMeta);
             if ($expectedAmount > 0 && $amount !== $expectedAmount) {
                 Log::warning('KG Inicis CBT CVS: amount mismatch', [
@@ -181,5 +236,19 @@ class CbtCvsNotifyController
         }
 
         return (int) round((float) $order->total_due_amount);
+    }
+
+    private function paymentStatusEquals(mixed $status, PaymentStatusEnum $expected): bool
+    {
+        return $this->paymentStatusValue($status) === $expected->value;
+    }
+
+    private function paymentStatusValue(mixed $status): string
+    {
+        if ($status instanceof PaymentStatusEnum) {
+            return $status->value;
+        }
+
+        return (string) $status;
     }
 }

@@ -40,6 +40,7 @@ class CbtCallbackRequest extends FormRequest
             'oid' => ['nullable', 'string', 'max:100'],
             'mid' => ['nullable', 'string', 'max:30'],
             'paymethod' => ['nullable', 'string', 'max:50'],
+            'selectedPaymentMethod' => ['nullable', 'string', 'max:50'],
         ];
     }
 }

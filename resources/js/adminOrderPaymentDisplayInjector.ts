@@ -62,9 +62,11 @@ function patchLabeledPaymentMethod(root: Element, displayLabel: string): boolean
             value.textContent = nextDisplayLabel;
             value.dataset.kginicisPaymentMethodPatched = 'true';
         }
+        row.dataset.kginicisPaymentMethodRow = 'admin-order';
         if (installment && installmentText) {
             installment.textContent = '';
             installment.style.display = 'none';
+            installment.dataset.kginicisPaymentInstallmentHidden = 'true';
         }
         patched = true;
     }
@@ -86,6 +88,7 @@ function patchPaymentMethodBadge(root: Element, baseLabel: string, embeddedLabel
 
     badge.textContent = embeddedLabel;
     badge.dataset.kginicisPaymentMethodPatched = 'true';
+    badge.dataset.kginicisPaymentMethodBadge = 'admin-order';
     return true;
 }
 
