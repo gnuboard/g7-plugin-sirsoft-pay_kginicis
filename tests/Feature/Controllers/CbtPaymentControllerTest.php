@@ -240,6 +240,52 @@ class CbtPaymentControllerTest extends PluginTestCase
         $this->assertSame('CBT_CVS_TID_002', $payment->transaction_id);
     }
 
+    public function test_cbt_cvs_notify_rejects_amount_mismatch(): void
+    {
+        $order = $this->createPersistedPendingJpyOrder('JP-ORDER-CVS-AMOUNT-001', 100);
+        $order->payment()->update([
+            'payment_status' => PaymentStatusEnum::WAITING_DEPOSIT,
+            'transaction_id' => 'CBT_CVS_TID_AMOUNT_001',
+            'payment_meta' => [
+                'is_cbt' => true,
+                'cbt_type' => 'JPPG',
+                'cbt_mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'cbt_sid' => 'SID-CVS-AMOUNT-001',
+                'is_test_mode' => true,
+                'pay_method' => 'CVS',
+                'cvs_amount' => 100,
+            ],
+        ]);
+
+        $response = $this->postJson('/plugins/sirsoft-pay_kginicis/payment/cbt/cvs-notify', [
+            'tid' => 'CBT_CVS_TID_AMOUNT_001',
+            'mid' => KgInicisApiService::JAPAN_TEST_MID,
+            'applDt' => '20260521',
+            'applTm' => '120000',
+            'status' => '00',
+            'payNm' => 'CBT',
+            'orderId' => 'JP-ORDER-CVS-AMOUNT-001',
+            'applNo' => 'APP-CVS',
+            'sid' => 'SID-CVS-AMOUNT-001',
+            'convenience' => '00007',
+            'confNo' => '999999999999999999',
+            'receiptNo' => '1634795292905',
+            'paymentTerm' => '20260530235959',
+            'amount' => '99',
+            'currencyCd' => 'JPY',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('FAIL', $response->getContent());
+
+        $order->refresh();
+        $payment = OrderPayment::query()->where('order_id', $order->id)->firstOrFail();
+
+        $this->assertEquals(OrderStatusEnum::PENDING_ORDER, $order->order_status);
+        $this->assertEquals(PaymentStatusEnum::WAITING_DEPOSIT, $payment->payment_status);
+        $this->assertSame('waiting_deposit', $payment->payment_meta['cvs_status'] ?? 'waiting_deposit');
+    }
+
     public function test_cbt_callback_auto_refunds_approved_payment_when_local_completion_fails(): void
     {
         $order = $this->makePendingJpyOrder('JP-ORDER-003', 100);

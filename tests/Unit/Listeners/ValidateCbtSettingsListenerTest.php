@@ -5,10 +5,16 @@ namespace Plugins\Sirsoft\PayKginicis\Tests\Unit\Listeners;
 use App\Services\PluginSettingsService;
 use Illuminate\Validation\ValidationException;
 use Plugins\Sirsoft\PayKginicis\Listeners\ValidateCbtSettingsListener;
+use Plugins\Sirsoft\PayKginicis\Plugin;
 use Plugins\Sirsoft\PayKginicis\Tests\PluginTestCase;
 
 class ValidateCbtSettingsListenerTest extends PluginTestCase
 {
+    public function test_plugin_registers_cbt_settings_validation_listener(): void
+    {
+        $this->assertContains(ValidateCbtSettingsListener::class, (new Plugin())->getHookListeners());
+    }
+
     public function test_ignores_other_plugins(): void
     {
         $listener = new ValidateCbtSettingsListener();
