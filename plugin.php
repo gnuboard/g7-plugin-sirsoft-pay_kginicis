@@ -128,6 +128,15 @@ class Plugin extends AbstractPlugin
                     'en' => 'Requires a separate MID for Japanese Yen (JPY) payments.',
                 ],
             ],
+            'japan_restrict_jpy_payment_methods' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => 'JPY 주문 결제수단 제한', 'en' => 'Restrict JPY Payment Methods'],
+                'hint' => [
+                    'ko' => '활성화하면 JPY 주문은 신용카드, PayPay, 일본 편의점결제만 CBT로 진행됩니다.',
+                    'en' => 'When enabled, JPY orders can proceed through CBT only with credit card, PayPay, or Japan convenience store payment.',
+                ],
+            ],
             'test_japan_sign_key' => [
                 'type' => 'string',
                 'default' => '5AL5Djb1Ipualn0F',
@@ -260,6 +269,7 @@ class Plugin extends AbstractPlugin
             'live_mobile_hash_key' => '',
             'use_escrow' => false,
             'japan_enabled' => false,
+            'japan_restrict_jpy_payment_methods' => false,
             'test_japan_sign_key' => '5AL5Djb1Ipualn0F',
             'live_japan_mid' => '',
             'live_japan_sign_key' => '',

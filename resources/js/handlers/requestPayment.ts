@@ -44,6 +44,7 @@ interface ClientConfig {
         mobile_vbank_notify: string;
     };
     japan_enabled: boolean;
+    japan_restrict_jpy_payment_methods?: boolean;
     japan_configured?: boolean;
     use_escrow: boolean;
     japan_mid: string;
@@ -573,6 +574,7 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
             config.japan_enabled &&
             !!config.japan_mid &&
             config.japan_configured !== false;
+        const shouldRestrictJpyPaymentMethods = config.japan_restrict_jpy_payment_methods === true;
 
         if (isJapanPaymentMethod && !isJpy) {
             throw new Error('KG Inicis Japan payment methods require a JPY order.');
@@ -582,7 +584,7 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
             throw new Error('KG Inicis Japan CBT payment is not configured.');
         }
 
-        if (isJpy && !CBT_ALLOWED_PAYMENT_METHODS.has(paymentMethod)) {
+        if (isJpy && shouldRestrictJpyPaymentMethods && !CBT_ALLOWED_PAYMENT_METHODS.has(paymentMethod)) {
             throw new Error('JPY orders can only use KG Inicis Japan CBT payment methods.');
         }
 

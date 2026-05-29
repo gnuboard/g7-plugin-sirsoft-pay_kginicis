@@ -214,6 +214,8 @@
         "section_japan_hint": "Settings for Japanese Yen (JPY) payments via KG Inicis CBT (Cross Border Trade).",
         "japan_enabled": "Enable Japan Payment",
         "japan_enabled_hint": "Requires a separate CBT MID for Japanese Yen (JPY) payments.",
+        "japan_restrict_jpy_payment_methods": "Restrict JPY Payment Methods",
+        "japan_restrict_jpy_payment_methods_hint": "When enabled, JPY orders can proceed through CBT only with credit card, PayPay, or Japan convenience store payment. When disabled, the selected payment method is not restricted.",
         "test_japan_cbt_key": "Test Japan CBT Hash Key",
         "test_japan_cbt_key_hint": "Test KEY used for CBT hash data generation.",
         "live_japan_mid": "Live Japan MID",
