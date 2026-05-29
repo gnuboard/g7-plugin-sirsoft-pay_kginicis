@@ -406,7 +406,29 @@ describe('requestPaymentHandler — CBT (JPPG) 분기', () => {
         );
     });
 
-    it('JPY 주문에서 한국 KG 간편결제 선택 시 CBT 전체 paymethod 로 fallback 하지 않고 중단', async () => {
+    it('JPY 결제수단 제한 옵션이 꺼져 있으면 한국 KG 간편결제 선택 시 기존 CBT fallback 을 유지', async () => {
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: CBT_PG_PAYMENT,
+                paymentMethod: 'kginicis_kakaopay',
+            },
+        });
+
+        expect(apiPost).toHaveBeenCalled();
+        expect(submitSpy).toHaveBeenCalledTimes(1);
+        const fields = getLastSubmittedFormFields();
+        const extraData = JSON.parse(fields.extraData);
+        expect(extraData.payment.paymethod).toEqual(['CARD', 'CVS', 'PAYpay']);
+    });
+
+    it('JPY 결제수단 제한 옵션이 켜져 있으면 한국 KG 간편결제 선택 시 CBT 전체 paymethod 로 fallback 하지 않고 중단', async () => {
+        apiGet.mockResolvedValue({
+            data: {
+                ...CLIENT_CONFIG.data,
+                japan_restrict_jpy_payment_methods: true,
+            },
+        });
+
         await requestPaymentHandler({
             params: {
                 pgPaymentData: CBT_PG_PAYMENT,
