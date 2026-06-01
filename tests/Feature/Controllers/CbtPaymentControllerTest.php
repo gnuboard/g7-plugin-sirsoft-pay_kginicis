@@ -238,6 +238,10 @@ class CbtPaymentControllerTest extends PluginTestCase
         $this->assertSame('CVS', $payment->payment_meta['pay_method'] ?? null);
         $this->assertSame('paid', $payment->payment_meta['cvs_status'] ?? null);
         $this->assertSame('CBT_CVS_TID_002', $payment->transaction_id);
+        $this->assertSame('confirmed', $payment->payment_meta['cvs_last_notify_result'] ?? null);
+        $this->assertSame('deposit_confirmed', $payment->payment_meta['cvs_last_notify_reason'] ?? null);
+        $this->assertSame('confirmed', $payment->payment_meta['cvs_notify_history'][0]['result'] ?? null);
+        $this->assertSame('deposit_confirmed', $payment->payment_meta['cvs_notify_history'][0]['reason'] ?? null);
     }
 
     public function test_cbt_cvs_notify_rejects_amount_mismatch(): void
@@ -284,6 +288,9 @@ class CbtPaymentControllerTest extends PluginTestCase
         $this->assertEquals(OrderStatusEnum::PENDING_ORDER, $order->order_status);
         $this->assertEquals(PaymentStatusEnum::WAITING_DEPOSIT, $payment->payment_status);
         $this->assertSame('waiting_deposit', $payment->payment_meta['cvs_status'] ?? 'waiting_deposit');
+        $this->assertSame('failed', $payment->payment_meta['cvs_last_notify_result'] ?? null);
+        $this->assertSame('amount_mismatch', $payment->payment_meta['cvs_last_notify_reason'] ?? null);
+        $this->assertSame('amount_mismatch', $payment->payment_meta['cvs_notify_history'][0]['reason'] ?? null);
     }
 
     public function test_cbt_cvs_notify_rejects_sid_mismatch(): void
@@ -360,6 +367,111 @@ class CbtPaymentControllerTest extends PluginTestCase
 
         $payment = OrderPayment::query()->where('order_id', $order->id)->firstOrFail();
         $this->assertEquals(PaymentStatusEnum::WAITING_DEPOSIT, $payment->payment_status);
+    }
+
+    public function test_admin_can_view_cbt_cvs_operations_summary(): void
+    {
+        $this->createPersistedPendingCbtCvsOrder('JP-ORDER-CVS-ADMIN-001', 100);
+
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin);
+
+        $response = $this->getJson('/api/plugins/sirsoft-pay_kginicis/admin/orders/JP-ORDER-CVS-ADMIN-001/cbt-cvs');
+
+        $response->assertOk()
+            ->assertJsonPath('data.is_cbt_cvs', true)
+            ->assertJsonPath('data.payment_status', PaymentStatusEnum::WAITING_DEPOSIT->value)
+            ->assertJsonPath('data.cbt_mid', KgInicisApiService::JAPAN_TEST_MID)
+            ->assertJsonPath('data.cbt_sid', 'SID-JP-ORDER-CVS-ADMIN-001')
+            ->assertJsonPath('data.can_simulate_notify', true);
+
+        $this->assertStringContainsString(
+            '/plugins/sirsoft-pay_kginicis/payment/cbt/cvs-notify',
+            (string) $response->json('data.notify_url'),
+        );
+    }
+
+    public function test_admin_can_simulate_test_cvs_notify(): void
+    {
+        $order = $this->createPersistedPendingCbtCvsOrder('JP-ORDER-CVS-SIM-001', 100);
+
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/admin/orders/JP-ORDER-CVS-SIM-001/cbt-cvs/simulate-notify');
+
+        $response->assertOk()
+            ->assertJsonPath('data.payment_status', PaymentStatusEnum::PAID->value)
+            ->assertJsonPath('data.cvs_status', 'paid')
+            ->assertJsonPath('data.last_notify_result', 'confirmed');
+
+        $order->refresh();
+        $payment = OrderPayment::query()->where('order_id', $order->id)->firstOrFail();
+        $this->assertEquals(OrderStatusEnum::PAYMENT_COMPLETE, $order->order_status);
+        $this->assertEquals(PaymentStatusEnum::PAID, $payment->payment_status);
+        $this->assertSame('admin_simulation', $payment->payment_meta['cvs_notify_history'][0]['source'] ?? null);
+    }
+
+    public function test_admin_cannot_simulate_live_cvs_notify(): void
+    {
+        $this->createPersistedPendingCbtCvsOrder('JP-ORDER-CVS-LIVE-001', 100, [
+            'is_test_mode' => false,
+        ]);
+
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/admin/orders/JP-ORDER-CVS-LIVE-001/cbt-cvs/simulate-notify');
+
+        $response->assertStatus(422);
+
+        $payment = OrderPayment::query()
+            ->whereHas('order', fn ($query) => $query->where('order_number', 'JP-ORDER-CVS-LIVE-001'))
+            ->firstOrFail();
+        $this->assertEquals(PaymentStatusEnum::WAITING_DEPOSIT, $payment->payment_status);
+    }
+
+    public function test_admin_can_mark_overdue_cvs_payment_expired(): void
+    {
+        $this->createPersistedPendingCbtCvsOrder('JP-ORDER-CVS-EXP-001', 100, [
+            'cvs_payment_term' => now()->subDay()->format('YmdHis'),
+        ]);
+
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/admin/orders/JP-ORDER-CVS-EXP-001/cbt-cvs/expire');
+
+        $response->assertOk()
+            ->assertJsonPath('data.payment_status', PaymentStatusEnum::EXPIRED->value)
+            ->assertJsonPath('data.cvs_status', 'expired')
+            ->assertJsonPath('data.expiry_reason', 'payment_term_elapsed');
+
+        $payment = OrderPayment::query()
+            ->whereHas('order', fn ($query) => $query->where('order_number', 'JP-ORDER-CVS-EXP-001'))
+            ->firstOrFail();
+
+        $this->assertEquals(PaymentStatusEnum::EXPIRED, $payment->payment_status);
+        $this->assertSame('expired', $payment->payment_meta['cvs_status'] ?? null);
+    }
+
+    public function test_admin_can_recheck_cbt_cvs_local_status(): void
+    {
+        $this->createPersistedPendingCbtCvsOrder('JP-ORDER-CVS-RECHECK-001', 100);
+
+        $admin = $this->createAdminUser();
+        $this->actingAs($admin);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/admin/orders/JP-ORDER-CVS-RECHECK-001/cbt-cvs/recheck');
+
+        $response->assertOk()
+            ->assertJsonPath('data.last_recheck_result', 'local_status_checked');
+
+        $payment = OrderPayment::query()
+            ->whereHas('order', fn ($query) => $query->where('order_number', 'JP-ORDER-CVS-RECHECK-001'))
+            ->firstOrFail();
+
+        $this->assertSame('local_status_checked', $payment->payment_meta['cvs_last_recheck_result'] ?? null);
     }
 
     public function test_cbt_callback_auto_refunds_approved_payment_when_local_completion_fails(): void
@@ -869,6 +981,34 @@ class CbtPaymentControllerTest extends PluginTestCase
             'currency' => 'JPY',
             'currency_snapshot' => ['JPY' => 1.0],
             'paid_at' => null,
+        ]);
+
+        return $order->fresh();
+    }
+
+    private function createPersistedPendingCbtCvsOrder(string $orderNumber, int $amount, array $metaOverrides = []): Order
+    {
+        $order = $this->createPersistedPendingJpyOrder($orderNumber, $amount);
+        $sid = 'SID-' . $orderNumber;
+        $tid = 'CBT_CVS_TID_' . str_replace('-', '_', $orderNumber);
+
+        $order->payment()->update([
+            'payment_status' => PaymentStatusEnum::WAITING_DEPOSIT,
+            'transaction_id' => $tid,
+            'payment_meta' => array_merge([
+                'is_cbt' => true,
+                'cbt_type' => 'JPPG',
+                'cbt_mid' => KgInicisApiService::JAPAN_TEST_MID,
+                'cbt_sid' => $sid,
+                'is_test_mode' => true,
+                'pay_method' => 'CVS',
+                'cvs_status' => 'waiting_deposit',
+                'cvs_amount' => $amount,
+                'cvs_convenience' => '00007',
+                'cvs_conf_no' => '999999999999999999',
+                'cvs_receipt_no' => '1634795292905',
+                'cvs_payment_term' => now()->addDays(3)->format('YmdHis'),
+            ], $metaOverrides),
         ]);
 
         return $order->fresh();

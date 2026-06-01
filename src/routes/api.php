@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCashReceiptController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtConnectivityCheckController;
+use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtCvsOperationsController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtReconciliationController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminCbtTestProductController;
 use Plugins\Sirsoft\PayKginicis\Controllers\AdminEscrowDeliveryController;
@@ -73,6 +74,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
         ->name('orders.cbt-reconciliation.show');
     Route::post('/orders/{orderNumber}/cbt-reconciliation/refund-retry', [AdminCbtReconciliationController::class, 'retryRefund'])
         ->name('orders.cbt-reconciliation.refund-retry');
+
+    Route::get('/orders/{orderNumber}/cbt-cvs', [AdminCbtCvsOperationsController::class, 'show'])
+        ->name('orders.cbt-cvs.show');
+    Route::post('/orders/{orderNumber}/cbt-cvs/simulate-notify', [AdminCbtCvsOperationsController::class, 'simulateNotify'])
+        ->name('orders.cbt-cvs.simulate-notify');
+    Route::post('/orders/{orderNumber}/cbt-cvs/expire', [AdminCbtCvsOperationsController::class, 'expire'])
+        ->name('orders.cbt-cvs.expire');
+    Route::post('/orders/{orderNumber}/cbt-cvs/recheck', [AdminCbtCvsOperationsController::class, 'recheck'])
+        ->name('orders.cbt-cvs.recheck');
 
     // 현금영수증 별도발행
     Route::post('/orders/{orderNumber}/cash-receipt', [AdminCashReceiptController::class, 'issue'])
