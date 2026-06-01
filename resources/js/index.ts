@@ -5,7 +5,6 @@ import { installAdminOrderPaymentDisplayInjector } from './adminOrderPaymentDisp
 import { installOrderCompleteReceiptInjector } from './orderCompleteReceiptInjector';
 import { installVbankInfoInjector } from './vbankInfoInjector';
 import { installPaymentCloseMessageListener } from './paymentCloseMessageListener';
-import { installCheckoutJpyPaymentMethodRestrictor } from './checkoutJpyPaymentMethodRestrictor';
 
 const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
@@ -85,7 +84,6 @@ function initPlugin(): void {
 // fetch 인터셉터: 체크아웃 페이지에서 kginicis 주문 응답을 가로채 결제창 호출
 // (체크아웃 템플릿이 코어 영역이라 수정 불가하므로 클라이언트 사이드 우회)
 installOrderResponseInterceptor();
-installCheckoutJpyPaymentMethodRestrictor();
 
 installMypageOrderShowInjector();
 installAdminOrderPaymentDisplayInjector();

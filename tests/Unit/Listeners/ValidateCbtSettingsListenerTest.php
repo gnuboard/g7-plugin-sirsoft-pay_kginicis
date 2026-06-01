@@ -15,19 +15,6 @@ class ValidateCbtSettingsListenerTest extends PluginTestCase
         $this->assertContains(ValidateCbtSettingsListener::class, (new Plugin())->getHookListeners());
     }
 
-    public function test_plugin_schema_includes_jpy_payment_method_restriction_option(): void
-    {
-        $plugin = new Plugin();
-
-        $schema = $plugin->getSettingsSchema();
-        $config = $plugin->getConfigValues();
-
-        $this->assertSame('boolean', $schema['japan_restrict_jpy_payment_methods']['type'] ?? null);
-        $this->assertFalse($schema['japan_restrict_jpy_payment_methods']['default'] ?? true);
-        $this->assertArrayHasKey('japan_restrict_jpy_payment_methods', $config);
-        $this->assertFalse($config['japan_restrict_jpy_payment_methods']);
-    }
-
     public function test_ignores_other_plugins(): void
     {
         $listener = new ValidateCbtSettingsListener();

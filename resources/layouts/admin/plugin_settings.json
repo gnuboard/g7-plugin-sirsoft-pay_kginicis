@@ -1070,45 +1070,6 @@
                                         },
                                         "children": [
                                             {
-                                                "id": "field_japan_restrict_jpy_payment_methods",
-                                                "type": "basic",
-                                                "name": "Div",
-                                                "props": {
-                                                    "className": "flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4"
-                                                },
-                                                "children": [
-                                                    {
-                                                        "type": "basic",
-                                                        "name": "Div",
-                                                        "children": [
-                                                            {
-                                                                "type": "basic",
-                                                                "name": "Label",
-                                                                "props": {
-                                                                    "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
-                                                                },
-                                                                "text": "$t:sirsoft-pay_kginicis.settings.japan_restrict_jpy_payment_methods"
-                                                            },
-                                                            {
-                                                                "type": "basic",
-                                                                "name": "P",
-                                                                "props": {
-                                                                    "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
-                                                                },
-                                                                "text": "$t:sirsoft-pay_kginicis.settings.japan_restrict_jpy_payment_methods_hint"
-                                                            }
-                                                        ]
-                                                    },
-                                                    {
-                                                        "type": "composite",
-                                                        "name": "Toggle",
-                                                        "props": {
-                                                            "name": "japan_restrict_jpy_payment_methods"
-                                                        }
-                                                    }
-                                                ]
-                                            },
-                                            {
                                                 "id": "cbt_test_helper_card",
                                                 "type": "basic",
                                                 "name": "Div",

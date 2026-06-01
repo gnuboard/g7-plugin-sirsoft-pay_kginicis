@@ -170,6 +170,9 @@ class UserReceiptController
             $fields[] = ['label' => '입금 마감일시', 'value' => $this->formatCbtCompactDateTime((string) ($raw['paymentTerm'] ?? $paymentMeta['cvs_payment_term'] ?? ''))];
         }
 
+        $fields[] = ['label' => 'CBT MID', 'value' => (string) ($paymentMeta['cbt_mid'] ?? $paymentMeta['mid'] ?? '')];
+        $fields[] = ['label' => 'SID', 'value' => (string) ($paymentMeta['cbt_sid'] ?? '')];
+
         return array_values(array_filter(
             $fields,
             fn (array $field) => ($field['value'] ?? '') !== ''

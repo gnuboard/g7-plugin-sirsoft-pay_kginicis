@@ -146,9 +146,7 @@ class UserReceiptControllerTest extends PluginTestCase
             ->assertJsonPath('payment_method_display_label', '신용카드 (일본 CBT)')
             ->assertJsonFragment(['label' => '결제수단', 'value' => '신용카드 (일본 CBT)'])
             ->assertJsonFragment(['label' => '거래번호', 'value' => 'INIJPGCARDCBTTEST00120260522151050916864'])
-            ->assertJsonFragment(['label' => '카드 승인번호', 'value' => '0679589'])
-            ->assertJsonMissing(['label' => 'CBT MID', 'value' => 'CBTTEST001'])
-            ->assertJsonMissing(['label' => 'SID', 'value' => 'CBTTEST00120260522er9rLrYt5']);
+            ->assertJsonFragment(['label' => '카드 승인번호', 'value' => '0679589']);
     }
 
     public function test_cbt_cvs_waiting_deposit_receipt_response_uses_cvs_label_and_due_amount(): void
@@ -220,9 +218,7 @@ class UserReceiptControllerTest extends PluginTestCase
             ->assertJsonFragment(['label' => '편의점 코드', 'value' => '00007'])
             ->assertJsonFragment(['label' => '편의점 확인번호', 'value' => '999999999999999999'])
             ->assertJsonFragment(['label' => '편의점 접수번호', 'value' => '1779433713966'])
-            ->assertJsonFragment(['label' => '입금 마감일시', 'value' => '2026-05-27 23:59:59'])
-            ->assertJsonMissing(['label' => 'CBT MID', 'value' => 'CBTTEST001'])
-            ->assertJsonMissing(['label' => 'SID', 'value' => 'CBTTEST00120260522M280RzeXo']);
+            ->assertJsonFragment(['label' => '입금 마감일시', 'value' => '2026-05-27 23:59:59']);
     }
 
     private function mockPluginSettings(): void
