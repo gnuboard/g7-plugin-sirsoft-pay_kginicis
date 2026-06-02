@@ -106,6 +106,7 @@ class RegisterPgProviderListener implements HookListenerInterface
                 : 'https://stdpay.inicis.com/stdjs/INIStdPay.js',
             'callback_urls' => [
                 'signature'           => '/plugins/sirsoft-pay_kginicis/payment/signature',
+                'close_report'        => '/plugins/sirsoft-pay_kginicis/payment/close-report',
                 'callback'            => '/plugins/sirsoft-pay_kginicis/payment/callback',
                 'close'               => '/plugins/sirsoft-pay_kginicis/payment/close',
                 'cbt_checkout_token'  => '/plugins/sirsoft-pay_kginicis/payment/cbt/checkout-token',
@@ -117,14 +118,15 @@ class RegisterPgProviderListener implements HookListenerInterface
                 'mobile_callback'     => '/plugins/sirsoft-pay_kginicis/payment/mobile/callback',
                 'mobile_vbank_notify' => '/plugins/sirsoft-pay_kginicis/payment/mobile/vbank-notify',
             ],
-            'japan_enabled'              => $settings['japan_enabled'] ?? false,
-            'japan_configured'           => $this->isJapanConfigured($settings, $isTest),
-            'use_escrow'                 => $settings['use_escrow'] ?? false,
-            'japan_mid'                  => $isTest
+            'japan_enabled'                      => $settings['japan_enabled'] ?? false,
+            'japan_restrict_jpy_payment_methods' => (bool) ($settings['japan_restrict_jpy_payment_methods'] ?? false),
+            'japan_configured'                   => $this->isJapanConfigured($settings, $isTest),
+            'use_escrow'                         => $settings['use_escrow'] ?? false,
+            'japan_mid'                          => $isTest
                 ? KgInicisApiService::JAPAN_TEST_MID
                 : ($settings['live_japan_mid'] ?? ''),
-            'cbt_extra_data'             => $this->buildCbtExtraData($settings),
-            'use_credit_point'           => (bool) ($settings['use_credit_point'] ?? false),
+            'cbt_extra_data'                     => $this->buildCbtExtraData($settings),
+            'use_credit_point'                   => (bool) ($settings['use_credit_point'] ?? false),
         ]);
     }
 

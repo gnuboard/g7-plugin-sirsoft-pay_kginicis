@@ -7,6 +7,10 @@ import {
     removeKoreanPaymentForms,
     resetStandardPaySdk,
 } from '../paymentDomCleanup';
+import {
+    markStandardPaymentCloseReportContext,
+    monitorStandardPaymentWindowClose,
+} from '../paymentCloseMessageListener';
 
 interface PgPaymentData {
     order_number: string;
@@ -32,6 +36,7 @@ interface ClientConfig {
     sdk_url: string;
     callback_urls: {
         signature: string;
+        close_report?: string;
         callback: string;
         close: string;
         cbt_checkout_token: string;
@@ -44,6 +49,7 @@ interface ClientConfig {
         mobile_vbank_notify: string;
     };
     japan_enabled: boolean;
+    japan_restrict_jpy_payment_methods?: boolean;
     japan_configured?: boolean;
     use_escrow: boolean;
     japan_mid: string;
@@ -429,7 +435,23 @@ async function requestKoreanPayment(
 
     document.body.appendChild(form);
 
+    const baselineIframes = Array.from(document.querySelectorAll('iframe'));
+    if (config.callback_urls.close_report) {
+        markStandardPaymentCloseReportContext({
+            closeReportUrl: config.callback_urls.close_report,
+            oid: pgPaymentData.order_number,
+            price: Number(pgPaymentData.amount),
+            buyer_email: pgPaymentData.customer_email ?? '',
+            buyer_phone: pgPaymentData.customer_phone ?? '',
+            payment_method: paymentMethod,
+        });
+    }
+
     window.INIStdPay.pay(formId);
+
+    if (config.callback_urls.close_report) {
+        monitorStandardPaymentWindowClose(baselineIframes);
+    }
 }
 
 /**
@@ -573,6 +595,7 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
             config.japan_enabled &&
             !!config.japan_mid &&
             config.japan_configured !== false;
+        const shouldRestrictJpyPaymentMethods = config.japan_restrict_jpy_payment_methods === true;
 
         if (isJapanPaymentMethod && !isJpy) {
             throw new Error('KG Inicis Japan payment methods require a JPY order.');
@@ -582,7 +605,7 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
             throw new Error('KG Inicis Japan CBT payment is not configured.');
         }
 
-        if (isJpy && !CBT_ALLOWED_PAYMENT_METHODS.has(paymentMethod)) {
+        if (isJpy && shouldRestrictJpyPaymentMethods && !CBT_ALLOWED_PAYMENT_METHODS.has(paymentMethod)) {
             throw new Error('JPY orders can only use KG Inicis Japan CBT payment methods.');
         }
 

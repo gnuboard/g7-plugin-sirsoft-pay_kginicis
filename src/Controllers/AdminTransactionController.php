@@ -336,6 +336,19 @@ class AdminTransactionController extends AdminBaseController
             '_escrow_confirm' => null,
             '_inquiry_at' => date('Y-m-d H:i:s'),
             '_local_notice' => 'CBT 거래는 한국 INIAPI 거래조회 대상이 아니므로 저장된 승인/입금 확인 정보로 표시됩니다.',
+            '_cbt_cvs' => $payMethod === 'CVS' ? [
+                'status' => (string) ($localMeta['cvs_status'] ?? ''),
+                'last_notify_at' => (string) ($localMeta['cvs_last_notify_at'] ?? ''),
+                'last_notify_result' => (string) ($localMeta['cvs_last_notify_result'] ?? ''),
+                'last_notify_reason' => (string) ($localMeta['cvs_last_notify_reason'] ?? ''),
+                'last_recheck_at' => (string) ($localMeta['cvs_last_recheck_at'] ?? ''),
+                'last_recheck_result' => (string) ($localMeta['cvs_last_recheck_result'] ?? ''),
+                'expired_at' => (string) ($localMeta['cvs_expired_at'] ?? ''),
+                'expiry_reason' => (string) ($localMeta['cvs_expiry_reason'] ?? ''),
+                'notify_history' => is_array($localMeta['cvs_notify_history'] ?? null)
+                    ? array_slice($localMeta['cvs_notify_history'], 0, 10)
+                    : [],
+            ] : null,
         ];
 
         return $result;
