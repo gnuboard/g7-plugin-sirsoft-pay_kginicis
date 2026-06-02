@@ -138,7 +138,8 @@ class CbtCallbackController
         if ($authResultCode !== '' && $authResultCode !== 'OK') {
             $order = $this->orderService->findByOrderNumber($oid);
             if ($order) {
-                $this->orderService->failPayment($order, $authResultCode, $authResultMsg);
+                $order = $this->orderService->failPayment($order, $authResultCode, $authResultMsg);
+                $this->markCbtAuthFailurePayment($order, $request, $authResultCode, $authResultMsg);
             }
 
             Log::warning('KG Inicis CBT: auth failed', [
@@ -224,9 +225,11 @@ class CbtCallbackController
             $approvedAmount = $this->resolveApprovedAmount($pgResponse, $order);
             $authResponse = $this->sanitizePgResponse($request->except(['_token']), self::CBT_AUTH_RESPONSE_KEYS);
             $approveResponse = $this->sanitizePgResponse($pgResponse, self::CBT_APPROVE_RESPONSE_KEYS);
+            $selectedPaymentMethod = $this->resolveSelectedCbtPaymentMethod($request, $payMethod);
+            $selectionMeta = $this->buildCbtSelectionPaymentMeta($selectedPaymentMethod);
 
             if ($this->isCbtCvsPayMethod($payMethod)) {
-                $this->handleCbtCvsIssued($order, $pgResponse, $tid, $sid, $approvedAmount, $authResponse, $approveResponse);
+                $this->handleCbtCvsIssued($order, $pgResponse, $tid, $sid, $approvedAmount, $authResponse, $approveResponse, $selectedPaymentMethod);
 
                 Log::info('KG Inicis CBT: CVS payment issued', ['oid' => $oid, 'tid' => $tid]);
 
@@ -237,7 +240,7 @@ class CbtCallbackController
                 'transaction_id' => $tid,
                 'card_approval_number' => $pgResponse['approve'] ?? null,
                 'card_installment_months' => $this->normalizeInstallmentMonths($pgResponse['installMonth'] ?? null),
-                'payment_meta' => [
+                'payment_meta' => array_merge([
                     'result_code' => $resultCode,
                     'pay_method' => $payMethod,
                     'cbt_type' => 'JPPG',
@@ -251,7 +254,7 @@ class CbtCallbackController
                     'pg_auth_response' => $authResponse,
                     'pg_approve_response' => $approveResponse,
                     'pg_raw_response' => $approveResponse,
-                ],
+                ], $selectionMeta),
             ], $approvedAmount);
 
             Log::info('KG Inicis CBT: payment completed', ['oid' => $oid, 'tid' => $tid]);
@@ -324,6 +327,42 @@ class CbtCallbackController
             'message' => $resultMsg,
             'orderId' => $orderId,
         ];
+    }
+
+    private function markCbtAuthFailurePayment(
+        Order $order,
+        CbtCallbackRequest $request,
+        string $resultCode,
+        string $resultMsg,
+    ): void {
+        $payment = $order->payment()->first();
+
+        if (! $payment) {
+            return;
+        }
+
+        $payMethod = (string) $request->input('paymethod', '');
+        $selectedPaymentMethod = $this->resolveSelectedCbtPaymentMethod($request, $payMethod);
+        $meta = is_array($payment->payment_meta) ? $payment->payment_meta : [];
+        $authResponse = $this->sanitizePgResponse($request->except(['_token']), self::CBT_AUTH_RESPONSE_KEYS);
+
+        $payment->update([
+            'payment_status' => PaymentStatusEnum::FAILED,
+            'payment_meta' => array_merge($meta, [
+                'result_code' => $resultCode,
+                'result_msg' => $resultMsg,
+                'pay_method' => $payMethod !== '' ? $this->normalizeCbtPayMethod($payMethod) : null,
+                'cbt_type' => 'JPPG',
+                'cbt_mid' => $this->apiService->getJapanMid(),
+                'mid' => $this->apiService->getJapanMid(),
+                'currency' => 'JPY',
+                'is_cbt' => true,
+                'is_test_mode' => $this->apiService->isTestMode(),
+                'pg_response_sanitized' => true,
+                'pg_auth_response' => $authResponse,
+                'cbt_failure_at' => now()->toIso8601String(),
+            ], $this->buildCbtSelectionPaymentMeta($selectedPaymentMethod)),
+        ]);
     }
 
     private function isPayPayProcessingFailure(string $resultCode, string $resultMsg, string $payMethod): bool
@@ -435,6 +474,38 @@ class CbtCallbackController
         return $authPayMethod !== '' ? $authPayMethod : null;
     }
 
+    private function resolveSelectedCbtPaymentMethod(CbtCallbackRequest $request, string $payMethod): ?string
+    {
+        $selectedPaymentMethod = (string) $request->input('selectedPaymentMethod', '');
+        $allowedSelectedMethods = [
+            'card',
+            'kginicis_japan_paypay',
+            'kginicis_japan_cvs',
+        ];
+
+        if (in_array($selectedPaymentMethod, $allowedSelectedMethods, true)) {
+            return $selectedPaymentMethod;
+        }
+
+        return match ($this->normalizeCbtPayMethod($payMethod)) {
+            'CARD' => 'card',
+            'PAYPAY' => 'kginicis_japan_paypay',
+            'CVS' => 'kginicis_japan_cvs',
+            default => null,
+        };
+    }
+
+    private function buildCbtSelectionPaymentMeta(?string $selectedPaymentMethod): array
+    {
+        if ($selectedPaymentMethod === null || $selectedPaymentMethod === '') {
+            return [];
+        }
+
+        return [
+            'selected_payment_method' => $selectedPaymentMethod,
+        ];
+    }
+
     private function normalizeCbtPayMethod(string $payMethod): string
     {
         return strtoupper(trim($payMethod));
@@ -462,6 +533,7 @@ class CbtCallbackController
         int $amount,
         array $authResponse,
         array $approveResponse,
+        ?string $selectedPaymentMethod,
     ): void {
         $paymentTerm = (string) ($pgResponse['paymentTerm'] ?? '');
         $dueAt = null;
@@ -484,7 +556,7 @@ class CbtCallbackController
             'vbank_number' => $pgResponse['confNo'] ?? ($pgResponse['receiptNo'] ?? null),
             'vbank_due_at' => $dueAt,
             'vbank_issued_at' => now(),
-            'payment_meta' => [
+            'payment_meta' => array_merge([
                 'result_code' => $pgResponse['resultCode'] ?? 'OK',
                 'pay_method' => 'CVS',
                 'cbt_type' => 'JPPG',
@@ -504,7 +576,7 @@ class CbtCallbackController
                 'cvs_conf_no' => $pgResponse['confNo'] ?? null,
                 'cvs_receipt_no' => $pgResponse['receiptNo'] ?? null,
                 'cvs_payment_term' => $paymentTerm !== '' ? $paymentTerm : null,
-            ],
+            ], $this->buildCbtSelectionPaymentMeta($selectedPaymentMethod)),
         ], fn ($value) => $value !== null));
     }
 

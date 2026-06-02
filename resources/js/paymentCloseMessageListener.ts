@@ -159,6 +159,10 @@ function isInsideDialog(iframe: HTMLIFrameElement): boolean {
     return !!iframe.closest('dialog');
 }
 
+function isInsideInicisModal(iframe: HTMLIFrameElement): boolean {
+    return !!iframe.closest('#inicisModalDiv, .inipay_modal');
+}
+
 function isBlankStandardPayIframe(iframe: HTMLIFrameElement): boolean {
     if (!looksLikeStandardPayIframe(iframe)) {
         return false;
@@ -189,7 +193,7 @@ function isActiveStandardPaymentIframe(
     iframe: HTMLIFrameElement,
     baselineIframes: Set<HTMLIFrameElement>,
 ): boolean {
-    if (looksLikeStandardPayIframe(iframe) && !isInsideDialog(iframe)) {
+    if (looksLikeStandardPayIframe(iframe) && !isInsideDialog(iframe) && !isInsideInicisModal(iframe)) {
         return false;
     }
 
@@ -215,6 +219,8 @@ function hasOrphanStandardPaymentIframe(baselineIframes: Set<HTMLIFrameElement>)
         .some((iframe) => !baselineIframes.has(iframe)
             && looksLikeStandardPayIframe(iframe)
             && !isInsideDialog(iframe)
+            && !isInsideInicisModal(iframe)
+            && isBlankStandardPayIframe(iframe)
             && isVisibleElement(iframe));
 }
 
