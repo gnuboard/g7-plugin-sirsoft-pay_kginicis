@@ -38,7 +38,8 @@ class CbtPaymentControllerTest extends PluginTestCase
                     && ($meta['is_cbt'] ?? false) === true
                     && ($meta['cbt_mid'] ?? '') === KgInicisApiService::JAPAN_TEST_MID
                     && ($meta['cbt_sid'] ?? '') === 'SID001'
-                    && ($meta['pay_method'] ?? '') === 'CARD';
+                    && ($meta['pay_method'] ?? '') === 'CARD'
+                    && ($meta['selected_payment_method'] ?? '') === 'card';
             }), 100)
             ->andReturn($order);
 
@@ -117,6 +118,7 @@ class CbtPaymentControllerTest extends PluginTestCase
         $this->assertEquals(PaymentStatusEnum::WAITING_DEPOSIT, $payment->payment_status);
         $this->assertSame('CBT_CVS_TID_001', $payment->transaction_id);
         $this->assertSame('CVS', $payment->payment_meta['pay_method'] ?? null);
+        $this->assertSame('kginicis_japan_cvs', $payment->payment_meta['selected_payment_method'] ?? null);
         $this->assertSame('00007', $payment->payment_meta['cvs_convenience'] ?? null);
         $this->assertSame('999999999999999999', $payment->vbank_number);
     }
@@ -153,21 +155,13 @@ class CbtPaymentControllerTest extends PluginTestCase
 
     public function test_cbt_callback_paypay_processing_failure_hides_upstream_message_from_checkout(): void
     {
-        $order = $this->makePendingJpyOrder('JP-ORDER-PAYPAY-FAIL-001', 100);
-
-        $orderService = Mockery::mock(OrderProcessingService::class);
-        $orderService->shouldReceive('findByOrderNumber')
-            ->with('JP-ORDER-PAYPAY-FAIL-001')
-            ->andReturn($order);
-        $orderService->shouldReceive('failPayment')
-            ->once()
-            ->with($order, 'processing_failure', 'Processing failed upstream.')
-            ->andReturn($order);
+        $order = $this->createPersistedPendingJpyOrder('JP-ORDER-PAYPAY-FAIL-001', 100);
 
         $apiService = Mockery::mock(KgInicisApiService::class);
+        $apiService->shouldReceive('getJapanMid')->andReturn(KgInicisApiService::JAPAN_TEST_MID);
+        $apiService->shouldReceive('isTestMode')->andReturn(true);
         $apiService->shouldNotReceive('approveCbtPayment');
 
-        $this->app->instance(OrderProcessingService::class, $orderService);
         $this->app->instance(KgInicisApiService::class, $apiService);
 
         $response = $this->get('/plugins/sirsoft-pay_kginicis/payment/cbt/callback?'
@@ -178,6 +172,7 @@ class CbtPaymentControllerTest extends PluginTestCase
                 'resultMsg' => 'Processing failed upstream.',
                 'mid' => KgInicisApiService::JAPAN_TEST_MID,
                 'paymethod' => 'PAYpay',
+                'selectedPaymentMethod' => 'kginicis_japan_paypay',
             ]));
 
         $response->assertRedirect();
@@ -191,6 +186,14 @@ class CbtPaymentControllerTest extends PluginTestCase
         $this->assertStringNotContainsString('processing_failure', parse_url($location, PHP_URL_QUERY) ?: '');
         $this->assertStringNotContainsString('Processing+failed+upstream', $location);
         $this->assertStringNotContainsString('Processing%20failed%20upstream', $location);
+
+        $order->refresh();
+        $payment = OrderPayment::query()->where('order_id', $order->id)->firstOrFail();
+        $this->assertEquals(OrderStatusEnum::CANCELLED, $order->order_status);
+        $this->assertEquals(PaymentStatusEnum::FAILED, $payment->payment_status);
+        $this->assertSame('PAYPAY', $payment->payment_meta['pay_method'] ?? null);
+        $this->assertSame('kginicis_japan_paypay', $payment->payment_meta['selected_payment_method'] ?? null);
+        $this->assertSame('processing_failure', $payment->payment_meta['result_code'] ?? null);
     }
 
     public function test_cbt_cvs_notify_completes_waiting_deposit_payment(): void

@@ -182,6 +182,51 @@ describe('paymentCloseMessageListener', () => {
         );
     });
 
+    it('KG 이니시스 공식 모달 안의 표준결제 iframe 은 열린 결제창으로 본다', async () => {
+        vi.useFakeTimers();
+        const apiPost = vi.fn().mockResolvedValue({ success: true });
+        windowRecord().G7Core = {
+            api: { post: apiPost },
+            state: { setLocal },
+        };
+        markStandardPaymentCloseReportContext({
+            closeReportUrl: '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            oid: 'ORD-CLOSE-MODAL-001',
+            price: 10000,
+        });
+
+        monitorStandardPaymentWindowClose([], 'inicis-overlay-closed');
+
+        const modal = document.createElement('div');
+        modal.id = 'inicisModalDiv';
+        modal.className = 'inipay_modal fade in';
+        modal.style.width = '640px';
+        modal.style.height = '640px';
+        document.body.appendChild(modal);
+
+        const iframe = document.createElement('iframe');
+        iframe.className = 'inipay_iframe';
+        iframe.src = 'https://stgstdpay.inicis.com/payMain/pay';
+        iframe.style.width = '640px';
+        iframe.style.height = '640px';
+        modal.appendChild(iframe);
+
+        await vi.advanceTimersByTimeAsync(3600);
+        expect(apiPost).not.toHaveBeenCalled();
+
+        modal.remove();
+        await vi.advanceTimersByTimeAsync(1200);
+
+        expect(apiPost).toHaveBeenCalledWith(
+            '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            expect.objectContaining({
+                oid: 'ORD-CLOSE-MODAL-001',
+                price: 10000,
+                reason: 'inicis-overlay-closed',
+            }),
+        );
+    });
+
     it('dialog 없이 KG 표준결제 iframe 만 남아 있으면 중단된 결제창으로 보고한다', async () => {
         vi.useFakeTimers();
         const apiPost = vi.fn().mockResolvedValue({ success: true });
