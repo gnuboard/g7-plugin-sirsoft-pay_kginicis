@@ -7,6 +7,10 @@ import {
     removeKoreanPaymentForms,
     resetStandardPaySdk,
 } from '../paymentDomCleanup';
+import {
+    markStandardPaymentCloseReportContext,
+    monitorStandardPaymentWindowClose,
+} from '../paymentCloseMessageListener';
 
 interface PgPaymentData {
     order_number: string;
@@ -32,6 +36,7 @@ interface ClientConfig {
     sdk_url: string;
     callback_urls: {
         signature: string;
+        close_report?: string;
         callback: string;
         close: string;
         cbt_checkout_token: string;
@@ -430,7 +435,23 @@ async function requestKoreanPayment(
 
     document.body.appendChild(form);
 
+    const baselineIframes = Array.from(document.querySelectorAll('iframe'));
+    if (config.callback_urls.close_report) {
+        markStandardPaymentCloseReportContext({
+            closeReportUrl: config.callback_urls.close_report,
+            oid: pgPaymentData.order_number,
+            price: Number(pgPaymentData.amount),
+            buyer_email: pgPaymentData.customer_email ?? '',
+            buyer_phone: pgPaymentData.customer_phone ?? '',
+            payment_method: paymentMethod,
+        });
+    }
+
     window.INIStdPay.pay(formId);
+
+    if (config.callback_urls.close_report) {
+        monitorStandardPaymentWindowClose(baselineIframes);
+    }
 }
 
 /**

@@ -5,7 +5,13 @@ import {
     hasMobilePaymentReturnPending,
     markMobilePaymentReturnPending,
 } from '../paymentDomCleanup';
-import { installPaymentCloseMessageListener, resetCheckoutSubmittingState } from '../paymentCloseMessageListener';
+import {
+    clearStandardPaymentCloseReportContext,
+    installPaymentCloseMessageListener,
+    markStandardPaymentCloseReportContext,
+    monitorStandardPaymentWindowClose,
+    resetCheckoutSubmittingState,
+} from '../paymentCloseMessageListener';
 
 function windowRecord(): Record<string, unknown> {
     return window as unknown as Record<string, unknown>;
@@ -22,6 +28,7 @@ describe('paymentCloseMessageListener', () => {
             },
         };
         setLocal.mockClear();
+        clearStandardPaymentCloseReportContext();
         vi.spyOn(console, 'info').mockImplementation(() => {});
         vi.spyOn(console, 'warn').mockImplementation(() => {});
     });
@@ -29,8 +36,10 @@ describe('paymentCloseMessageListener', () => {
     afterEach(() => {
         delete windowRecord().G7Core;
         delete windowRecord().__sirsoftKginicisPaymentCloseListenerInstalled;
+        clearStandardPaymentCloseReportContext();
         clearMobilePaymentReturnPending();
         vi.restoreAllMocks();
+        vi.useRealTimers();
     });
 
     it('KG closeUrl 메시지를 받으면 체크아웃 제출 상태를 해제한다', () => {
@@ -52,6 +61,158 @@ describe('paymentCloseMessageListener', () => {
         expect(setLocal).toHaveBeenCalledWith({ isSubmittingOrder: false });
         expect(document.getElementById('kginicis_pay_form_stale')).toBeNull();
         expect(consumeStandardPaySdkReloadFlag()).toBe(true);
+    });
+
+    it('KG closeUrl 메시지를 받으면 활성 주문의 결제창 닫힘을 서버에 보고한다', async () => {
+        const apiPost = vi.fn().mockResolvedValue({ success: true });
+        windowRecord().G7Core = {
+            api: { post: apiPost },
+            state: { setLocal },
+        };
+        markStandardPaymentCloseReportContext({
+            closeReportUrl: '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            oid: 'ORD-CLOSE-001',
+            price: 10000,
+            buyer_email: 'buyer@example.com',
+            buyer_phone: '01012345678',
+            payment_method: 'card',
+        });
+        installPaymentCloseMessageListener();
+
+        window.dispatchEvent(new MessageEvent('message', {
+            origin: window.location.origin,
+            data: {
+                source: 'sirsoft-pay_kginicis',
+                type: 'payment-window-closed',
+                reason: 'inicis-close-url',
+            },
+        }));
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(apiPost).toHaveBeenCalledWith(
+            '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            {
+                oid: 'ORD-CLOSE-001',
+                price: 10000,
+                buyer_email: 'buyer@example.com',
+                buyer_phone: '01012345678',
+                payment_method: 'card',
+                reason: 'inicis-close-url',
+            },
+        );
+        expect(setLocal).toHaveBeenCalledWith({ isSubmittingOrder: false });
+    });
+
+    it('표준결제 오버레이 iframe 이 사라지면 결제창 닫힘을 서버에 보고한다', async () => {
+        vi.useFakeTimers();
+        const apiPost = vi.fn().mockResolvedValue({ success: true });
+        windowRecord().G7Core = {
+            api: { post: apiPost },
+            state: { setLocal },
+        };
+        markStandardPaymentCloseReportContext({
+            closeReportUrl: '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            oid: 'ORD-CLOSE-002',
+            price: 10000,
+        });
+
+        monitorStandardPaymentWindowClose([], 'inicis-overlay-closed');
+
+        const iframe = document.createElement('iframe');
+        iframe.style.width = '320px';
+        iframe.style.height = '240px';
+        document.body.appendChild(iframe);
+        await vi.advanceTimersByTimeAsync(500);
+
+        iframe.remove();
+        await vi.advanceTimersByTimeAsync(1200);
+
+        expect(apiPost).toHaveBeenCalledWith(
+            '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            expect.objectContaining({
+                oid: 'ORD-CLOSE-002',
+                price: 10000,
+                reason: 'inicis-overlay-closed',
+            }),
+        );
+    });
+
+    it('KG 표준결제 iframe 이 빈 about:blank 상태로 남아도 닫힘으로 보고한다', async () => {
+        vi.useFakeTimers();
+        const apiPost = vi.fn().mockResolvedValue({ success: true });
+        windowRecord().G7Core = {
+            api: { post: apiPost },
+            state: { setLocal },
+        };
+        markStandardPaymentCloseReportContext({
+            closeReportUrl: '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            oid: 'ORD-CLOSE-003',
+            price: 10000,
+        });
+
+        monitorStandardPaymentWindowClose([], 'inicis-overlay-closed');
+
+        const dialog = document.createElement('dialog');
+        dialog.open = true;
+        dialog.style.width = '320px';
+        dialog.style.height = '240px';
+        document.body.appendChild(dialog);
+
+        const iframe = document.createElement('iframe');
+        iframe.className = 'inipay_iframe';
+        iframe.src = 'https://stgstdpay.inicis.com/payMain/pay';
+        iframe.style.width = '320px';
+        iframe.style.height = '240px';
+        dialog.appendChild(iframe);
+        await vi.advanceTimersByTimeAsync(500);
+
+        document.body.appendChild(iframe);
+        dialog.remove();
+        iframe.src = 'about:blank';
+        await vi.advanceTimersByTimeAsync(1200);
+
+        expect(apiPost).toHaveBeenCalledWith(
+            '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            expect.objectContaining({
+                oid: 'ORD-CLOSE-003',
+                price: 10000,
+                reason: 'inicis-overlay-closed',
+            }),
+        );
+    });
+
+    it('dialog 없이 KG 표준결제 iframe 만 남아 있으면 중단된 결제창으로 보고한다', async () => {
+        vi.useFakeTimers();
+        const apiPost = vi.fn().mockResolvedValue({ success: true });
+        windowRecord().G7Core = {
+            api: { post: apiPost },
+            state: { setLocal },
+        };
+        markStandardPaymentCloseReportContext({
+            closeReportUrl: '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            oid: 'ORD-CLOSE-004',
+            price: 10000,
+        });
+
+        monitorStandardPaymentWindowClose([], 'inicis-overlay-closed');
+
+        const iframe = document.createElement('iframe');
+        iframe.className = 'inipay_iframe';
+        iframe.style.width = '320px';
+        iframe.style.height = '240px';
+        document.body.appendChild(iframe);
+
+        await vi.advanceTimersByTimeAsync(3600);
+
+        expect(apiPost).toHaveBeenCalledWith(
+            '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            expect.objectContaining({
+                oid: 'ORD-CLOSE-004',
+                price: 10000,
+                reason: 'inicis-overlay-closed',
+            }),
+        );
     });
 
     it('다른 origin 메시지는 무시한다', () => {

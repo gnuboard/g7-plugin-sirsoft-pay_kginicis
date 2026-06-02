@@ -106,6 +106,7 @@ class RegisterPgProviderListener implements HookListenerInterface
                 : 'https://stdpay.inicis.com/stdjs/INIStdPay.js',
             'callback_urls' => [
                 'signature'           => '/plugins/sirsoft-pay_kginicis/payment/signature',
+                'close_report'        => '/plugins/sirsoft-pay_kginicis/payment/close-report',
                 'callback'            => '/plugins/sirsoft-pay_kginicis/payment/callback',
                 'close'               => '/plugins/sirsoft-pay_kginicis/payment/close',
                 'cbt_checkout_token'  => '/plugins/sirsoft-pay_kginicis/payment/cbt/checkout-token',

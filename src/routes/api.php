@@ -13,6 +13,7 @@ use Plugins\Sirsoft\PayKginicis\Controllers\AdminTransactionController;
 use Plugins\Sirsoft\PayKginicis\Controllers\CbtCheckoutTokenController;
 use Plugins\Sirsoft\PayKginicis\Controllers\CbtHashDataController;
 use Plugins\Sirsoft\PayKginicis\Controllers\MobileSignatureController;
+use Plugins\Sirsoft\PayKginicis\Controllers\PaymentCloseReportController;
 use Plugins\Sirsoft\PayKginicis\Controllers\PaymentSignatureController;
 use Plugins\Sirsoft\PayKginicis\Controllers\UserReceiptController;
 
@@ -29,6 +30,10 @@ use Plugins\Sirsoft\PayKginicis\Controllers\UserReceiptController;
 // 결제창 서명 생성 — 인증 불필요, 프론트엔드에서 직접 호출
 Route::post('/payment/signature', [PaymentSignatureController::class, 'generate'])
     ->name('payment.signature');
+
+// PC 표준결제창 닫힘 보고 — 주문 컨텍스트 검증 후 결제 실패/취소 이력 기록
+Route::post('/payment/close-report', [PaymentCloseReportController::class, 'store'])
+    ->name('payment.close-report');
 
 // CBT 해시 데이터 생성 — 인증 불필요, 프론트엔드에서 직접 호출
 Route::post('/payment/cbt/checkout-token', [CbtCheckoutTokenController::class, 'issue'])
