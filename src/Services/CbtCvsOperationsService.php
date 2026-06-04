@@ -13,6 +13,7 @@ use Modules\Sirsoft\Ecommerce\Models\OrderPayment;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
 use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
+use Plugins\Sirsoft\PayKginicis\Repositories\CbtCvsOperationsRepositoryInterface;
 
 class CbtCvsOperationsService
 {
@@ -42,8 +43,17 @@ class CbtCvsOperationsService
     public function __construct(
         private readonly OrderProcessingService $orderService,
         private readonly KgInicisApiService $apiService,
+        private readonly CbtCvsOperationsRepositoryInterface $repository,
     ) {}
 
+    /**
+     * KG 이니시스 CBT 편의점 입금 통보를 검증하고 주문 결제 상태를 갱신합니다.
+     *
+     * @param  array<string, mixed>  $payload  NOTI payload
+     * @param  string  $source  수신 경로 구분
+     * @param  string|null  $remoteIp  통보 발신 IP
+     * @return array<string, mixed> 통보 처리 결과
+     */
     public function handleNotify(array $payload, string $source = 'kg', ?string $remoteIp = null): array
     {
         $tid = trim((string) ($payload['tid'] ?? ''));
@@ -74,7 +84,7 @@ class CbtCvsOperationsService
                 return $this->notifyResult('FAIL', 'failed', 'order_not_found');
             }
 
-            $payment = $order->payment()->first();
+            $payment = $this->repository->firstPaymentForOrder($order);
             if (! $payment) {
                 Log::warning('KG Inicis CBT CVS: payment row not found', [
                     'order_id' => $orderId,
@@ -207,7 +217,7 @@ class CbtCvsOperationsService
                 'payment_meta' => $completedMeta,
             ], $amount);
 
-            $order->payment()->update(['pg_provider' => 'kginicis']);
+            $this->repository->updatePaymentProvider($order, 'kginicis');
 
             Log::info('KG Inicis CBT CVS: deposit confirmed', [
                 'order_id' => $orderId,
@@ -231,6 +241,12 @@ class CbtCvsOperationsService
         }
     }
 
+    /**
+     * 주문의 CBT 편의점 입금 운영 요약 정보를 반환합니다.
+     *
+     * @param  string  $orderNumber  주문번호
+     * @return array<string, mixed>|null 운영 요약
+     */
     public function summary(string $orderNumber): ?array
     {
         $order = $this->findOrder($orderNumber);
@@ -281,6 +297,13 @@ class CbtCvsOperationsService
         ];
     }
 
+    /**
+     * 테스트 모드 CBT 편의점 입금 완료 NOTI 를 관리자 동작으로 시뮬레이션합니다.
+     *
+     * @param  string  $orderNumber  주문번호
+     * @param  string|null  $remoteIp  관리자 요청 IP
+     * @return array<string, mixed> 처리 결과
+     */
     public function simulatePaidNotify(string $orderNumber, ?string $remoteIp = null): array
     {
         $context = $this->operationContext($orderNumber);
@@ -336,6 +359,12 @@ class CbtCvsOperationsService
         ];
     }
 
+    /**
+     * 입금 기한이 지난 CBT 편의점 결제를 만료 상태로 표시합니다.
+     *
+     * @param  string  $orderNumber  주문번호
+     * @return array<string, mixed> 처리 결과
+     */
     public function expireOverdue(string $orderNumber): array
     {
         $context = $this->operationContext($orderNumber);
@@ -359,10 +388,10 @@ class CbtCvsOperationsService
         ]);
 
         DB::transaction(function () use ($payment, $updatedMeta): void {
-            $payment->forceFill([
+            $this->repository->updatePayment($payment, [
                 'payment_status' => PaymentStatusEnum::EXPIRED,
                 'payment_meta' => $updatedMeta,
-            ])->save();
+            ]);
         });
 
         return [
@@ -371,6 +400,12 @@ class CbtCvsOperationsService
         ];
     }
 
+    /**
+     * 로컬 상태 확인 시각을 CBT 편의점 결제 메타에 기록합니다.
+     *
+     * @param  string  $orderNumber  주문번호
+     * @return array<string, mixed> 처리 결과
+     */
     public function markRechecked(string $orderNumber): array
     {
         $context = $this->operationContext($orderNumber);
@@ -430,10 +465,7 @@ class CbtCvsOperationsService
 
     private function findOrder(string $orderNumber): ?Order
     {
-        return Order::query()
-            ->with('payment')
-            ->where('order_number', $orderNumber)
-            ->first();
+        return $this->repository->findOrderWithPayment($orderNumber);
     }
 
     private function notifyResult(string $body, string $status, string $reason): array
@@ -495,8 +527,7 @@ class CbtCvsOperationsService
 
     private function savePaymentMeta(OrderPayment $payment, array $meta): void
     {
-        $payment->forceFill(['payment_meta' => $meta])->save();
-        $payment->refresh();
+        $this->repository->updatePayment($payment, ['payment_meta' => $meta]);
     }
 
     private function normalizeHistory(mixed $history): array
