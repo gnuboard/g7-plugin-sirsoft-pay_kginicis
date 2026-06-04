@@ -3,7 +3,11 @@
 namespace Plugins\Sirsoft\PayKginicis\Tests\Feature\Controllers;
 
 use Mockery;
+use Modules\Sirsoft\Ecommerce\Database\Factories\OrderFactory;
+use Modules\Sirsoft\Ecommerce\Database\Factories\OrderPaymentFactory;
 use Modules\Sirsoft\Ecommerce\Enums\OrderStatusEnum;
+use Modules\Sirsoft\Ecommerce\Enums\PaymentMethodEnum;
+use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Models\OrderAddress;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
@@ -125,6 +129,52 @@ class PaymentCloseReportControllerTest extends PluginTestCase
         $response->assertOk()
             ->assertJsonPath('data.status', 'ignored')
             ->assertJsonPath('data.reason', 'order_not_payable');
+    }
+
+    public function test_close_report_preserves_easy_pay_context_on_cancelled_order(): void
+    {
+        $order = OrderFactory::new()->create([
+            'order_number' => 'ORD-CLOSE-EASYPAY-001',
+            'order_status' => OrderStatusEnum::PENDING_ORDER,
+            'currency' => 'KRW',
+            'subtotal_amount' => 10000,
+            'total_amount' => 10000,
+            'total_due_amount' => 10000,
+            'total_paid_amount' => 0,
+        ]);
+
+        $payment = OrderPaymentFactory::new()->create([
+            'order_id' => $order->id,
+            'payment_status' => PaymentStatusEnum::READY,
+            'payment_method' => PaymentMethodEnum::CARD,
+            'pg_provider' => 'kginicis',
+            'embedded_pg_provider' => null,
+            'transaction_id' => null,
+            'paid_amount_local' => 0,
+            'paid_amount_base' => 10000,
+            'payment_meta' => ['existing' => 'value'],
+            'paid_at' => null,
+        ]);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/payment/close-report', [
+            'oid' => 'ORD-CLOSE-EASYPAY-001',
+            'price' => 10000,
+            'payment_method' => 'kginicis_kakaopay',
+            'reason' => 'inicis-overlay-closed',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.status', 'recorded');
+
+        $payment->refresh();
+
+        $this->assertSame(PaymentStatusEnum::CANCELLED, $payment->payment_status);
+        $this->assertSame('kakaopay', $payment->embedded_pg_provider);
+        $this->assertSame('value', $payment->payment_meta['existing'] ?? null);
+        $this->assertSame('kginicis_kakaopay', $payment->payment_meta['selected_payment_method'] ?? null);
+        $this->assertSame('kakaopay', $payment->payment_meta['embedded_pg_provider'] ?? null);
+        $this->assertSame('카카오페이', $payment->payment_meta['embedded_pg_provider_label'] ?? null);
+        $this->assertSame('kginicis_kakaopay', $payment->payment_meta['close_report_payment_method'] ?? null);
     }
 
     private function makeOrder(string $orderNumber, int $amount, string $currency = 'KRW'): Order

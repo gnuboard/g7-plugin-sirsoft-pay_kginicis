@@ -168,14 +168,16 @@ function isBlankStandardPayIframe(iframe: HTMLIFrameElement): boolean {
         return false;
     }
 
-    if (iframe.src && iframe.src !== 'about:blank') {
+    const srcAttr = iframe.getAttribute('src')?.trim() ?? '';
+    const src = iframe.src?.trim() ?? '';
+    if (srcAttr !== '' && src !== 'about:blank') {
         return false;
     }
 
     try {
         const doc = iframe.contentDocument;
         if (!doc) {
-            return false;
+            return srcAttr === '';
         }
 
         const isBlankUrl = doc.location.href === 'about:blank'
@@ -218,8 +220,6 @@ function hasOrphanStandardPaymentIframe(baselineIframes: Set<HTMLIFrameElement>)
     return Array.from(document.querySelectorAll('iframe'))
         .some((iframe) => !baselineIframes.has(iframe)
             && looksLikeStandardPayIframe(iframe)
-            && !isInsideDialog(iframe)
-            && !isInsideInicisModal(iframe)
             && isBlankStandardPayIframe(iframe)
             && isVisibleElement(iframe));
 }
