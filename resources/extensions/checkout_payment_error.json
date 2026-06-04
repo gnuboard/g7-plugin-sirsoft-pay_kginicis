@@ -7,7 +7,7 @@
             "name": "Modal",
             "props": {
                 "title": "$t:sirsoft-pay_kginicis.payment_error.title",
-                "size": "small",
+                "size": "sm",
                 "showCloseButton": true
             },
             "children": [
