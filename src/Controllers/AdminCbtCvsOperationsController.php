@@ -18,6 +18,12 @@ class AdminCbtCvsOperationsController extends AdminBaseController
         parent::__construct();
     }
 
+    /**
+     * CBT 편의점 입금 운영 요약을 조회합니다.
+     *
+     * @param  string  $orderNumber  주문번호
+     * @return JsonResponse 응답
+     */
     public function show(string $orderNumber): JsonResponse
     {
         $summary = $this->operationsService->summary($orderNumber);
@@ -32,6 +38,13 @@ class AdminCbtCvsOperationsController extends AdminBaseController
         return ResponseHelper::success('messages.success', $summary);
     }
 
+    /**
+     * 테스트 모드 CBT 편의점 입금 완료 NOTI 를 시뮬레이션합니다.
+     *
+     * @param  Request  $request  요청
+     * @param  string  $orderNumber  주문번호
+     * @return JsonResponse 응답
+     */
     public function simulateNotify(Request $request, string $orderNumber): JsonResponse
     {
         $result = $this->operationsService->simulatePaidNotify($orderNumber, $request->ip());
@@ -47,6 +60,12 @@ class AdminCbtCvsOperationsController extends AdminBaseController
         );
     }
 
+    /**
+     * 입금 기한이 지난 CBT 편의점 결제를 만료 처리합니다.
+     *
+     * @param  string  $orderNumber  주문번호
+     * @return JsonResponse 응답
+     */
     public function expire(string $orderNumber): JsonResponse
     {
         $result = $this->operationsService->expireOverdue($orderNumber);
@@ -62,6 +81,12 @@ class AdminCbtCvsOperationsController extends AdminBaseController
         );
     }
 
+    /**
+     * CBT 편의점 결제의 로컬 상태 재확인 시각을 기록합니다.
+     *
+     * @param  string  $orderNumber  주문번호
+     * @return JsonResponse 응답
+     */
     public function recheck(string $orderNumber): JsonResponse
     {
         $result = $this->operationsService->markRechecked($orderNumber);
