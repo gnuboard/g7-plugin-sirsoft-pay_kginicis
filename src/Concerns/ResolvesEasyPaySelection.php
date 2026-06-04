@@ -16,6 +16,15 @@ trait ResolvesEasyPaySelection
             return null;
         }
 
+        return $this->normalizeEasyPayMethod($method);
+    }
+
+    private function normalizeEasyPayMethod(?string $method): ?string
+    {
+        if (! is_string($method) || $method === '') {
+            return null;
+        }
+
         return array_key_exists($method, $this->kginicisEasyPayMethodMap())
             ? $method
             : null;

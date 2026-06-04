@@ -7,13 +7,16 @@ namespace Plugins\Sirsoft\PayKginicis\Controllers;
 use App\Helpers\ResponseHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\RateLimiter;
+use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\ValidatesCbtOrderContext;
+use Plugins\Sirsoft\PayKginicis\Concerns\ResolvesEasyPaySelection;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\PaymentCloseReportRequest;
 
 class PaymentCloseReportController
 {
     use ValidatesCbtOrderContext;
+    use ResolvesEasyPaySelection;
 
     private const FAILURE_CODE = 'USER_CANCEL';
 
@@ -75,6 +78,10 @@ class PaymentCloseReportController
             ]);
         }
 
+        $selectedEasyPayMethod = $this->normalizeEasyPayMethod(
+            is_string($validated['payment_method'] ?? null) ? $validated['payment_method'] : null,
+        );
+
         $failedOrder = $this->orderService->failPayment(
             $order,
             self::FAILURE_CODE,
@@ -82,6 +89,8 @@ class PaymentCloseReportController
         );
 
         $closeReason = trim((string) ($validated['reason'] ?? ''));
+
+        $this->persistEasyPayCloseContext($failedOrder, $selectedEasyPayMethod);
 
         $this->orderService->recordPaymentCancellation(
             $failedOrder,
@@ -97,5 +106,27 @@ class PaymentCloseReportController
     private function rateLimitKey(PaymentCloseReportRequest $request, string $oid): string
     {
         return 'sirsoft-pay_kginicis:payment-close-report:' . sha1($request->ip() . '|' . $oid);
+    }
+
+    private function persistEasyPayCloseContext(Order $order, ?string $selectedEasyPayMethod): void
+    {
+        if ($selectedEasyPayMethod === null || ! $order->exists) {
+            return;
+        }
+
+        $payment = $order->payment()->first();
+        if (! $payment) {
+            return;
+        }
+
+        $existingMeta = is_array($payment->payment_meta) ? $payment->payment_meta : [];
+        $payment->update([
+            'embedded_pg_provider' => $this->resolveEmbeddedPgProvider($selectedEasyPayMethod),
+            'payment_meta' => array_merge(
+                $existingMeta,
+                $this->buildEasyPayPaymentMeta($selectedEasyPayMethod),
+                ['close_report_payment_method' => $selectedEasyPayMethod],
+            ),
+        ]);
     }
 }
