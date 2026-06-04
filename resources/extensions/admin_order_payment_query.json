@@ -563,7 +563,7 @@
                                                         {
                                                             "type": "basic",
                                                             "name": "Span",
-                                                            "props": { "className": "text-xs text-gray-500 dark:text-gray-400 block mb-0.5" },
+                                                            "props": { "className": "text-tertiary block mb-0.5" },
                                                             "text": "TID"
                                                         },
                                                         {
@@ -1116,7 +1116,7 @@
                                         {
                                             "type": "basic",
                                             "name": "Label",
-                                            "props": { "className": "text-xs text-gray-500 dark:text-gray-400 w-16 flex-shrink-0" },
+                                            "props": { "className": "text-tertiary w-16 flex-shrink-0" },
                                             "text": "$t:sirsoft-pay_kginicis.admin.escrow_delivery_invoice_label"
                                         },
                                         {
@@ -1148,7 +1148,7 @@
                                         {
                                             "type": "basic",
                                             "name": "Label",
-                                            "props": { "className": "text-xs text-gray-500 dark:text-gray-400 w-16 flex-shrink-0" },
+                                            "props": { "className": "text-tertiary w-16 flex-shrink-0" },
                                             "text": "$t:sirsoft-pay_kginicis.admin.escrow_delivery_courier_label"
                                         },
                                         {
@@ -1541,7 +1541,7 @@
                                                 {
                                                     "type": "basic",
                                                     "name": "Span",
-                                                    "props": { "className": "font-mono text-xs text-gray-500 dark:text-gray-400 break-all" },
+                                                    "props": { "className": "font-mono text-tertiary break-all" },
                                                     "text": "{{payment.transaction_id}}"
                                                 },
                                                 {
@@ -1602,7 +1602,7 @@
                                                         {
                                                             "type": "basic",
                                                             "name": "Label",
-                                                            "props": { "className": "text-xs text-gray-500 dark:text-gray-400 w-16 flex-shrink-0" },
+                                                            "props": { "className": "text-tertiary w-16 flex-shrink-0" },
                                                             "text": "$t:sirsoft-pay_kginicis.admin.cash_receipt_type_label"
                                                         },
                                                         {
@@ -1648,7 +1648,7 @@
                                                         {
                                                             "type": "basic",
                                                             "name": "Label",
-                                                            "props": { "className": "text-xs text-gray-500 dark:text-gray-400 w-16 flex-shrink-0" },
+                                                            "props": { "className": "text-tertiary w-16 flex-shrink-0" },
                                                             "text": "$t:sirsoft-pay_kginicis.admin.cash_receipt_number_label"
                                                         },
                                                         {

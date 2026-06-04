@@ -150,7 +150,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.test_mode"
                                                     },
@@ -158,7 +158,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.test_mode_hint"
                                                     }
@@ -254,7 +254,7 @@
                                         "type": "basic",
                                         "name": "P",
                                         "props": {
-                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                            "className": "form-hint"
                                         },
                                         "text": "$t:sirsoft-pay_kginicis.settings.section_live_keys_hint"
                                     }
@@ -286,7 +286,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.live_mid"
                                                     },
@@ -294,7 +294,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.live_mid_hint"
                                                     }
@@ -338,7 +338,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1.5 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "mt-1.5 text-tertiary"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.live_mid_example"
                                                     }
@@ -365,7 +365,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.live_sign_key"
                                                     },
@@ -373,7 +373,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.live_sign_key_hint"
                                                     }
@@ -448,7 +448,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.live_iniapi_key"
                                                     },
@@ -456,7 +456,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.live_iniapi_key_hint"
                                                     }
@@ -531,7 +531,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.live_iniapi_iv"
                                                     },
@@ -539,7 +539,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.live_iniapi_iv_hint"
                                                     }
@@ -614,7 +614,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.live_mobile_hash_key"
                                                     },
@@ -622,7 +622,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.live_mobile_hash_key_hint"
                                                     }
@@ -711,7 +711,7 @@
                                         "type": "basic",
                                         "name": "P",
                                         "props": {
-                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                            "className": "form-hint"
                                         },
                                         "text": "$t:sirsoft-pay_kginicis.settings.section_easy_pay_hint"
                                     }
@@ -739,7 +739,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_allow_with_other_pg"
                                                     },
@@ -747,7 +747,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_allow_with_other_pg_hint"
                                                     }
@@ -777,7 +777,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_naverpay"
                                                     },
@@ -785,7 +785,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_naverpay_hint"
                                                     }
@@ -815,7 +815,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_samsung_pay"
                                                     },
@@ -823,7 +823,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_samsung_pay_hint"
                                                     }
@@ -853,7 +853,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_lpay"
                                                     },
@@ -861,7 +861,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_lpay_hint"
                                                     }
@@ -891,7 +891,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.easy_pay_kakaopay"
                                                     },
@@ -958,7 +958,7 @@
                                                 "type": "basic",
                                                 "name": "Label",
                                                 "props": {
-                                                    "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                    "className": "form-label"
                                                 },
                                                 "text": "$t:sirsoft-pay_kginicis.settings.use_credit_point"
                                             },
@@ -966,7 +966,7 @@
                                                 "type": "basic",
                                                 "name": "P",
                                                 "props": {
-                                                    "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                    "className": "form-hint"
                                                 },
                                                 "text": "$t:sirsoft-pay_kginicis.settings.use_credit_point_hint"
                                             }
@@ -1010,7 +1010,7 @@
                                         "type": "basic",
                                         "name": "P",
                                         "props": {
-                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                            "className": "form-hint"
                                         },
                                         "text": "$t:sirsoft-pay_kginicis.settings.section_japan_hint"
                                     }
@@ -1039,7 +1039,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.japan_enabled"
                                                     },
@@ -1047,7 +1047,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.japan_enabled_hint"
                                                     }
@@ -1637,7 +1637,7 @@
                                                                 "type": "basic",
                                                                 "name": "Label",
                                                                 "props": {
-                                                                    "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                                    "className": "form-label"
                                                                 },
                                                                 "text": "$t:sirsoft-pay_kginicis.settings.live_japan_mid"
                                                             },
@@ -1645,7 +1645,7 @@
                                                                 "type": "basic",
                                                                 "name": "P",
                                                                 "props": {
-                                                                    "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                                    "className": "form-hint"
                                                                 },
                                                                 "text": "$t:sirsoft-pay_kginicis.settings.live_japan_mid_hint"
                                                             }
@@ -1691,7 +1691,7 @@
                                                                 "type": "basic",
                                                                 "name": "Label",
                                                                 "props": {
-                                                                    "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                                    "className": "form-label"
                                                                 },
                                                                 "text": "$t:sirsoft-pay_kginicis.settings.live_japan_cbt_key"
                                                             },
@@ -1699,7 +1699,7 @@
                                                                 "type": "basic",
                                                                 "name": "P",
                                                                 "props": {
-                                                                    "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                                    "className": "form-hint"
                                                                 },
                                                                 "text": "$t:sirsoft-pay_kginicis.settings.live_japan_cbt_key_hint"
                                                             }
@@ -1750,7 +1750,7 @@
                                                                 "type": "basic",
                                                                 "name": "P",
                                                                 "props": {
-                                                                    "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                                    "className": "form-hint"
                                                                 },
                                                                 "text": "$t:sirsoft-pay_kginicis.settings.jppg_merchant_info_hint"
                                                             }
@@ -1864,7 +1864,7 @@
                                         "type": "basic",
                                         "name": "P",
                                         "props": {
-                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                            "className": "form-hint"
                                         },
                                         "text": "$t:sirsoft-pay_kginicis.settings.section_escrow_hint"
                                     }
@@ -1893,7 +1893,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.use_escrow"
                                                     },
@@ -1901,7 +1901,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.use_escrow_hint"
                                                     }
@@ -1971,7 +1971,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.redirect_success_url"
                                                     },
@@ -1979,7 +1979,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.redirect_success_url_hint"
                                                     }
@@ -2025,7 +2025,7 @@
                                                         "type": "basic",
                                                         "name": "Label",
                                                         "props": {
-                                                            "className": "block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                            "className": "form-label"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.redirect_fail_url"
                                                     },
@@ -2033,7 +2033,7 @@
                                                         "type": "basic",
                                                         "name": "P",
                                                         "props": {
-                                                            "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                            "className": "form-hint"
                                                         },
                                                         "text": "$t:sirsoft-pay_kginicis.settings.redirect_fail_url_hint"
                                                     }
@@ -2121,7 +2121,7 @@
                                                 "type": "basic",
                                                 "name": "P",
                                                 "props": {
-                                                    "className": "text-sm text-gray-600 dark:text-gray-400 mb-2"
+                                                    "className": "text-label mb-2"
                                                 },
                                                 "text": "$t:sirsoft-pay_kginicis.settings.vbank_notify_hint"
                                             },
