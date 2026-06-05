@@ -101,6 +101,31 @@ class UserReceiptControllerTest extends PluginTestCase
             ->assertJsonPath('embedded_pg_provider_label', null);
     }
 
+    public function test_receipt_response_allows_sanctum_bearer_token(): void
+    {
+        $this->mockPluginSettings();
+        $user = User::factory()->create();
+        $order = OrderFactory::new()->create([
+            'user_id' => $user->id,
+            'order_number' => 'ORD-BEARER-RECEIPT-' . random_int(10000, 99999),
+            'order_status' => OrderStatusEnum::PAYMENT_COMPLETE,
+            'total_amount' => 1000,
+            'total_due_amount' => 0,
+            'total_paid_amount' => 1000,
+            'paid_at' => now(),
+        ]);
+
+        $this->createKginicisPayment($order, 'StdpayCARDINIpayTest20260605110631608277');
+
+        $token = $user->createToken('kginicis-receipt-test')->plainTextToken;
+
+        $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson("/api/plugins/sirsoft-pay_kginicis/user/orders/{$order->order_number}/receipt")
+            ->assertOk()
+            ->assertJsonPath('receipt_type', 'inicis_receipt')
+            ->assertJsonPath('payment_method_label', '신용카드');
+    }
+
     public function test_cbt_receipt_response_returns_internal_confirmation_data_without_inicis_receipt_url(): void
     {
         $this->mockPluginSettings();

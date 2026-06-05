@@ -91,15 +91,18 @@ function patchPaymentMethodDisplay(displayLabel: string | null | undefined): boo
 async function injectOnOrderComplete(orderNumber: string): Promise<void> {
     if (document.getElementById(BTN_ID)) return;
 
-    const payment = await fetchPayment(orderNumber);
-    if (!payment || payment.pg_provider !== 'kginicis') return;
-    if (!payment.transaction_id) return;
-
     const receiptInfo = await fetchKginicisReceiptInfo(orderNumber);
-    const isPaid = payment.payment_status === 'paid';
-    const isCbtConfirmation = receiptInfo?.receipt_type === 'cbt_confirmation';
-    if (!isPaid && !isCbtConfirmation) return;
     if (!canOpenKginicisReceipt(receiptInfo)) return;
+
+    const payment = await fetchPayment(orderNumber);
+    if (payment) {
+        if (payment.pg_provider !== 'kginicis') return;
+        if (!payment.transaction_id) return;
+
+        const isPaid = payment.payment_status === 'paid';
+        const isCbtConfirmation = receiptInfo.receipt_type === 'cbt_confirmation';
+        if (!isPaid && !isCbtConfirmation) return;
+    }
 
     patchPaymentMethodDisplay(receiptInfo.payment_method_display_label);
 
