@@ -10,10 +10,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Modules\Sirsoft\Ecommerce\Services\GuestOrderAuthService;
+use Plugins\Sirsoft\PayKginicis\Concerns\IssuesReceiptCookie;
 use Plugins\Sirsoft\PayKginicis\Concerns\ResolvesEasyPaySelection;
 
 class UserReceiptController
 {
+    use IssuesReceiptCookie;
     use ResolvesEasyPaySelection;
 
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
@@ -47,14 +49,24 @@ class UserReceiptController
         if (Auth::check()) {
             $query->where('o.user_id', Auth::id());
         } else {
+            // 1차: X-Guest-Order-Token 헤더 (코어 globalHeaders 또는 명시 헤더)
             $token = $request->header('X-Guest-Order-Token');
             $order = $this->guestOrderAuthService->verifyToken($token, $orderNumber);
 
+            // 2차 폴백: 결제 완료 직후 PG callback 이 발급한 단기 영수증 쿠키.
+            // sessionStorage 토큰이 없거나 브라우저 캐시가 stale 한 환경에서도 5분간 동작.
             if (! $order) {
-                return response()->json(['error' => 'Not found'], 404);
+                $cookieValue = $request->cookie(self::RECEIPT_COOKIE_NAME);
+                if ($this->verifyReceiptCookie($cookieValue, $orderNumber)) {
+                    $query->where('o.id', function ($sub) use ($orderNumber) {
+                        $sub->select('id')->from('ecommerce_orders')->where('order_number', $orderNumber);
+                    });
+                } else {
+                    return response()->json(['error' => 'Not found'], 404);
+                }
+            } else {
+                $query->whereNull('o.user_id')->where('o.id', $order->id);
             }
-
-            $query->whereNull('o.user_id')->where('o.id', $order->id);
         }
 
         $payment = $query

@@ -41,6 +41,7 @@ abstract class PluginTestCase extends TestCase
         $this->registerPluginAutoload();
 
         $this->app->register(\Modules\Sirsoft\Ecommerce\Providers\EcommerceServiceProvider::class);
+        $this->app->register(\Plugins\Sirsoft\PayKginicis\Providers\PayKginicisServiceProvider::class);
 
         $this->registerModuleRoutes();
         $this->registerPluginRoutes();

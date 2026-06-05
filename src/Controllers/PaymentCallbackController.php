@@ -15,6 +15,7 @@ use Modules\Sirsoft\Ecommerce\Exceptions\PaymentAmountMismatchException;
 use Modules\Sirsoft\Ecommerce\Helpers\DeviceDetector;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
+use Plugins\Sirsoft\PayKginicis\Concerns\IssuesReceiptCookie;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
 use Plugins\Sirsoft\PayKginicis\Concerns\ResolvesEasyPaySelection;
 use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
@@ -32,6 +33,7 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
  */
 class PaymentCallbackController
 {
+    use IssuesReceiptCookie;
     use PreventsReplayCallback;
     use ResolvesEasyPaySelection;
     use SanitizesPgResponse;
@@ -256,6 +258,7 @@ class PaymentCallbackController
             // 가상계좌: completePayment 없이 계좌 정보만 저장 (입금 통보 시 completePayment)
             if (($pgResponse['payMethod'] ?? '') === 'VBank') {
                 $this->handleVbankIssued($order, $pgResponse, $tid, $request);
+                $this->queueReceiptCookie($moid);
 
                 return redirect($this->resolveSuccessUrl($moid));
             }
@@ -263,6 +266,7 @@ class PaymentCallbackController
             // Replay 가드: 동일 tid 가 이미 paid 상태면 중복 처리하지 않고 성공 페이지로 복귀
             if ($this->wasAlreadyPaid($tid)) {
                 $this->logReplayDetected($tid, $moid, 'PC authCallback (card)');
+                $this->queueReceiptCookie($moid);
 
                 return redirect($this->resolveSuccessUrl($moid));
             }
@@ -303,6 +307,7 @@ class PaymentCallbackController
             ], $totPrice);
 
             $order->payment()->update(['pg_provider' => 'kginicis']);
+            $this->queueReceiptCookie($moid);
 
             return redirect($this->resolveSuccessUrl($moid));
 
