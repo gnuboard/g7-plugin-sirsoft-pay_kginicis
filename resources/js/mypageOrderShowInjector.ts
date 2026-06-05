@@ -11,7 +11,9 @@ const PLUGIN_ID = 'sirsoft-pay_kginicis';
 const FLAG = '__kginicisOrderShowInjectorInstalled';
 const ROW_ID = 'kginicis-mp-receipt-row';
 
-const ORDER_SHOW_RE = /^\/mypage\/orders\/([^/]+)$/;
+// 회원 마이페이지(/mypage/orders/{N}) + 비회원 주문 상세(/shop/guest/orders/{N}) 두 URL 매칭.
+// 두 페이지가 동일 _payment.json partial 을 공유하므로 DOM 구조도 동일 — 같은 injector 가 양쪽 처리.
+const ORDER_SHOW_RE = /^(?:\/mypage\/orders\/([^/]+)|\/shop\/guest\/orders\/([^/]+))$/;
 
 interface Payment {
     pg_provider?: string;
@@ -164,7 +166,11 @@ function startPolling(orderNumber: string): void {
 
 function onRouteChange(): void {
     const match = location.pathname.match(ORDER_SHOW_RE);
-    if (match) startPolling(match[1]);
+    if (match) {
+        // 회원 그룹(match[1]) 또는 비회원 그룹(match[2]) 중 한 쪽이 채워진다.
+        const orderNumber = match[1] ?? match[2];
+        if (orderNumber) startPolling(orderNumber);
+    }
 }
 
 export function installMypageOrderShowInjector(): void {
