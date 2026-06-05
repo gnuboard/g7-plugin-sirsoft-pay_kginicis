@@ -46,10 +46,11 @@ Route::post('/payment/cbt/hash-data', [CbtHashDataController::class, 'generate']
 Route::post('/payment/mobile/signature', [MobileSignatureController::class, 'generate'])
     ->name('payment.mobile.signature');
 
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::get('/user/orders/{orderNumber}/receipt', [UserReceiptController::class, 'show'])
-        ->name('user.orders.receipt');
-});
+// 영수증 조회 — 회원/비회원 공유 (컨트롤러 내부 분기).
+// 회원: Auth::id() 매칭, 비회원: X-Guest-Order-Token 으로 GuestOrderAuthService 검증
+// (코어 PublicOrderController::showByOrderNumber 와 동일 패턴).
+Route::get('/user/orders/{orderNumber}/receipt', [UserReceiptController::class, 'show'])
+    ->name('user.orders.receipt');
 
 Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->group(function () {
     // 가상계좌 입금통보 URL 조회 (관리자 설정 페이지 표시용)

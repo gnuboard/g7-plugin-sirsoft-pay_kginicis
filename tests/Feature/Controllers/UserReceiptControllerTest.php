@@ -4,11 +4,13 @@ namespace Plugins\Sirsoft\PayKginicis\Tests\Feature\Controllers;
 
 use App\Models\User;
 use App\Services\PluginSettingsService;
+use Illuminate\Support\Facades\Hash;
 use Modules\Sirsoft\Ecommerce\Database\Factories\OrderFactory;
 use Modules\Sirsoft\Ecommerce\Database\Factories\OrderPaymentFactory;
 use Modules\Sirsoft\Ecommerce\Enums\OrderStatusEnum;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentMethodEnum;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
+use Modules\Sirsoft\Ecommerce\Services\GuestOrderAuthService;
 use Plugins\Sirsoft\PayKginicis\Tests\PluginTestCase;
 
 class UserReceiptControllerTest extends PluginTestCase
@@ -223,6 +225,117 @@ class UserReceiptControllerTest extends PluginTestCase
             ->assertJsonFragment(['label' => '입금 마감일시', 'value' => '2026-05-27 23:59:59'])
             ->assertJsonMissing(['label' => 'CBT MID', 'value' => 'CBTTEST001'])
             ->assertJsonMissing(['label' => 'SID', 'value' => 'CBTTEST00120260522M280RzeXo']);
+    }
+
+    public function test_guest_receipt_requires_valid_token(): void
+    {
+        $this->mockPluginSettings();
+        $order = $this->createGuestOrder();
+        $this->createKginicisPayment($order, 'StdpayCARDINIpayTest20260605110631608277');
+
+        // 토큰 헤더 없음 → 404
+        $this->getJson("/api/plugins/sirsoft-pay_kginicis/user/orders/{$order->order_number}/receipt")
+            ->assertNotFound();
+
+        // 변조 토큰 → 404
+        $this->withHeader('X-Guest-Order-Token', (time() + 1800) . '|' . str_repeat('0', 64))
+            ->getJson("/api/plugins/sirsoft-pay_kginicis/user/orders/{$order->order_number}/receipt")
+            ->assertNotFound();
+    }
+
+    public function test_guest_receipt_returns_inicis_receipt_url_with_valid_token(): void
+    {
+        $this->mockPluginSettings();
+        $order = $this->createGuestOrder();
+        $this->createKginicisPayment($order, 'StdpayCARDINIpayTest20260605110631608277');
+
+        $token = $this->issueGuestToken($order);
+
+        $this->withHeader('X-Guest-Order-Token', $token)
+            ->getJson("/api/plugins/sirsoft-pay_kginicis/user/orders/{$order->order_number}/receipt")
+            ->assertOk()
+            ->assertJsonPath('receipt_type', 'inicis_receipt')
+            ->assertJsonPath('receipt_url', 'https://iniweb.inicis.com/DefaultWebApp/mall/cr/cm/mCmReceipt_head.jsp?noTid=StdpayCARDINIpayTest20260605110631608277&noMethod=1')
+            ->assertJsonPath('payment_method_label', '신용카드');
+    }
+
+    public function test_guest_token_for_other_order_cannot_access_receipt(): void
+    {
+        $this->mockPluginSettings();
+        $order1 = $this->createGuestOrder();
+        $order2 = $this->createGuestOrder();
+        $this->createKginicisPayment($order1, 'StdpayCARDINIpayTest20260605110631608277');
+        $this->createKginicisPayment($order2, 'StdpayCARDINIpayTest20260605110631608278');
+
+        // order1 토큰을 들고 order2 영수증 조회 → 404 (cross-order token reuse 차단)
+        $token1 = $this->issueGuestToken($order1);
+
+        $this->withHeader('X-Guest-Order-Token', $token1)
+            ->getJson("/api/plugins/sirsoft-pay_kginicis/user/orders/{$order2->order_number}/receipt")
+            ->assertNotFound();
+    }
+
+    public function test_authenticated_user_cannot_access_guest_order_receipt_via_token(): void
+    {
+        $this->mockPluginSettings();
+        $user = User::factory()->create();
+        $order = $this->createGuestOrder();
+        $this->createKginicisPayment($order, 'StdpayCARDINIpayTest20260605110631608277');
+
+        // 회원이 로그인된 상태에서 비회원 토큰을 헤더에 들고 접근 → 회원 분기로 user_id 매칭 실패 404
+        $token = $this->issueGuestToken($order);
+
+        $this->actingAs($user)
+            ->withHeader('X-Guest-Order-Token', $token)
+            ->getJson("/api/plugins/sirsoft-pay_kginicis/user/orders/{$order->order_number}/receipt")
+            ->assertNotFound();
+    }
+
+    private function createGuestOrder()
+    {
+        return OrderFactory::new()->create([
+            'user_id' => null,
+            'guest_lookup_password_hash' => Hash::make('test1234'),
+            'order_number' => 'ORD-GUEST-RECEIPT-' . random_int(10000, 99999),
+            'order_status' => OrderStatusEnum::PAYMENT_COMPLETE,
+            'total_amount' => 1000,
+            'total_due_amount' => 0,
+            'total_paid_amount' => 1000,
+            'paid_at' => now(),
+        ]);
+    }
+
+    private function createKginicisPayment($order, string $transactionId): void
+    {
+        OrderPaymentFactory::new()->create([
+            'order_id' => $order->id,
+            'payment_status' => PaymentStatusEnum::PAID,
+            'payment_method' => PaymentMethodEnum::CARD,
+            'pg_provider' => 'kginicis',
+            'transaction_id' => $transactionId,
+            'paid_amount_local' => 1000,
+            'payment_meta' => ['pay_method' => 'Card'],
+        ]);
+    }
+
+    /**
+     * 전화번호 매칭(shipping_address 필요)을 우회하고 토큰을 직접 발급한다.
+     * 컨트롤러의 토큰 검증 분기만 검증하기 위해 sign() private API 를 reflection 으로 호출.
+     */
+    private function issueGuestToken($order): string
+    {
+        $svc = app(GuestOrderAuthService::class);
+        $rc = new \ReflectionClass($svc);
+        $signMethod = $rc->getMethod('sign');
+        $signMethod->setAccessible(true);
+        $suffixMethod = $rc->getMethod('passwordHashSuffix');
+        $suffixMethod->setAccessible(true);
+
+        $expiresTs = time() + 1800;
+        $suffix = $suffixMethod->invoke($svc, $order);
+        $sig = $signMethod->invoke($svc, $order->order_number, (int) $order->id, $expiresTs, $suffix);
+
+        return $expiresTs . '|' . $sig;
     }
 
     private function mockPluginSettings(): void

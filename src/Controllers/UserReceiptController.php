@@ -7,7 +7,9 @@ namespace Plugins\Sirsoft\PayKginicis\Controllers;
 use App\Services\PluginSettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Modules\Sirsoft\Ecommerce\Services\GuestOrderAuthService;
 use Plugins\Sirsoft\PayKginicis\Concerns\ResolvesEasyPaySelection;
 
 class UserReceiptController
@@ -21,10 +23,15 @@ class UserReceiptController
 
     public function __construct(
         private readonly PluginSettingsService $pluginSettingsService,
+        private readonly GuestOrderAuthService $guestOrderAuthService,
     ) {}
 
     /**
      * show
+     *
+     * 회원/비회원 공유 영수증 조회. 코어 OrderController::showByOrderNumber 와 동일한
+     * 회원 우선 분기 — Auth::check() 일 때는 본인 회원 주문만, 비로그인일 때는
+     * X-Guest-Order-Token 으로 비회원 주문 매칭. 실패 사유는 모두 404 로 통일.
      *
      * @param  Request  $request
      * @param  string  $orderNumber
@@ -32,13 +39,25 @@ class UserReceiptController
      */
     public function show(Request $request, string $orderNumber): JsonResponse
     {
-        $user = $request->user();
-
-        $payment = DB::table('ecommerce_order_payments as p')
+        $query = DB::table('ecommerce_order_payments as p')
             ->join('ecommerce_orders as o', 'o.id', '=', 'p.order_id')
             ->where('o.order_number', $orderNumber)
-            ->where('o.user_id', $user->id)
-            ->where('p.pg_provider', 'kginicis')
+            ->where('p.pg_provider', 'kginicis');
+
+        if (Auth::check()) {
+            $query->where('o.user_id', Auth::id());
+        } else {
+            $token = $request->header('X-Guest-Order-Token');
+            $order = $this->guestOrderAuthService->verifyToken($token, $orderNumber);
+
+            if (! $order) {
+                return response()->json(['error' => 'Not found'], 404);
+            }
+
+            $query->whereNull('o.user_id')->where('o.id', $order->id);
+        }
+
+        $payment = $query
             ->select([
                 'o.order_number',
                 'o.currency as order_currency',
