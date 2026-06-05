@@ -33,12 +33,25 @@ function getGuestOrderToken(): string | null {
     return typeof globalToken === 'string' && globalToken !== '' ? globalToken : null;
 }
 
+async function requestKginicisReceiptInfo(
+    orderNumber: string,
+    headers: Record<string, string>,
+): Promise<{ status: number; data: KginicisReceiptInfo | null }> {
+    try {
+        const res = await fetch(`/api/plugins/${PLUGIN_ID}/user/orders/${orderNumber}/receipt`, {
+            headers,
+            credentials: 'same-origin',
+        });
+        if (!res.ok) return { status: res.status, data: null };
+        return { status: res.status, data: (await res.json()) as KginicisReceiptInfo };
+    } catch {
+        return { status: 0, data: null };
+    }
+}
+
 export async function fetchKginicisReceiptInfo(orderNumber: string): Promise<KginicisReceiptInfo | null> {
     const authToken = getAuthToken();
     const guestToken = getGuestOrderToken();
-
-    // 회원 sanctum 토큰 또는 비회원 주문 조회 토큰 중 하나는 있어야 호출 가능.
-    if (!authToken && !guestToken) return null;
 
     const headers: Record<string, string> = { Accept: 'application/json' };
     if (authToken) {
@@ -48,13 +61,19 @@ export async function fetchKginicisReceiptInfo(orderNumber: string): Promise<Kgi
         headers['X-Guest-Order-Token'] = guestToken;
     }
 
-    try {
-        const res = await fetch(`/api/plugins/${PLUGIN_ID}/user/orders/${orderNumber}/receipt`, { headers });
-        if (!res.ok) return null;
-        return (await res.json()) as KginicisReceiptInfo;
-    } catch {
-        return null;
+    const first = await requestKginicisReceiptInfo(orderNumber, headers);
+    if (first.data || first.status !== 401 || !authToken) {
+        return first.data;
     }
+
+    // 오래된 localStorage 토큰이 남아 401 이 난 경우 비회원 주문 토큰 또는
+    // PG callback 이 발급한 HttpOnly receipt cookie 경로로 한 번 더 시도한다.
+    const fallbackHeaders: Record<string, string> = { Accept: 'application/json' };
+    if (guestToken) {
+        fallbackHeaders['X-Guest-Order-Token'] = guestToken;
+    }
+
+    return (await requestKginicisReceiptInfo(orderNumber, fallbackHeaders)).data;
 }
 
 export function canOpenKginicisReceipt(

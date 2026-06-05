@@ -50,6 +50,7 @@ Route::post('/payment/mobile/signature', [MobileSignatureController::class, 'gen
 // 회원: Auth::id() 매칭, 비회원: X-Guest-Order-Token 으로 GuestOrderAuthService 검증
 // (코어 PublicOrderController::showByOrderNumber 와 동일 패턴).
 Route::get('/user/orders/{orderNumber}/receipt', [UserReceiptController::class, 'show'])
+    ->middleware('optional.sanctum')
     ->name('user.orders.receipt');
 
 Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->group(function () {

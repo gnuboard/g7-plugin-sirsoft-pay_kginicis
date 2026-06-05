@@ -15,6 +15,8 @@ const ROW_ID = 'kginicis-mp-receipt-row';
 // 두 페이지가 동일 _payment.json partial 을 공유하므로 DOM 구조도 동일 — 같은 injector 가 양쪽 처리.
 const ORDER_SHOW_RE = /^(?:\/mypage\/orders\/([^/]+)|\/shop\/guest\/orders\/([^/]+))$/;
 
+const activePolls = new Map<string, number>();
+
 interface Payment {
     pg_provider?: string;
     payment_status?: string;
@@ -50,7 +52,10 @@ function findPaymentContainer(): Element | null {
     }
 
     const h3 = Array.from(document.querySelectorAll<HTMLElement>('h3')).find(
-        el => el.textContent?.includes('결제 정보'),
+        el => {
+            const text = el.textContent?.trim() ?? '';
+            return text.includes('결제 정보') || /^Payment Information$/i.test(text);
+        },
     );
     if (!h3) return null;
 
@@ -71,7 +76,7 @@ export function patchMypagePaymentMethodDisplay(container: Element, displayLabel
         if (spans.length < 2) continue;
 
         const label = spans[0].textContent?.trim();
-        if (label !== '결제 방법' && label !== '결제수단') continue;
+        if (label !== '결제 방법' && label !== '결제수단' && label !== 'Payment Method') continue;
 
         const value = spans[spans.length - 1];
         if (value.textContent?.trim() === displayLabel) {
@@ -123,19 +128,20 @@ function buildReceiptRow(orderNumber: string, receiptInfo: KginicisReceiptInfo):
 
 async function tryInject(orderNumber: string): Promise<boolean> {
     const orderData = getOrderFromState(orderNumber);
-    if (!orderData) return false;
-
-    const { payment } = orderData;
-    if (!payment || payment.pg_provider !== 'kginicis') return true;
-    if (!payment.transaction_id) return true;
+    const payment = orderData?.payment;
+    if (payment) {
+        if (payment.pg_provider !== 'kginicis') return true;
+        if (!payment.transaction_id) return true;
+    }
 
     const container = findPaymentContainer();
     if (!container) return false;
 
     const paymentInfo = await fetchKginicisReceiptInfo(orderNumber);
-    const isPaid = payment.payment_status === 'paid';
+    const isPaid = payment?.payment_status === 'paid';
     const isCbtConfirmation = paymentInfo?.receipt_type === 'cbt_confirmation';
-    if (!isPaid && !isCbtConfirmation) return true;
+    if (payment && !isPaid && !isCbtConfirmation) return true;
+    if (!payment && !canOpenKginicisReceipt(paymentInfo)) return false;
 
     const patched = patchMypagePaymentMethodDisplay(
         container,
@@ -155,13 +161,19 @@ async function tryInject(orderNumber: string): Promise<boolean> {
 }
 
 function startPolling(orderNumber: string): void {
+    if (activePolls.has(orderNumber)) return;
+
     let attempts = 0;
-    const id = setInterval(() => {
+    const id = window.setInterval(() => {
         attempts++;
         void tryInject(orderNumber).then(done => {
-            if (done || attempts >= 30) clearInterval(id);
+            if (done || attempts >= 30) {
+                window.clearInterval(id);
+                activePolls.delete(orderNumber);
+            }
         });
     }, 400);
+    activePolls.set(orderNumber, id);
 }
 
 function onRouteChange(): void {
@@ -181,7 +193,16 @@ export function installMypageOrderShowInjector(): void {
 
     console.info(`[${PLUGIN_ID}] mypage order show injector installed`);
 
-    const schedule = (delay = 1500) => setTimeout(onRouteChange, delay);
+    let pendingRouteCheck: number | null = null;
+    const schedule = (delay = 1500) => {
+        if (pendingRouteCheck !== null) {
+            window.clearTimeout(pendingRouteCheck);
+        }
+        pendingRouteCheck = window.setTimeout(() => {
+            pendingRouteCheck = null;
+            onRouteChange();
+        }, delay);
+    };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => schedule());
@@ -194,5 +215,16 @@ export function installMypageOrderShowInjector(): void {
         origPush(...args);
         schedule(600);
     };
+    const origReplace = history.replaceState.bind(history);
+    history.replaceState = (...args: Parameters<typeof history.replaceState>) => {
+        origReplace(...args);
+        schedule(600);
+    };
     window.addEventListener('popstate', () => schedule(500));
+
+    const observeTarget = document.getElementById('app') ?? document.body;
+    const observer = new MutationObserver(() => {
+        if (ORDER_SHOW_RE.test(location.pathname)) schedule(250);
+    });
+    observer.observe(observeTarget, { childList: true, subtree: true });
 }
