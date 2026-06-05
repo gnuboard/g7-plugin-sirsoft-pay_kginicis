@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
+use Plugins\Sirsoft\PayKginicis\Concerns\IssuesReceiptCookie;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
 use Plugins\Sirsoft\PayKginicis\Http\Requests\CbtCallbackRequest;
 use Plugins\Sirsoft\PayKginicis\Services\CbtReconciliationService;
@@ -27,6 +28,7 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
  */
 class CbtCallbackController
 {
+    use IssuesReceiptCookie;
     use PreventsReplayCallback;
 
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
@@ -211,6 +213,7 @@ class CbtCallbackController
             // Replay 가드: 동일 tid 가 이미 paid 상태면 중복 처리하지 않고 성공 페이지로 복귀
             if ($this->wasAlreadyPaid($tid)) {
                 $this->logReplayDetected($tid, $oid, 'CBT authCallback');
+                $this->queueReceiptCookie($oid);
 
                 return redirect($this->resolveSuccessUrl($oid));
             }
@@ -230,6 +233,7 @@ class CbtCallbackController
 
             if ($this->isCbtCvsPayMethod($payMethod)) {
                 $this->handleCbtCvsIssued($order, $pgResponse, $tid, $sid, $approvedAmount, $authResponse, $approveResponse, $selectedPaymentMethod);
+                $this->queueReceiptCookie($oid);
 
                 Log::info('KG Inicis CBT: CVS payment issued', ['oid' => $oid, 'tid' => $tid]);
 
@@ -256,6 +260,8 @@ class CbtCallbackController
                     'pg_raw_response' => $approveResponse,
                 ], $selectionMeta),
             ], $approvedAmount);
+
+            $this->queueReceiptCookie($oid);
 
             Log::info('KG Inicis CBT: payment completed', ['oid' => $oid, 'tid' => $tid]);
 

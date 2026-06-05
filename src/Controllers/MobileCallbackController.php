@@ -11,6 +11,7 @@ use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Exceptions\PaymentAmountMismatchException;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
+use Plugins\Sirsoft\PayKginicis\Concerns\IssuesReceiptCookie;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
 use Plugins\Sirsoft\PayKginicis\Concerns\ResolvesEasyPaySelection;
 use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
@@ -28,6 +29,7 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
  */
 class MobileCallbackController
 {
+    use IssuesReceiptCookie;
     use PreventsReplayCallback;
     use ResolvesEasyPaySelection;
     use SanitizesPgResponse;
@@ -208,6 +210,7 @@ class MobileCallbackController
             // 가상계좌: completePayment 없이 발급 정보만 저장 (입금 통보 시점에 completePayment)
             if (strcasecmp($payType, 'VBank') === 0) {
                 $this->handleVbankIssued($order, $result, $tid);
+                $this->queueReceiptCookie($moid);
 
                 return redirect($this->resolveSuccessUrl($moid));
             }
@@ -215,6 +218,7 @@ class MobileCallbackController
             // Replay 가드: 동일 tid 가 이미 paid 상태면 중복 처리하지 않고 성공 페이지로 복귀
             if ($this->wasAlreadyPaid($tid)) {
                 $this->logReplayDetected($tid, $moid, 'mobile authCallback (card)');
+                $this->queueReceiptCookie($moid);
 
                 return redirect($this->resolveSuccessUrl($moid));
             }
@@ -253,6 +257,7 @@ class MobileCallbackController
             ], $totPrice);
 
             $order->payment()->update(['pg_provider' => 'kginicis']);
+            $this->queueReceiptCookie($moid);
 
             return redirect($this->resolveSuccessUrl($moid));
 

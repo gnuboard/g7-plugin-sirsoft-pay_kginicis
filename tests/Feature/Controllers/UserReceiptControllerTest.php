@@ -4,6 +4,7 @@ namespace Plugins\Sirsoft\PayKginicis\Tests\Feature\Controllers;
 
 use App\Models\User;
 use App\Services\PluginSettingsService;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Support\Facades\Hash;
 use Modules\Sirsoft\Ecommerce\Database\Factories\OrderFactory;
 use Modules\Sirsoft\Ecommerce\Database\Factories\OrderPaymentFactory;
@@ -15,6 +16,15 @@ use Plugins\Sirsoft\PayKginicis\Tests\PluginTestCase;
 
 class UserReceiptControllerTest extends PluginTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // 영수증 cookie 가 EncryptCookies 미들웨어에서 폐기되지 않도록 명시 등록.
+        // production 에서는 PayKginicisServiceProvider::boot 가 동일하게 등록.
+        EncryptCookies::except(['kginicis_receipt_token']);
+    }
+
     public function test_receipt_response_includes_easy_pay_display_label(): void
     {
         $this->mockPluginSettings();
@@ -290,6 +300,7 @@ class UserReceiptControllerTest extends PluginTestCase
             ->getJson("/api/plugins/sirsoft-pay_kginicis/user/orders/{$order->order_number}/receipt")
             ->assertNotFound();
     }
+
 
     private function createGuestOrder()
     {
