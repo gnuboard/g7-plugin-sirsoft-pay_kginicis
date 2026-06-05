@@ -18,18 +18,40 @@ type Payment = {
     [key: string]: unknown;
 };
 
-function getToken(): string | null {
+function getAuthToken(): string | null {
     return localStorage.getItem('auth_token');
 }
 
+function getGuestOrderToken(): string | null {
+    // 코어 storageHandlers.initGuestOrderTokenHandler 가 sessionStorage 에 저장한 토큰.
+    // sessionStorage 미접근 환경(private/iframe) fallback 으로 _global.guestOrderToken 도 확인.
+    try {
+        const sessionToken = sessionStorage.getItem('g7_guest_order_token');
+        if (sessionToken) return sessionToken;
+    } catch {
+        // sessionStorage 접근 불가
+    }
+    const globalToken = (window as any).G7Core?.state?.get?.('_global')?.guestOrderToken;
+    return typeof globalToken === 'string' && globalToken !== '' ? globalToken : null;
+}
+
 async function fetchPayment(orderNumber: string): Promise<Payment | null> {
-    const token = getToken();
-    if (!token) return null;
+    const authToken = getAuthToken();
+    const guestToken = getGuestOrderToken();
+
+    // 회원 sanctum 토큰 또는 비회원 주문 조회 토큰 중 하나는 있어야 호출 가능.
+    if (!authToken && !guestToken) return null;
+
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+    } else if (guestToken) {
+        // 코어 PublicOrderController::showByOrderNumber 가 X-Guest-Order-Token 으로 비회원 주문 매칭.
+        headers['X-Guest-Order-Token'] = guestToken;
+    }
 
     try {
-        const res = await fetch(`/api/modules/sirsoft-ecommerce/user/orders/${orderNumber}`, {
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-        });
+        const res = await fetch(`/api/modules/sirsoft-ecommerce/user/orders/${orderNumber}`, { headers });
         if (!res.ok) return null;
         const data = (await res.json()) as { data?: { payment?: Payment } };
         return data?.data?.payment ?? null;
