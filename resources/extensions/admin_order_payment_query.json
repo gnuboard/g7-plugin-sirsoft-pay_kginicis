@@ -3,6 +3,7 @@
     "data_sources": [
         {
             "id": "kginicis_status",
+            "label_key": "$t:sirsoft-pay_kginicis.editor.data_source.kginicis_status",
             "type": "api",
             "endpoint": "/api/plugins/sirsoft-pay_kginicis/admin/orders/{{route.orderNumber}}/transaction-status",
             "method": "GET",
@@ -11,6 +12,7 @@
         },
         {
             "id": "kginicis_cbt_reconciliation",
+            "label_key": "$t:sirsoft-pay_kginicis.editor.data_source.kginicis_cbt_reconciliation",
             "type": "api",
             "endpoint": "/api/plugins/sirsoft-pay_kginicis/admin/orders/{{route.orderNumber}}/cbt-reconciliation",
             "method": "GET",
@@ -27,6 +29,7 @@
         },
         {
             "id": "kginicis_escrow_delivery",
+            "label_key": "$t:sirsoft-pay_kginicis.editor.data_source.kginicis_escrow_delivery",
             "type": "api",
             "endpoint": "/api/plugins/sirsoft-pay_kginicis/admin/orders/{{route.orderNumber}}/escrow-delivery",
             "method": "GET",
