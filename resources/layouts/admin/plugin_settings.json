@@ -139,7 +139,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "flex items-center justify-between"
+                                            "className": "flex-between"
                                         },
                                         "children": [
                                             {
@@ -728,7 +728,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "flex items-center justify-between px-6 py-4 bg-blue-50 dark:bg-blue-900/20"
+                                            "className": "flex-between px-6 py-4 bg-blue-50 dark:bg-blue-900/20"
                                         },
                                         "children": [
                                             {
@@ -1028,7 +1028,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "flex items-center justify-between"
+                                            "className": "flex-between"
                                         },
                                         "children": [
                                             {
@@ -1535,7 +1535,7 @@
                                                                             {
                                                                                 "type": "basic",
                                                                                 "name": "Div",
-                                                                                "props": { "className": "flex items-center justify-between" },
+                                                                                "props": { "className": "flex-between" },
                                                                                 "children": [
                                                                                     {
                                                                                         "type": "basic",
@@ -1882,7 +1882,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "flex items-center justify-between"
+                                            "className": "flex-between"
                                         },
                                         "children": [
                                             {
