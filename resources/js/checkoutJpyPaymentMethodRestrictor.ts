@@ -7,6 +7,7 @@ const CLIENT_CONFIG_PATH = '/api/modules/sirsoft-ecommerce/payments/client-confi
 const CHECKOUT_CURRENCY_KEY = '__sirsoftKginicisCheckoutCurrency';
 
 const ALLOWED_JPY_PAYMENT_METHODS = new Set(['card', 'kginicis_japan_paypay', 'kginicis_japan_cvs']);
+const JAPAN_ONLY_PAYMENT_METHODS = new Set(['kginicis_japan_paypay', 'kginicis_japan_cvs']);
 const KNOWN_PAYMENT_METHODS = new Set([
     'card',
     'vbank',
@@ -180,6 +181,12 @@ function shouldUseJpyRestriction(): boolean {
     return CHECKOUT_RE.test(window.location.pathname) && resolveCheckoutCurrency() === 'JPY';
 }
 
+function shouldHideJapanMethods(): boolean {
+    if (!CHECKOUT_RE.test(window.location.pathname)) return false;
+    const currency = resolveCheckoutCurrency();
+    return currency !== null && currency !== 'JPY';
+}
+
 async function fetchRestrictEnabled(fetchImpl: typeof fetch): Promise<boolean> {
     if (cachedRestrictEnabled !== null) return cachedRestrictEnabled;
 
@@ -220,6 +227,33 @@ export function restrictPaymentSettingsForJpy(body: PaymentSettingsBody): Paymen
                         ...method,
                         is_active: false,
                         _kginicis_restricted_for_jpy: true,
+                    };
+                }),
+            },
+        },
+    };
+}
+
+export function hideJapanPaymentMethodsForNonJpy(body: PaymentSettingsBody): PaymentSettingsBody {
+    const methods = body.data?.order_settings?.payment_methods;
+    if (!Array.isArray(methods)) return body;
+
+    return {
+        ...body,
+        data: {
+            ...body.data,
+            order_settings: {
+                ...body.data?.order_settings,
+                payment_methods: methods.map((method) => {
+                    const id = typeof method.id === 'string' ? method.id : '';
+                    if (!JAPAN_ONLY_PAYMENT_METHODS.has(id)) {
+                        return method;
+                    }
+
+                    return {
+                        ...method,
+                        is_active: false,
+                        _kginicis_restricted_for_non_jpy: true,
                     };
                 }),
             },
@@ -268,7 +302,9 @@ function inferButtonPaymentMethod(button: HTMLElement): string | null {
 }
 
 function patchRenderedPaymentButtons(): boolean {
-    if (!shouldUseJpyRestriction()) return false;
+    const isJpy = shouldUseJpyRestriction();
+    const isHideJapan = shouldHideJapanMethods();
+    if (!isJpy && !isHideJapan) return false;
 
     const container = findPaymentContainer();
     if (!container) return false;
@@ -278,7 +314,11 @@ function patchRenderedPaymentButtons(): boolean {
         const methodId = inferButtonPaymentMethod(button);
         if (!methodId || !KNOWN_PAYMENT_METHODS.has(methodId)) return;
 
-        if (ALLOWED_JPY_PAYMENT_METHODS.has(methodId)) {
+        const allowed = isJpy
+            ? ALLOWED_JPY_PAYMENT_METHODS.has(methodId)
+            : !JAPAN_ONLY_PAYMENT_METHODS.has(methodId);
+
+        if (allowed) {
             button.style.removeProperty('display');
             button.disabled = false;
             button.removeAttribute('aria-hidden');
@@ -288,7 +328,11 @@ function patchRenderedPaymentButtons(): boolean {
         button.style.display = 'none';
         button.disabled = true;
         button.setAttribute('aria-hidden', 'true');
-        button.dataset.kginicisRestrictedForJpy = 'true';
+        if (isJpy) {
+            button.dataset.kginicisRestrictedForJpy = 'true';
+        } else {
+            button.dataset.kginicisRestrictedForNonJpy = 'true';
+        }
         patched = true;
     });
 
@@ -297,7 +341,11 @@ function patchRenderedPaymentButtons(): boolean {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const local = ((window as any).G7Core)?.state?.getLocal?.();
             const current = local?.paymentMethod;
-            if (typeof current === 'string' && !ALLOWED_JPY_PAYMENT_METHODS.has(current)) {
+            const needsReset = typeof current === 'string' && (
+                (isJpy && !ALLOWED_JPY_PAYMENT_METHODS.has(current)) ||
+                (isHideJapan && JAPAN_ONLY_PAYMENT_METHODS.has(current))
+            );
+            if (needsReset) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 ((window as any).G7Core)?.state?.setLocal?.({ paymentMethod: 'card' });
             }
@@ -311,8 +359,11 @@ function patchRenderedPaymentButtons(): boolean {
 
 async function startDomPatchLoop(fetchImpl: typeof fetch): Promise<void> {
     if (!CHECKOUT_RE.test(window.location.pathname)) return;
-    if (!(await fetchRestrictEnabled(fetchImpl))) return;
-    if (!shouldUseJpyRestriction()) return;
+    const isJpy = shouldUseJpyRestriction();
+    const isHideJapan = shouldHideJapanMethods();
+    if (!isJpy && !isHideJapan) return;
+    // JPY 제한은 어드민 토글에 종속. 비-JPY 숨김은 항상 적용.
+    if (isJpy && !(await fetchRestrictEnabled(fetchImpl))) return;
 
     patchRenderedPaymentButtons();
 
@@ -382,14 +433,29 @@ export function installCheckoutJpyPaymentMethodRestrictor(): void {
             return response;
         }
 
-        if (!(await fetchRestrictEnabled(originalFetch)) || !shouldUseJpyRestriction()) {
+        const isJpy = shouldUseJpyRestriction();
+        const isHideJapan = shouldHideJapanMethods();
+        if (!isJpy && !isHideJapan) {
+            return response;
+        }
+
+        // JPY 제한(다른 결제수단 차단)은 어드민 토글에 종속되지만,
+        // 비-JPY 에서 일본 전용 결제수단 숨김은 항상 적용한다 (한국 등 비-JPY 사용자가
+        // PayPay/일본 편의점결제를 잘못 선택하는 UX 회귀를 막기 위함).
+        if (isJpy && !(await fetchRestrictEnabled(originalFetch))) {
             return response;
         }
 
         try {
             const body = (await response.clone().json()) as PaymentSettingsBody;
-            const restricted = restrictPaymentSettingsForJpy(body);
-            logger.info('restricted checkout payment methods for JPY order');
+            const restricted = isJpy
+                ? restrictPaymentSettingsForJpy(body)
+                : hideJapanPaymentMethodsForNonJpy(body);
+            logger.info(
+                isJpy
+                    ? 'restricted checkout payment methods for JPY order'
+                    : 'hid Japan-only payment methods for non-JPY order',
+            );
             return mutateResponse(response, restricted);
         } catch (error) {
             logger.warn('failed to restrict checkout payment methods', error);
