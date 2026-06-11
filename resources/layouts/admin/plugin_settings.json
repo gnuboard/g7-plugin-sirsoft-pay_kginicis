@@ -239,7 +239,7 @@
                                 "type": "basic",
                                 "name": "Div",
                                 "props": {
-                                    "className": "px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+                                    "className": "flex-start justify-between px-6 py-4"
                                 },
                                 "children": [
                                     {
@@ -768,7 +768,7 @@
                                 "type": "basic",
                                 "name": "Div",
                                 "props": {
-                                    "className": "px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+                                    "className": "flex-start justify-between px-6 py-4"
                                 },
                                 "children": [
                                     {
@@ -838,7 +838,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "flex items-start justify-between px-6 py-4"
+                                            "className": "panel-header-row"
                                         },
                                         "children": [
                                             {
@@ -876,7 +876,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "flex items-start justify-between px-6 py-4"
+                                            "className": "panel-header-row"
                                         },
                                         "children": [
                                             {
@@ -914,7 +914,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "flex items-start justify-between px-6 py-4"
+                                            "className": "panel-header-row"
                                         },
                                         "children": [
                                             {
@@ -952,7 +952,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "flex items-start justify-between px-6 py-4"
+                                            "className": "panel-header-row"
                                         },
                                         "children": [
                                             {
@@ -1002,7 +1002,7 @@
                                 "type": "basic",
                                 "name": "Div",
                                 "props": {
-                                    "className": "px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+                                    "className": "flex-start justify-between px-6 py-4"
                                 },
                                 "children": [
                                     {
@@ -1019,7 +1019,7 @@
                                 "type": "basic",
                                 "name": "Div",
                                 "props": {
-                                    "className": "flex items-start justify-between px-6 py-4"
+                                    "className": "panel-header-row"
                                 },
                                 "children": [
                                     {
@@ -1067,7 +1067,7 @@
                                 "type": "basic",
                                 "name": "Div",
                                 "props": {
-                                    "className": "px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+                                    "className": "flex-start justify-between px-6 py-4"
                                 },
                                 "children": [
                                     {
@@ -1194,7 +1194,7 @@
                                                         "type": "basic",
                                                         "name": "Div",
                                                         "props": {
-                                                            "className": "flex items-start gap-3 mb-3"
+                                                            "className": "flex-start gap-3 mb-3"
                                                         },
                                                         "children": [
                                                             {
@@ -1415,7 +1415,7 @@
                                                         "type": "basic",
                                                         "name": "Div",
                                                         "props": {
-                                                            "className": "flex items-start gap-3 mb-3"
+                                                            "className": "flex-start gap-3 mb-3"
                                                         },
                                                         "children": [
                                                             {
@@ -2249,7 +2249,7 @@
                                 "type": "basic",
                                 "name": "Div",
                                 "props": {
-                                    "className": "px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+                                    "className": "flex-start justify-between px-6 py-4"
                                 },
                                 "children": [
                                     {
@@ -2332,7 +2332,7 @@
                                 "type": "basic",
                                 "name": "Div",
                                 "props": {
-                                    "className": "px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+                                    "className": "flex-start justify-between px-6 py-4"
                                 },
                                 "children": [
                                     {
