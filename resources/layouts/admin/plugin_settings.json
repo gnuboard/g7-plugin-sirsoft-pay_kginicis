@@ -88,7 +88,7 @@
                                                 "type": "basic",
                                                 "name": "H3",
                                                 "props": {
-                                                    "className": "text-sm font-medium text-red-800 dark:text-red-200"
+                                                    "className": "text-error-soft"
                                                 },
                                                 "text": "$t:admin.plugins.settings.validation_error"
                                             },
@@ -108,7 +108,7 @@
                                                         "type": "basic",
                                                         "name": "Li",
                                                         "props": {
-                                                            "className": "text-sm text-red-700 dark:text-red-300"
+                                                            "className": "grid-3col-responsive"
                                                         },
                                                         "text": "{{message}}"
                                                     }
@@ -246,7 +246,7 @@
                                         "type": "basic",
                                         "name": "H3",
                                         "props": {
-                                            "className": "text-base font-semibold text-gray-900 dark:text-white"
+                                            "className": "text-error-strong"
                                         },
                                         "text": "$t:sirsoft-pay_kginicis.settings.section_live_keys"
                                     },
@@ -272,7 +272,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "grid grid-cols-1 lg:grid-cols-3 gap-4 items-start"
+                                            "className": "section-heading-md"
                                         },
                                         "children": [
                                             {
@@ -351,7 +351,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "grid grid-cols-1 lg:grid-cols-3 gap-4 items-start"
+                                            "className": "section-heading-md"
                                         },
                                         "children": [
                                             {
@@ -452,7 +452,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "grid grid-cols-1 lg:grid-cols-3 gap-4 items-start"
+                                            "className": "section-heading-md"
                                         },
                                         "children": [
                                             {
@@ -553,7 +553,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "grid grid-cols-1 lg:grid-cols-3 gap-4 items-start"
+                                            "className": "section-heading-md"
                                         },
                                         "children": [
                                             {
@@ -654,7 +654,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "grid grid-cols-1 lg:grid-cols-3 gap-4 items-start"
+                                            "className": "section-heading-md"
                                         },
                                         "children": [
                                             {
@@ -775,7 +775,7 @@
                                         "type": "basic",
                                         "name": "H3",
                                         "props": {
-                                            "className": "text-base font-semibold text-gray-900 dark:text-white"
+                                            "className": "text-error-strong"
                                         },
                                         "text": "$t:sirsoft-pay_kginicis.settings.section_easy_pay"
                                     },
@@ -1009,7 +1009,7 @@
                                         "type": "basic",
                                         "name": "H3",
                                         "props": {
-                                            "className": "text-base font-semibold text-gray-900 dark:text-white"
+                                            "className": "text-error-strong"
                                         },
                                         "text": "$t:sirsoft-pay_kginicis.settings.section_general_options"
                                     }
@@ -1074,7 +1074,7 @@
                                         "type": "basic",
                                         "name": "H3",
                                         "props": {
-                                            "className": "text-base font-semibold text-gray-900 dark:text-white"
+                                            "className": "text-error-strong"
                                         },
                                         "text": "$t:sirsoft-pay_kginicis.settings.section_japan"
                                     },
@@ -1895,7 +1895,7 @@
                                                 "type": "basic",
                                                 "name": "Div",
                                                 "props": {
-                                                    "className": "grid grid-cols-1 lg:grid-cols-3 gap-4 items-start"
+                                                    "className": "section-heading-md"
                                                 },
                                                 "children": [
                                                     {
@@ -1949,7 +1949,7 @@
                                                 "type": "basic",
                                                 "name": "Div",
                                                 "props": {
-                                                    "className": "grid grid-cols-1 lg:grid-cols-3 gap-4 items-start"
+                                                    "className": "section-heading-md"
                                                 },
                                                 "children": [
                                                     {
@@ -2256,7 +2256,7 @@
                                         "type": "basic",
                                         "name": "H3",
                                         "props": {
-                                            "className": "text-base font-semibold text-gray-900 dark:text-white"
+                                            "className": "text-error-strong"
                                         },
                                         "text": "$t:sirsoft-pay_kginicis.settings.section_escrow"
                                     },
@@ -2339,7 +2339,7 @@
                                         "type": "basic",
                                         "name": "H3",
                                         "props": {
-                                            "className": "text-base font-semibold text-gray-900 dark:text-white"
+                                            "className": "text-error-strong"
                                         },
                                         "text": "$t:sirsoft-pay_kginicis.settings.section_redirect"
                                     }
@@ -2357,7 +2357,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "grid grid-cols-1 lg:grid-cols-3 gap-4 items-start"
+                                            "className": "section-heading-md"
                                         },
                                         "children": [
                                             {
@@ -2411,7 +2411,7 @@
                                         "type": "basic",
                                         "name": "Div",
                                         "props": {
-                                            "className": "grid grid-cols-1 lg:grid-cols-3 gap-4 items-start"
+                                            "className": "section-heading-md"
                                         },
                                         "children": [
                                             {
