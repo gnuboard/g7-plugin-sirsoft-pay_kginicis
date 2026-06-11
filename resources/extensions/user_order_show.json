@@ -20,7 +20,7 @@
                         {
                             "type": "basic",
                             "name": "Div",
-                            "props": { "className": "flex items-center justify-between text-sm" },
+                            "props": { "className": "flex-between text-sm" },
                             "children": [
                                 {
                                     "type": "basic",
@@ -39,7 +39,7 @@
                         {
                             "type": "basic",
                             "name": "Div",
-                            "props": { "className": "flex items-center justify-between text-sm" },
+                            "props": { "className": "flex-between text-sm" },
                             "children": [
                                 {
                                     "type": "basic",
@@ -59,7 +59,7 @@
                             "type": "basic",
                             "name": "Div",
                             "if": "{{order.data.total_tax_free_amount > 0}}",
-                            "props": { "className": "flex items-center justify-between text-sm" },
+                            "props": { "className": "flex-between text-sm" },
                             "children": [
                                 {
                                     "type": "basic",
@@ -87,7 +87,7 @@
                             "type": "basic",
                             "name": "Div",
                             "if": "{{!!order.data.payment?.is_escrow}}",
-                            "props": { "className": "flex items-center justify-between" },
+                            "props": { "className": "flex-between" },
                             "children": [
                                 {
                                     "type": "basic",
@@ -106,7 +106,7 @@
                         {
                             "type": "basic",
                             "name": "Div",
-                            "props": { "className": "flex items-center justify-between" },
+                            "props": { "className": "flex-between" },
                             "children": [
                                 {
                                     "type": "basic",
