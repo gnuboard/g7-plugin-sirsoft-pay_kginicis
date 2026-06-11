@@ -1,3 +1,4 @@
+// e2e:allow PG 영수증 조회/팝업 — 외부 PG(이니시스) 결제 데이터 의존으로 브라우저 E2E 재현 불가, Vitest 회귀(__tests__/receiptPopup.test.ts)로 검증
 const PLUGIN_ID = 'sirsoft-pay_kginicis';
 
 export interface KginicisReceiptField {
@@ -49,7 +50,15 @@ async function requestKginicisReceiptInfo(
     }
 }
 
-export async function fetchKginicisReceiptInfo(orderNumber: string): Promise<KginicisReceiptInfo | null> {
+export interface KginicisReceiptFetchResult {
+    /** 최종 시도의 HTTP 상태 코드 (네트워크 오류 시 0) */
+    status: number;
+    info: KginicisReceiptInfo | null;
+}
+
+export async function fetchKginicisReceiptInfoDetailed(
+    orderNumber: string,
+): Promise<KginicisReceiptFetchResult> {
     const authToken = getAuthToken();
     const guestToken = getGuestOrderToken();
 
@@ -63,7 +72,7 @@ export async function fetchKginicisReceiptInfo(orderNumber: string): Promise<Kgi
 
     const first = await requestKginicisReceiptInfo(orderNumber, headers);
     if (first.data || first.status !== 401 || !authToken) {
-        return first.data;
+        return { status: first.status, info: first.data };
     }
 
     // 오래된 localStorage 토큰이 남아 401 이 난 경우 비회원 주문 토큰 또는
@@ -73,7 +82,12 @@ export async function fetchKginicisReceiptInfo(orderNumber: string): Promise<Kgi
         fallbackHeaders['X-Guest-Order-Token'] = guestToken;
     }
 
-    return (await requestKginicisReceiptInfo(orderNumber, fallbackHeaders)).data;
+    const second = await requestKginicisReceiptInfo(orderNumber, fallbackHeaders);
+    return { status: second.status, info: second.data };
+}
+
+export async function fetchKginicisReceiptInfo(orderNumber: string): Promise<KginicisReceiptInfo | null> {
+    return (await fetchKginicisReceiptInfoDetailed(orderNumber)).info;
 }
 
 export function canOpenKginicisReceipt(
