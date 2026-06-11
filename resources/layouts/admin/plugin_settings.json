@@ -329,7 +329,7 @@
                                                                     "type": "text",
                                                                     "name": "live_mid",
                                                                     "placeholder": "shoptest",
-                                                                    "className": "flex-1 px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm outline-none border-0"
+                                                                    "className": "text-primary flex-1 px-3 py-2 bg-white dark:bg-gray-700 font-mono text-sm outline-none border-0"
                                                                 }
                                                             }
                                                         ]
@@ -400,7 +400,7 @@
                                                                     "type": "{{_local._show_live_sign_key ? 'text' : 'password'}}",
                                                                     "name": "live_sign_key",
                                                                     "placeholder": "••••••••••••••••",
-                                                                    "className": "w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
+                                                                    "className": "text-primary w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
                                                                 }
                                                             },
                                                             {
@@ -501,7 +501,7 @@
                                                                     "type": "{{_local._show_live_iniapi_key ? 'text' : 'password'}}",
                                                                     "name": "live_iniapi_key",
                                                                     "placeholder": "••••••••••••••••",
-                                                                    "className": "w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
+                                                                    "className": "text-primary w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
                                                                 }
                                                             },
                                                             {
@@ -602,7 +602,7 @@
                                                                     "type": "{{_local._show_live_iniapi_iv ? 'text' : 'password'}}",
                                                                     "name": "live_iniapi_iv",
                                                                     "placeholder": "••••••••••••••••",
-                                                                    "className": "w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
+                                                                    "className": "text-primary w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
                                                                 }
                                                             },
                                                             {
@@ -703,7 +703,7 @@
                                                                     "type": "{{_local._show_live_mobile_hash_key ? 'text' : 'password'}}",
                                                                     "name": "live_mobile_hash_key",
                                                                     "placeholder": "••••••••••••••••",
-                                                                    "className": "w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
+                                                                    "className": "text-primary w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
                                                                 }
                                                             },
                                                             {
@@ -1167,7 +1167,7 @@
                                                                 "type": "basic",
                                                                 "name": "P",
                                                                 "props": {
-                                                                    "className": "mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                                                    "className": "text-tertiary mt-1"
                                                                 },
                                                                 "text": "$t:sirsoft-pay_kginicis.settings.japan_restrict_jpy_payment_methods_hint"
                                                             }
@@ -1233,7 +1233,7 @@
                                                         "type": "basic",
                                                         "name": "Div",
                                                         "props": {
-                                                            "className": "flex flex-wrap gap-2 items-center"
+                                                            "className": "flex-center flex-wrap gap-2"
                                                         },
                                                         "children": [
                                                             {
@@ -1454,7 +1454,7 @@
                                                         "type": "basic",
                                                         "name": "Div",
                                                         "props": {
-                                                            "className": "flex flex-wrap gap-2 items-center"
+                                                            "className": "flex-center flex-wrap gap-2"
                                                         },
                                                         "children": [
                                                             {
@@ -1607,7 +1607,7 @@
                                                                                 "type": "basic",
                                                                                 "name": "Span",
                                                                                 "props": {
-                                                                                    "className": "font-mono text-gray-600 dark:text-gray-400 select-all"
+                                                                                    "className": "text-secondary font-mono select-all"
                                                                                 },
                                                                                 "text": "{{_local.cbtConnCheckResult?.server_ip ?? '-'}}"
                                                                             }
@@ -1937,7 +1937,7 @@
                                                                     "type": "text",
                                                                     "name": "live_japan_mid",
                                                                     "placeholder": "",
-                                                                    "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
+                                                                    "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
                                                                 }
                                                             }
                                                         ]
@@ -1991,7 +1991,7 @@
                                                                     "type": "password",
                                                                     "name": "live_japan_sign_key",
                                                                     "placeholder": "••••••••••••••••",
-                                                                    "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
+                                                                    "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm"
                                                                 }
                                                             }
                                                         ]
@@ -2054,7 +2054,7 @@
                                                                             "type": "text",
                                                                             "name": "japan_merchant_name",
                                                                             "placeholder": "サンプルストア",
-                                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
+                                                                            "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
                                                                         }
                                                                     }
                                                                 ]
@@ -2078,7 +2078,7 @@
                                                                             "type": "text",
                                                                             "name": "japan_merchant_name_kana",
                                                                             "placeholder": "サンプルストア",
-                                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
+                                                                            "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
                                                                         }
                                                                     }
                                                                 ]
@@ -2102,7 +2102,7 @@
                                                                             "type": "text",
                                                                             "name": "japan_merchant_name_alphabet",
                                                                             "placeholder": "Sample Store",
-                                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
+                                                                            "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
                                                                         }
                                                                     }
                                                                 ]
@@ -2126,7 +2126,7 @@
                                                                             "type": "text",
                                                                             "name": "japan_merchant_name_short",
                                                                             "placeholder": "サンプル",
-                                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
+                                                                            "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
                                                                         }
                                                                     }
                                                                 ]
@@ -2150,7 +2150,7 @@
                                                                             "type": "text",
                                                                             "name": "japan_contact_name",
                                                                             "placeholder": "サポート窓口",
-                                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
+                                                                            "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
                                                                         }
                                                                     }
                                                                 ]
@@ -2174,7 +2174,7 @@
                                                                             "type": "email",
                                                                             "name": "japan_contact_email",
                                                                             "placeholder": "support@example.com",
-                                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
+                                                                            "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
                                                                         }
                                                                     }
                                                                 ]
@@ -2198,7 +2198,7 @@
                                                                             "type": "text",
                                                                             "name": "japan_contact_phone",
                                                                             "placeholder": "0120-123-456",
-                                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
+                                                                            "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
                                                                         }
                                                                     }
                                                                 ]
@@ -2222,7 +2222,7 @@
                                                                             "type": "text",
                                                                             "name": "japan_contact_opening_hours",
                                                                             "placeholder": "10:00-18:00",
-                                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
+                                                                            "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
                                                                         }
                                                                     }
                                                                 ]
@@ -2399,7 +2399,7 @@
                                                             "type": "text",
                                                             "name": "redirect_success_url",
                                                             "placeholder": "/shop/orders/{orderId}/complete",
-                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
+                                                            "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
                                                         }
                                                     }
                                                 ]
@@ -2453,7 +2453,7 @@
                                                             "type": "text",
                                                             "name": "redirect_fail_url",
                                                             "placeholder": "/shop/checkout",
-                                                            "className": "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
+                                                            "className": "text-primary w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
                                                         }
                                                     }
                                                 ]
@@ -2546,7 +2546,7 @@
                                                         "type": "basic",
                                                         "name": "Button",
                                                         "props": {
-                                                            "className": "flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-body border border-gray-300 dark:border-gray-600 rounded-lg font-medium transition-colors whitespace-nowrap"
+                                                            "className": "flex-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-body border border-gray-300 dark:border-gray-600 rounded-lg font-medium transition-colors whitespace-nowrap"
                                                         },
                                                         "actions": [
                                                             {
