@@ -1765,7 +1765,7 @@
                                                                 "type": "basic",
                                                                 "name": "Div",
                                                                 "props": {
-                                                                    "className": "stack"
+                                                                    "className": "row-stack"
                                                                 },
                                                                 "iteration": {
                                                                     "source": "{{_local.cbtConnCheckResult?.hosts ?? []}}",
