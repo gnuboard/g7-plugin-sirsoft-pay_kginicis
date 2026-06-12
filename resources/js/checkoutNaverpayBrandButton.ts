@@ -2,6 +2,9 @@ const PLUGIN_ID = 'sirsoft-pay_kginicis';
 const FLAG = '__sirsoftKginicisCheckoutNaverpayBrandButtonInstalled';
 const CHECKOUT_RE = /^\/shop\/checkout\/?$/;
 const CLIENT_CONFIG_PATH = '/api/modules/sirsoft-ecommerce/payments/client-config/kginicis';
+const TWO_LINE_COMPACT_WIDTH = 220;
+const DEFAULT_PADDING_X = 12;
+const COMPACT_PADDING_X = 10;
 
 let observer: MutationObserver | null = null;
 let cachedEnabled: Promise<boolean> | null = null;
@@ -46,6 +49,36 @@ function descriptionText(): string {
     return isKoreanPage()
         ? '네이버페이로 결제 (kg이니시스)'
         : 'Pay with Naver Pay (KG Inicis)';
+}
+
+function getButtonWidth(button: HTMLButtonElement): number {
+    const rectWidth = button.getBoundingClientRect().width;
+
+    return rectWidth > 0 ? rectWidth : button.clientWidth;
+}
+
+function shouldUseTwoLineCompactLayout(button: HTMLButtonElement): boolean {
+    const width = getButtonWidth(button);
+
+    return width > 0 && width < TWO_LINE_COMPACT_WIDTH;
+}
+
+function compactDescriptionFontSize(button: HTMLButtonElement): string {
+    const availableWidth = getButtonWidth(button) - (COMPACT_PADDING_X * 2);
+
+    if (availableWidth > 0 && availableWidth < 144) {
+        return '9.5px';
+    }
+
+    if (availableWidth > 0 && availableWidth < 160) {
+        return '10px';
+    }
+
+    if (availableWidth > 0 && availableWidth < 176) {
+        return '11px';
+    }
+
+    return '12px';
 }
 
 async function fetchEnabled(fetchImpl: typeof fetch): Promise<boolean> {
@@ -114,19 +147,23 @@ function formatNaverpayText(button: HTMLButtonElement): void {
 }
 
 function applyCompactNaverpayLayout(button: HTMLButtonElement): void {
-    button.style.paddingLeft = '12px';
-    button.style.paddingRight = '12px';
+    const useTwoLineCompact = shouldUseTwoLineCompactLayout(button);
+    const paddingX = useTwoLineCompact ? COMPACT_PADDING_X : DEFAULT_PADDING_X;
+
+    button.style.paddingLeft = `${paddingX}px`;
+    button.style.paddingRight = `${paddingX}px`;
     button.style.boxSizing = 'border-box';
     button.style.minWidth = '0';
 
     const row = button.querySelector<HTMLElement>('.flex.items-center.gap-2, .flex.items-center.gap-3')
         ?? button.querySelector<HTMLElement>('.flex.items-center');
     if (row) {
-        row.style.gap = '8px';
+        row.style.gap = useTwoLineCompact ? '6px' : '8px';
         row.style.width = '100%';
         row.style.minWidth = '0';
-        row.style.maxWidth = '188px';
+        row.style.maxWidth = useTwoLineCompact ? '100%' : '188px';
         row.style.boxSizing = 'border-box';
+        row.style.flexWrap = useTwoLineCompact ? 'wrap' : 'nowrap';
     }
 
     const heading = Array.from(button.querySelectorAll<HTMLElement>('p')).find((element) => {
@@ -147,7 +184,8 @@ function applyCompactNaverpayLayout(button: HTMLButtonElement): void {
 
     const textWrapper = heading.parentElement;
     if (textWrapper instanceof HTMLElement) {
-        textWrapper.style.flex = '1 1 0px';
+        textWrapper.style.display = useTwoLineCompact ? 'contents' : '';
+        textWrapper.style.flex = useTwoLineCompact ? '' : '1 1 0px';
         textWrapper.style.minWidth = '0';
         textWrapper.style.maxWidth = '100%';
 
@@ -157,6 +195,8 @@ function applyCompactNaverpayLayout(button: HTMLButtonElement): void {
             paragraph.style.whiteSpace = 'normal';
             paragraph.style.wordBreak = 'keep-all';
             paragraph.style.overflowWrap = 'anywhere';
+            paragraph.style.removeProperty('order');
+            paragraph.style.removeProperty('flex');
         });
 
         const description = Array.from(textWrapper.querySelectorAll<HTMLElement>('p')).find((paragraph) => {
@@ -167,7 +207,20 @@ function applyCompactNaverpayLayout(button: HTMLButtonElement): void {
         });
 
         if (description) {
-            description.style.fontSize = '12px';
+            if (useTwoLineCompact) {
+                heading.style.order = '2';
+                heading.style.flex = '1 1 0px';
+
+                description.style.order = '3';
+                description.style.flex = '0 0 100%';
+                description.style.whiteSpace = 'nowrap';
+                description.style.wordBreak = 'normal';
+                description.style.overflowWrap = 'normal';
+            }
+
+            description.style.fontSize = useTwoLineCompact
+                ? compactDescriptionFontSize(button)
+                : '12px';
             description.style.lineHeight = '1rem';
         }
     }
