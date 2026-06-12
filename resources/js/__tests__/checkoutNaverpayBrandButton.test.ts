@@ -78,6 +78,52 @@ describe('checkoutNaverpayBrandButton', () => {
         expect(cardButton?.querySelector('[data-original-icon="true"]')).not.toBeNull();
     });
 
+    it('좁은 카드에서는 제목과 설명을 총 2줄 compact layout 으로 정렬한다', () => {
+        renderPaymentButtons();
+
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement): DOMRect {
+            const isNaverpayButton = this instanceof HTMLButtonElement
+                && (this.textContent ?? '').includes('네이버페이');
+            const width = isNaverpayButton ? 180 : 0;
+
+            return {
+                bottom: 80,
+                height: 80,
+                left: 0,
+                right: width,
+                top: 0,
+                width,
+                x: 0,
+                y: 0,
+                toJSON: () => ({}),
+            } as DOMRect;
+        });
+
+        expect(patchRenderedNaverpayBrandButton()).toBe(true);
+
+        const naverpayButton = document.querySelector<HTMLButtonElement>('button[data-kginicis-naverpay-brand-button="true"]');
+        const row = naverpayButton?.querySelector<HTMLElement>('.flex.items-center');
+        const paragraphs = naverpayButton?.querySelectorAll<HTMLElement>('p');
+        const heading = paragraphs?.[0];
+        const description = paragraphs?.[1];
+        const textWrapper = heading?.parentElement;
+
+        expect(naverpayButton?.style.paddingLeft).toBe('10px');
+        expect(naverpayButton?.style.paddingRight).toBe('10px');
+        expect(row?.style.gap).toBe('6px');
+        expect(row?.style.maxWidth).toBe('100%');
+        expect(row?.style.flexWrap).toBe('wrap');
+        expect(textWrapper?.style.display).toBe('contents');
+        expect(heading?.style.order).toBe('2');
+        expect(heading?.style.flex).toBe('1 1 0px');
+        expect(description?.style.order).toBe('3');
+        expect(description?.style.flex).toBe('0 0 100%');
+        expect(description?.style.whiteSpace).toBe('nowrap');
+        expect(description?.style.wordBreak).toBe('normal');
+        expect(description?.style.overflowWrap).toBe('normal');
+        expect(description?.style.fontSize).toBe('11px');
+    });
+
     it('클라이언트 설정이 비활성화면 버튼을 건드리지 않는다', async () => {
         renderPaymentButtons();
 
