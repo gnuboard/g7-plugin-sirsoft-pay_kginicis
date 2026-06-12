@@ -73,12 +73,12 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
         $this->assertSame('네이버페이로 결제 — KG 이니시스를 통해 처리', $naverpay['description']['ko'] ?? null);
     }
 
-    public function test_naverpay_brand_button_option_uses_short_checkout_description(): void
+    public function test_brand_button_option_uses_short_checkout_description_for_naverpay(): void
     {
         $settings = $this->createMock(PluginSettingsService::class);
         $settings->method('get')
             ->willReturnCallback(function (string $identifier, ?string $key = null, mixed $default = null): mixed {
-                if ($identifier === 'sirsoft-pay_kginicis' && $key === 'easy_pay_naverpay_brand_button') {
+                if ($identifier === 'sirsoft-pay_kginicis' && $key === 'easy_pay_show_brand_button') {
                     return true;
                 }
 

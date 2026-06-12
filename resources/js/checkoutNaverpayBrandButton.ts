@@ -1,5 +1,5 @@
 const PLUGIN_ID = 'sirsoft-pay_kginicis';
-const FLAG = '__sirsoftKginicisCheckoutNaverpayBrandButtonInstalled';
+const FLAG = '__sirsoftKginicisCheckoutBrandPaymentButtonsInstalled';
 const CHECKOUT_RE = /^\/shop\/checkout\/?$/;
 const CLIENT_CONFIG_PATH = '/api/modules/sirsoft-ecommerce/payments/client-config/kginicis';
 const TWO_LINE_COMPACT_WIDTH = 220;
@@ -12,9 +12,152 @@ let retryTimer: number | null = null;
 
 interface ClientConfigBody {
     data?: {
-        easy_pay_naverpay_brand_button?: boolean;
+        easy_pay_show_brand_button?: boolean;
     };
 }
+
+interface BrandPaymentCopy {
+    heading: string;
+    description: string;
+    title: string;
+}
+
+interface BrandPaymentDefinition {
+    id: string;
+    labels: string[];
+    ko: BrandPaymentCopy;
+    en: BrandPaymentCopy;
+    markSvg: string;
+}
+
+const BRAND_PAYMENT_DEFINITIONS: BrandPaymentDefinition[] = [
+    {
+        id: 'kginicis_naverpay',
+        labels: ['네이버페이 (KG이니시스)', 'Naver Pay (KG Inicis)'],
+        ko: {
+            heading: '네이버페이',
+            description: '네이버페이로 결제 (kg이니시스)',
+            title: '네이버페이로 결제 (kg이니시스)',
+        },
+        en: {
+            heading: 'Naver Pay',
+            description: 'Pay with Naver Pay (KG Inicis)',
+            title: 'Pay with Naver Pay (KG Inicis)',
+        },
+        markSvg: [
+            '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="Naver Pay">',
+            '<rect width="40" height="40" rx="8" fill="#03C75A"/>',
+            '<text x="20" y="17" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="12" font-weight="700">N</text>',
+            '<text x="20" y="29" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="9" font-weight="700">Pay</text>',
+            '</svg>',
+        ].join(''),
+    },
+    {
+        id: 'kginicis_samsung_pay',
+        labels: ['삼성페이 (KG이니시스)', 'Samsung Pay (KG Inicis)'],
+        ko: {
+            heading: '삼성페이',
+            description: '삼성페이로 결제 (kg이니시스)',
+            title: '삼성페이로 결제 (kg이니시스)',
+        },
+        en: {
+            heading: 'Samsung Pay',
+            description: 'Pay with Samsung Pay (KG Inicis)',
+            title: 'Pay with Samsung Pay (KG Inicis)',
+        },
+        markSvg: [
+            '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="Samsung Pay">',
+            '<rect width="40" height="40" rx="8" fill="#1428A0"/>',
+            '<text x="20" y="18" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="10" font-weight="700">S</text>',
+            '<text x="20" y="29" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="9" font-weight="700">Pay</text>',
+            '</svg>',
+        ].join(''),
+    },
+    {
+        id: 'kginicis_lpay',
+        labels: ['L.pay (KG이니시스)', 'L.pay (KG Inicis)'],
+        ko: {
+            heading: 'L.pay',
+            description: 'L.pay로 결제 (kg이니시스)',
+            title: 'L.pay로 결제 (kg이니시스)',
+        },
+        en: {
+            heading: 'L.pay',
+            description: 'Pay with L.pay (KG Inicis)',
+            title: 'Pay with L.pay (KG Inicis)',
+        },
+        markSvg: [
+            '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="L.pay">',
+            '<rect width="40" height="40" rx="8" fill="#D71920"/>',
+            '<text x="20" y="18" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="12" font-weight="700">L</text>',
+            '<text x="20" y="29" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="8" font-weight="700">pay</text>',
+            '</svg>',
+        ].join(''),
+    },
+    {
+        id: 'kginicis_kakaopay',
+        labels: ['카카오페이 (KG이니시스)', 'Kakao Pay (KG Inicis)'],
+        ko: {
+            heading: '카카오페이',
+            description: '카카오페이로 결제 (kg이니시스)',
+            title: '카카오페이로 결제 (kg이니시스)',
+        },
+        en: {
+            heading: 'Kakao Pay',
+            description: 'Pay with Kakao Pay (KG Inicis)',
+            title: 'Pay with Kakao Pay (KG Inicis)',
+        },
+        markSvg: [
+            '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="Kakao Pay">',
+            '<rect width="40" height="40" rx="8" fill="#FEE500"/>',
+            '<text x="20" y="18" text-anchor="middle" fill="#111111" font-family="Arial, sans-serif" font-size="9" font-weight="700">Kakao</text>',
+            '<text x="20" y="29" text-anchor="middle" fill="#111111" font-family="Arial, sans-serif" font-size="9" font-weight="700">Pay</text>',
+            '</svg>',
+        ].join(''),
+    },
+    {
+        id: 'kginicis_japan_paypay',
+        labels: ['PayPay (일본 KG이니시스)', 'PayPay (KG Inicis Japan)'],
+        ko: {
+            heading: 'PayPay',
+            description: 'PayPay로 결제 (일본 KG)',
+            title: 'PayPay로 결제 (일본 KG이니시스)',
+        },
+        en: {
+            heading: 'PayPay',
+            description: 'Pay with PayPay (KG Japan)',
+            title: 'Pay with PayPay (KG Inicis Japan)',
+        },
+        markSvg: [
+            '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="PayPay">',
+            '<rect width="40" height="40" rx="8" fill="#E60012"/>',
+            '<text x="20" y="18" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="8" font-weight="700">Pay</text>',
+            '<text x="20" y="29" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="8" font-weight="700">Pay</text>',
+            '</svg>',
+        ].join(''),
+    },
+    {
+        id: 'kginicis_japan_cvs',
+        labels: ['일본 편의점결제 (KG이니시스)', 'Japan Convenience Store (KG Inicis)'],
+        ko: {
+            heading: '일본 편의점결제',
+            description: '편의점 결제 (일본 KG)',
+            title: '일본 편의점결제 (KG이니시스)',
+        },
+        en: {
+            heading: 'Convenience Store',
+            description: 'Pay at store (KG Japan)',
+            title: 'Japan Convenience Store (KG Inicis)',
+        },
+        markSvg: [
+            '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="Convenience Store">',
+            '<rect width="40" height="40" rx="8" fill="#0072CE"/>',
+            '<text x="20" y="18" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="9" font-weight="700">CVS</text>',
+            '<text x="20" y="29" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="8" font-weight="700">JP</text>',
+            '</svg>',
+        ].join(''),
+    },
+];
 
 const logger = {
     info: (...args: unknown[]) => console.info(`[${PLUGIN_ID}]`, ...args),
@@ -33,22 +176,12 @@ function isKoreanPage(): boolean {
     return lang.toLowerCase().startsWith('ko');
 }
 
-function titleText(): string {
-    return isKoreanPage()
-        ? '네이버페이로 결제 (kg이니시스)'
-        : 'Pay with Naver Pay (KG Inicis)';
+function copyFor(definition: BrandPaymentDefinition): BrandPaymentCopy {
+    return isKoreanPage() ? definition.ko : definition.en;
 }
 
-function headingText(): string {
-    return isKoreanPage()
-        ? '네이버페이'
-        : 'Naver Pay';
-}
-
-function descriptionText(): string {
-    return isKoreanPage()
-        ? '네이버페이로 결제 (kg이니시스)'
-        : 'Pay with Naver Pay (KG Inicis)';
+function normalizedText(value: string | null | undefined): string {
+    return (value ?? '').replace(/\s+/g, ' ').trim();
 }
 
 function getButtonWidth(button: HTMLButtonElement): number {
@@ -92,7 +225,7 @@ async function fetchEnabled(fetchImpl: typeof fetch): Promise<boolean> {
             if (!response.ok) return false;
 
             const body = (await response.json()) as ClientConfigBody;
-            return body.data?.easy_pay_naverpay_brand_button === true;
+            return body.data?.easy_pay_show_brand_button === true;
         } catch {
             return false;
         }
@@ -101,52 +234,76 @@ async function fetchEnabled(fetchImpl: typeof fetch): Promise<boolean> {
     return cachedEnabled;
 }
 
-function isNaverpayButton(button: HTMLButtonElement): boolean {
-    if (button.dataset.kginicisNaverpayBrandButton === 'true') return true;
+function findBrandPaymentDefinition(button: HTMLButtonElement): BrandPaymentDefinition | null {
+    const methodId = button.dataset.kginicisBrandPaymentMethod;
+    const existing = BRAND_PAYMENT_DEFINITIONS.find((definition) => definition.id === methodId);
+    if (existing) return existing;
 
-    const text = (button.textContent ?? '').replace(/\s+/g, ' ').trim();
+    if (button.dataset.kginicisNaverpayBrandButton === 'true') {
+        return BRAND_PAYMENT_DEFINITIONS.find((definition) => definition.id === 'kginicis_naverpay') ?? null;
+    }
 
-    return text.includes('네이버페이 (KG이니시스)')
-        || (text.includes('네이버페이') && text.includes('KG이니시스'))
-        || text.includes('Naver Pay (KG Inicis)');
+    const text = normalizedText(button.textContent);
+
+    return BRAND_PAYMENT_DEFINITIONS.find((definition) => {
+        const copy = copyFor(definition);
+
+        return definition.labels.some((label) => text.includes(label))
+            || text.includes(definition.ko.heading)
+            || text.includes(definition.en.heading)
+            || text.includes(copy.heading);
+    }) ?? null;
 }
 
-function formatNaverpayText(button: HTMLButtonElement): void {
-    const paragraphs = Array.from(button.querySelectorAll<HTMLParagraphElement>('p'));
-    const heading = paragraphs.find((element) => {
-        const text = (element.textContent ?? '').replace(/\s+/g, ' ').trim();
+function findHeading(
+    paragraphs: HTMLParagraphElement[] | HTMLElement[],
+    definition: BrandPaymentDefinition,
+): HTMLElement | null {
+    const copy = copyFor(definition);
 
-        return text.includes('네이버페이')
-            || text.includes('Naver Pay');
-    });
+    return paragraphs.find((element) => {
+        const text = normalizedText(element.textContent);
+
+        return element.dataset.kginicisBrandPaymentHeading === definition.id
+            || definition.labels.some((label) => text.includes(label))
+            || text.includes(definition.ko.heading)
+            || text.includes(definition.en.heading)
+            || text.includes(copy.heading);
+    }) ?? null;
+}
+
+function formatBrandPaymentText(button: HTMLButtonElement, definition: BrandPaymentDefinition): void {
+    const paragraphs = Array.from(button.querySelectorAll<HTMLParagraphElement>('p'));
+    const heading = findHeading(paragraphs, definition);
 
     if (!heading) return;
 
-    const headingLabel = headingText();
-    if (heading.textContent !== headingLabel) {
-        heading.textContent = headingLabel;
+    const copy = copyFor(definition);
+    if (heading.textContent !== copy.heading) {
+        heading.textContent = copy.heading;
     }
-    if (heading.dataset.kginicisNaverpayHeading !== headingLabel) {
-        heading.dataset.kginicisNaverpayHeading = headingLabel;
+    heading.dataset.kginicisBrandPaymentHeading = definition.id;
+    if (definition.id === 'kginicis_naverpay') {
+        heading.dataset.kginicisNaverpayHeading = copy.heading;
     }
-    if (heading.getAttribute('aria-label') !== headingLabel) {
-        heading.setAttribute('aria-label', headingLabel);
+    if (heading.getAttribute('aria-label') !== copy.heading) {
+        heading.setAttribute('aria-label', copy.heading);
     }
 
-    const description = paragraphs[paragraphs.indexOf(heading) + 1]
+    const description = paragraphs[paragraphs.indexOf(heading as HTMLParagraphElement) + 1]
         ?? paragraphs.find((element) => element !== heading);
     if (!description) return;
 
-    const descriptionLabel = descriptionText();
-    if (description.textContent !== descriptionLabel) {
-        description.textContent = descriptionLabel;
+    if (description.textContent !== copy.description) {
+        description.textContent = copy.description;
     }
-    if (description.dataset.kginicisNaverpayDescription !== descriptionLabel) {
-        description.dataset.kginicisNaverpayDescription = descriptionLabel;
+    description.dataset.kginicisBrandPaymentDescription = definition.id;
+    if (definition.id === 'kginicis_naverpay') {
+        description.dataset.kginicisNaverpayDescription = copy.description;
     }
 }
 
-function applyCompactNaverpayLayout(button: HTMLButtonElement): void {
+function applyCompactBrandPaymentLayout(button: HTMLButtonElement, definition: BrandPaymentDefinition): void {
     const useTwoLineCompact = shouldUseTwoLineCompactLayout(button);
     const paddingX = useTwoLineCompact ? COMPACT_PADDING_X : DEFAULT_PADDING_X;
 
@@ -161,17 +318,15 @@ function applyCompactNaverpayLayout(button: HTMLButtonElement): void {
         row.style.gap = useTwoLineCompact ? '6px' : '8px';
         row.style.width = '100%';
         row.style.minWidth = '0';
-        row.style.maxWidth = useTwoLineCompact ? '100%' : '188px';
+        row.style.maxWidth = '100%';
         row.style.boxSizing = 'border-box';
         row.style.flexWrap = useTwoLineCompact ? 'wrap' : 'nowrap';
     }
 
-    const heading = Array.from(button.querySelectorAll<HTMLElement>('p')).find((element) => {
-        const text = (element.textContent ?? '').replace(/\s+/g, ' ').trim();
-
-        return text.includes('네이버페이')
-            || text.includes('Naver Pay');
-    });
+    const heading = findHeading(
+        Array.from(button.querySelectorAll<HTMLElement>('p')),
+        definition,
+    );
 
     if (!heading) return;
 
@@ -199,12 +354,10 @@ function applyCompactNaverpayLayout(button: HTMLButtonElement): void {
             paragraph.style.removeProperty('flex');
         });
 
-        const description = Array.from(textWrapper.querySelectorAll<HTMLElement>('p')).find((paragraph) => {
-            const text = (paragraph.textContent ?? '').replace(/\s+/g, ' ').trim();
-
-            return text.includes('네이버페이로 결제')
-                || text.includes('Pay with Naver Pay');
-        });
+        const description = Array.from(textWrapper.querySelectorAll<HTMLElement>('p')).find((paragraph) => (
+            paragraph.dataset.kginicisBrandPaymentDescription === definition.id
+                || paragraph !== heading
+        ));
 
         if (description) {
             if (useTwoLineCompact) {
@@ -226,9 +379,13 @@ function applyCompactNaverpayLayout(button: HTMLButtonElement): void {
     }
 }
 
-function createNaverpayMark(): HTMLSpanElement {
+function createBrandPaymentMark(definition: BrandPaymentDefinition): HTMLSpanElement {
     const mark = document.createElement('span');
-    mark.dataset.kginicisNaverpayMark = 'true';
+    mark.dataset.kginicisBrandPaymentMark = 'true';
+    mark.dataset.kginicisBrandPaymentMethod = definition.id;
+    if (definition.id === 'kginicis_naverpay') {
+        mark.dataset.kginicisNaverpayMark = 'true';
+    }
     mark.setAttribute('aria-hidden', 'true');
     mark.style.display = 'inline-flex';
     mark.style.width = '32px';
@@ -236,14 +393,7 @@ function createNaverpayMark(): HTMLSpanElement {
     mark.style.flex = '0 0 32px';
     mark.style.alignItems = 'center';
     mark.style.justifyContent = 'center';
-
-    mark.innerHTML = [
-        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="Naver Pay">',
-        '<rect width="40" height="40" rx="8" fill="#03C75A"/>',
-        '<text x="20" y="17" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="12" font-weight="700">N</text>',
-        '<text x="20" y="29" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="9" font-weight="700">Pay</text>',
-        '</svg>',
-    ].join('');
+    mark.innerHTML = definition.markSvg;
 
     return mark;
 }
@@ -253,25 +403,45 @@ function findPaymentIcon(button: HTMLButtonElement): Element | null {
         ?? button.querySelector('i[class*="fa-"], i[role="img"], i');
 }
 
+function findPaymentRow(button: HTMLButtonElement): HTMLElement | null {
+    return button.querySelector<HTMLElement>('.flex.items-center.gap-2, .flex.items-center.gap-3')
+        ?? button.querySelector<HTMLElement>('.flex.items-center');
+}
+
 export function patchRenderedNaverpayBrandButton(root: ParentNode = document): boolean {
     let patched = false;
 
     root.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
-        if (!isNaverpayButton(button)) return;
+        const definition = findBrandPaymentDefinition(button);
+        if (!definition) return;
 
-        button.title = titleText();
-        button.dataset.kginicisNaverpayBrandButton = 'true';
-        formatNaverpayText(button);
-        applyCompactNaverpayLayout(button);
+        const copy = copyFor(definition);
+        button.title = copy.title;
+        button.dataset.kginicisBrandPaymentButton = 'true';
+        button.dataset.kginicisBrandPaymentMethod = definition.id;
+        if (definition.id === 'kginicis_naverpay') {
+            button.dataset.kginicisNaverpayBrandButton = 'true';
+        }
 
-        if (button.querySelector('[data-kginicis-naverpay-mark="true"]')) {
+        formatBrandPaymentText(button, definition);
+        applyCompactBrandPaymentLayout(button, definition);
+
+        if (button.querySelector('[data-kginicis-brand-payment-mark="true"], [data-kginicis-naverpay-mark="true"]')) {
             return;
         }
 
+        const mark = createBrandPaymentMark(definition);
         const icon = findPaymentIcon(button);
-        if (!icon || !icon.parentElement) return;
+        if (icon && icon.parentElement) {
+            icon.replaceWith(mark);
+            patched = true;
+            return;
+        }
 
-        icon.replaceWith(createNaverpayMark());
+        const row = findPaymentRow(button);
+        if (!row) return;
+
+        row.prepend(mark);
         patched = true;
     });
 
@@ -321,7 +491,7 @@ export function installCheckoutNaverpayBrandButton(fetchImpl: typeof fetch = fet
     windowRecord()[FLAG] = true;
 
     void startDomPatchLoop(fetchImpl).then(() => {
-        logger.info('checkout Naver Pay brand button patcher installed');
+        logger.info('checkout KG Inicis brand payment button patcher installed');
     });
 }
 

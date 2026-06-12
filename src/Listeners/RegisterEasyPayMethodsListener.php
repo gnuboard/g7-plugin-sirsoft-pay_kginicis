@@ -111,27 +111,27 @@ class RegisterEasyPayMethodsListener implements HookListenerInterface
     }
 
     /**
-     * 네이버페이 브랜드 버튼 옵션은 표시 메타데이터만 바꾸고 결제수단 ID는 유지한다.
+     * 브랜드 버튼 옵션은 표시 메타데이터만 바꾸고 결제수단 ID는 유지한다.
      */
     private function buildNaverPayEntry(): array
     {
         return $this->buildEntry(
             id: 'kginicis_naverpay',
             nameKey: 'sirsoft-pay_kginicis::payment_methods.naverpay.name',
-            descriptionKey: $this->usesNaverPayBrandButton()
+            descriptionKey: $this->usesBrandButton()
                 ? 'sirsoft-pay_kginicis::payment_methods.naverpay_brand.description'
                 : 'sirsoft-pay_kginicis::payment_methods.naverpay.description',
             icon: 'wallet',
         );
     }
 
-    private function usesNaverPayBrandButton(): bool
+    private function usesBrandButton(): bool
     {
         if (! \function_exists('plugin_setting')) {
             return false;
         }
 
-        return (bool) \plugin_setting(self::PLUGIN_IDENTIFIER, 'easy_pay_naverpay_brand_button', false);
+        return (bool) \plugin_setting(self::PLUGIN_IDENTIFIER, 'easy_pay_show_brand_button', false);
     }
 
     /**

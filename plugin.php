@@ -235,13 +235,13 @@ class Plugin extends AbstractPlugin
                 'default' => false,
                 'label' => ['ko' => 'KG이니시스 네이버페이 사용', 'en' => 'Enable Naver Pay (KG Inicis)'],
             ],
-            'easy_pay_naverpay_brand_button' => [
+            'easy_pay_show_brand_button' => [
                 'type' => 'boolean',
                 'default' => false,
-                'label' => ['ko' => '네이버페이 브랜드 버튼 표시', 'en' => 'Show Naver Pay Branded Button'],
+                'label' => ['ko' => '간편결제 브랜드 버튼 표시', 'en' => 'Show Easy Pay Branded Buttons'],
                 'hint' => [
-                    'ko' => '활성화하면 주문서 결제수단에서 네이버페이 버튼을 네이버페이 배지와 짧은 설명으로 표시합니다.',
-                    'en' => 'When enabled, the checkout payment method shows a Naver Pay badge and shorter description.',
+                    'ko' => '활성화하면 주문서 결제수단에서 KG 이니시스 간편결제 버튼을 브랜드 아이콘과 짧은 설명으로 표시합니다.',
+                    'en' => 'When enabled, checkout payment methods show KG Inicis easy pay brand icons and shorter descriptions.',
                 ],
             ],
             'easy_pay_lpay' => [
@@ -295,7 +295,7 @@ class Plugin extends AbstractPlugin
             'easy_pay_allow_with_other_pg' => false,
             'easy_pay_samsung_pay' => false,
             'easy_pay_naverpay' => false,
-            'easy_pay_naverpay_brand_button' => false,
+            'easy_pay_show_brand_button' => false,
             'easy_pay_lpay' => false,
             'easy_pay_kakaopay' => false,
             'use_credit_point' => false,
