@@ -4,6 +4,16 @@
 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)를 따르며,
 [Semantic Versioning](https://semver.org/lang/ko/)을 준수합니다.
 
+## [Unreleased]
+
+### Added
+
+- 네이버페이 결제수단을 주문서에서 브랜드 배지와 짧은 설명으로 표시할 수 있는 `easy_pay_naverpay_brand_button` 설정을 추가했습니다.
+
+### Fixed
+
+- 주문서에서 네이버페이 결제수단 텍스트가 데이터 로딩 후 늦게 채워지는 경우 브랜드 버튼 표시가 적용되지 않거나 1020px 전후 화면에서 문구가 버튼 밖으로 벗어날 수 있던 문제를 수정했습니다.
+
 ## [1.0.0-beta.6] - 2026-06-11
 
 ### Fixed

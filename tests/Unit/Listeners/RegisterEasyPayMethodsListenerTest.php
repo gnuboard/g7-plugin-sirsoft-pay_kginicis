@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Plugins\Sirsoft\PayKginicis\Tests\Unit\Listeners;
 
+use App\Services\PluginSettingsService;
 use Plugins\Sirsoft\PayKginicis\Listeners\RegisterEasyPayMethodsListener;
 use Plugins\Sirsoft\PayKginicis\Tests\PluginTestCase;
 
@@ -55,5 +56,48 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
             $this->assertNull($method['defaults']['pg_provider'] ?? null);
             $this->assertFalse($method['defaults']['is_active'] ?? true);
         }
+    }
+
+    public function test_naverpay_uses_legacy_description_by_default(): void
+    {
+        $listener = new RegisterEasyPayMethodsListener();
+
+        $methods = $listener->injectEasyPayMethods([
+            ['id' => 'phone'],
+            ['id' => 'point'],
+        ]);
+
+        $naverpay = collect($methods)->firstWhere('id', 'kginicis_naverpay');
+
+        $this->assertSame('네이버페이 (KG이니시스)', $naverpay['name']['ko'] ?? null);
+        $this->assertSame('네이버페이로 결제 — KG 이니시스를 통해 처리', $naverpay['description']['ko'] ?? null);
+    }
+
+    public function test_naverpay_brand_button_option_uses_short_checkout_description(): void
+    {
+        $settings = $this->createMock(PluginSettingsService::class);
+        $settings->method('get')
+            ->willReturnCallback(function (string $identifier, ?string $key = null, mixed $default = null): mixed {
+                if ($identifier === 'sirsoft-pay_kginicis' && $key === 'easy_pay_naverpay_brand_button') {
+                    return true;
+                }
+
+                return $default;
+            });
+        $this->app->instance(PluginSettingsService::class, $settings);
+
+        $listener = new RegisterEasyPayMethodsListener();
+
+        $methods = $listener->injectEasyPayMethods([
+            ['id' => 'phone'],
+            ['id' => 'point'],
+        ]);
+
+        $naverpay = collect($methods)->firstWhere('id', 'kginicis_naverpay');
+
+        $this->assertSame('네이버페이 (KG이니시스)', $naverpay['name']['ko'] ?? null);
+        $this->assertSame('네이버페이로 결제', $naverpay['description']['ko'] ?? null);
+        $this->assertSame('Pay with Naver Pay', $naverpay['description']['en'] ?? null);
+        $this->assertSame('wallet', $naverpay['icon'] ?? null);
     }
 }

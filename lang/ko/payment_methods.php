@@ -9,6 +9,10 @@ return [
         'name' => '네이버페이 (KG이니시스)',
         'description' => '네이버페이로 결제 — KG 이니시스를 통해 처리',
     ],
+    'naverpay_brand' => [
+        'description' => '네이버페이로 결제',
+        'title' => 'KG 이니시스를 통해 처리',
+    ],
     'lpay' => [
         'name' => 'L.pay (KG이니시스)',
         'description' => 'L.pay 로 결제 — KG 이니시스를 통해 처리',

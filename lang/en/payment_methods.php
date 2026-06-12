@@ -9,6 +9,10 @@ return [
         'name' => 'Naver Pay (KG Inicis)',
         'description' => 'Pay with Naver Pay via KG Inicis',
     ],
+    'naverpay_brand' => [
+        'description' => 'Pay with Naver Pay',
+        'title' => 'Processed through KG Inicis',
+    ],
     'lpay' => [
         'name' => 'L.pay (KG Inicis)',
         'description' => 'Pay with L.pay via KG Inicis',
