@@ -23,6 +23,8 @@ use App\Contracts\Extension\HookListenerInterface;
  */
 class RegisterEasyPayMethodsListener implements HookListenerInterface
 {
+    private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
+
     /**
      * 구독할 훅 매핑 반환.
      *
@@ -61,12 +63,7 @@ class RegisterEasyPayMethodsListener implements HookListenerInterface
                 descriptionKey: 'sirsoft-pay_kginicis::payment_methods.samsung_pay.description',
                 icon: 'mobile-screen-button',
             ),
-            $this->buildEntry(
-                id: 'kginicis_naverpay',
-                nameKey: 'sirsoft-pay_kginicis::payment_methods.naverpay.name',
-                descriptionKey: 'sirsoft-pay_kginicis::payment_methods.naverpay.description',
-                icon: 'wallet',
-            ),
+            $this->buildNaverPayEntry(),
             $this->buildEntry(
                 id: 'kginicis_lpay',
                 nameKey: 'sirsoft-pay_kginicis::payment_methods.lpay.name',
@@ -111,6 +108,30 @@ class RegisterEasyPayMethodsListener implements HookListenerInterface
             $kgInicisMethods,
             array_slice($methods, $insertAfter + 1),
         );
+    }
+
+    /**
+     * 네이버페이 브랜드 버튼 옵션은 표시 메타데이터만 바꾸고 결제수단 ID는 유지한다.
+     */
+    private function buildNaverPayEntry(): array
+    {
+        return $this->buildEntry(
+            id: 'kginicis_naverpay',
+            nameKey: 'sirsoft-pay_kginicis::payment_methods.naverpay.name',
+            descriptionKey: $this->usesNaverPayBrandButton()
+                ? 'sirsoft-pay_kginicis::payment_methods.naverpay_brand.description'
+                : 'sirsoft-pay_kginicis::payment_methods.naverpay.description',
+            icon: 'wallet',
+        );
+    }
+
+    private function usesNaverPayBrandButton(): bool
+    {
+        if (! \function_exists('plugin_setting')) {
+            return false;
+        }
+
+        return (bool) \plugin_setting(self::PLUGIN_IDENTIFIER, 'easy_pay_naverpay_brand_button', false);
     }
 
     /**

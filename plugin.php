@@ -235,6 +235,15 @@ class Plugin extends AbstractPlugin
                 'default' => false,
                 'label' => ['ko' => 'KG이니시스 네이버페이 사용', 'en' => 'Enable Naver Pay (KG Inicis)'],
             ],
+            'easy_pay_naverpay_brand_button' => [
+                'type' => 'boolean',
+                'default' => false,
+                'label' => ['ko' => '네이버페이 브랜드 버튼 표시', 'en' => 'Show Naver Pay Branded Button'],
+                'hint' => [
+                    'ko' => '활성화하면 주문서 결제수단에서 네이버페이 버튼을 네이버페이 배지와 짧은 설명으로 표시합니다.',
+                    'en' => 'When enabled, the checkout payment method shows a Naver Pay badge and shorter description.',
+                ],
+            ],
             'easy_pay_lpay' => [
                 'type' => 'boolean',
                 'default' => false,
@@ -255,7 +264,7 @@ class Plugin extends AbstractPlugin
 
     public function getConfigValues(): array
     {
-        return [
+        $defaults = [
             'is_test_mode' => true,
             'test_mid' => 'INIpayTest',
             'test_sign_key' => 'SU5JTElURV9UUklQTEVERVNfS0VZU1RS',
@@ -286,10 +295,42 @@ class Plugin extends AbstractPlugin
             'easy_pay_allow_with_other_pg' => false,
             'easy_pay_samsung_pay' => false,
             'easy_pay_naverpay' => false,
+            'easy_pay_naverpay_brand_button' => false,
             'easy_pay_lpay' => false,
             'easy_pay_kakaopay' => false,
             'use_credit_point' => false,
         ];
+
+        return array_merge($defaults, $this->getJsonConfigDefaults());
+    }
+
+    /**
+     * config/settings/defaults.json 의 defaults 섹션을 런타임 기본값에도 반영한다.
+     *
+     * 플러그인 설치 초기값은 PluginManager 가 defaults.json 을 사용하지만,
+     * 저장 파일이 없는 환경의 PluginSettingsService fallback 은 getConfigValues() 를
+     * 사용하므로 두 경로의 기본값이 갈라지지 않도록 맞춘다.
+     */
+    private function getJsonConfigDefaults(): array
+    {
+        $path = $this->getSettingsDefaultsPath();
+        if ($path === null || ! is_file($path)) {
+            return [];
+        }
+
+        $content = file_get_contents($path);
+        if ($content === false) {
+            return [];
+        }
+
+        $data = json_decode($content, true);
+        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($data)) {
+            return [];
+        }
+
+        $defaults = $data['defaults'] ?? [];
+
+        return is_array($defaults) ? $defaults : [];
     }
 
     public function getHookListeners(): array

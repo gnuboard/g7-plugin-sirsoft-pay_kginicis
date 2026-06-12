@@ -126,6 +126,7 @@ class RegisterPgProviderListener implements HookListenerInterface
                 : ($settings['live_japan_mid'] ?? ''),
             'cbt_extra_data'                     => $this->buildCbtExtraData($settings),
             'use_credit_point'                   => (bool) ($settings['use_credit_point'] ?? false),
+            'easy_pay_naverpay_brand_button'     => (bool) ($settings['easy_pay_naverpay_brand_button'] ?? false),
         ]);
     }
 

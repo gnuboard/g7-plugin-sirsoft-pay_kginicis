@@ -28,6 +28,45 @@ class ValidateCbtSettingsListenerTest extends PluginTestCase
         $this->assertFalse($config['japan_restrict_jpy_payment_methods']);
     }
 
+    public function test_plugin_schema_includes_naverpay_brand_button_option(): void
+    {
+        $plugin = new Plugin();
+
+        $schema = $plugin->getSettingsSchema();
+        $config = $plugin->getConfigValues();
+
+        $this->assertSame('boolean', $schema['easy_pay_naverpay_brand_button']['type'] ?? null);
+        $this->assertFalse($schema['easy_pay_naverpay_brand_button']['default'] ?? true);
+        $this->assertArrayHasKey('easy_pay_naverpay_brand_button', $config);
+        $this->assertTrue($config['easy_pay_naverpay_brand_button']);
+    }
+
+    public function test_plugin_config_values_respect_defaults_json_values(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'kginicis-defaults-');
+        file_put_contents($path, json_encode([
+            'defaults' => [
+                'easy_pay_naverpay_brand_button' => true,
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        $plugin = new class($path) extends Plugin
+        {
+            public function __construct(private readonly string $defaultsPath) {}
+
+            public function getSettingsDefaultsPath(): ?string
+            {
+                return $this->defaultsPath;
+            }
+        };
+
+        try {
+            $this->assertTrue($plugin->getConfigValues()['easy_pay_naverpay_brand_button']);
+        } finally {
+            @unlink($path);
+        }
+    }
+
     public function test_ignores_other_plugins(): void
     {
         $listener = new ValidateCbtSettingsListener();
