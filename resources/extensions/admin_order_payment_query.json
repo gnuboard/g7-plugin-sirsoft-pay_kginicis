@@ -93,14 +93,14 @@
                                     "type": "basic",
                                     "name": "Span",
                                     "if": "{{kginicis_cbt_reconciliation.data?.status === 'manual_refund_required'}}",
-                                    "props": { "className": "px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200" },
+                                    "props": { "className": "px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/40text-danger-soft" },
                                     "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_manual_badge"
                                 },
                                 {
                                     "type": "basic",
                                     "name": "Span",
                                     "if": "{{kginicis_cbt_reconciliation.data?.status === 'auto_refunded'}}",
-                                    "props": { "className": "px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200" },
+                                    "props": { "className": "px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/40text-success-soft" },
                                     "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_refunded_badge"
                                 }
                             ]
@@ -109,14 +109,14 @@
                             "type": "basic",
                             "name": "P",
                             "if": "{{kginicis_cbt_reconciliation.data?.status === 'manual_refund_required'}}",
-                            "props": { "className": "text-xs text-red-800 dark:text-red-300 leading-relaxed" },
+                            "props": { "className": "text-info-soft leading-relaxed" },
                             "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_manual_hint"
                         },
                         {
                             "type": "basic",
                             "name": "P",
                             "if": "{{kginicis_cbt_reconciliation.data?.status === 'auto_refunded'}}",
-                            "props": { "className": "text-xs text-red-800 dark:text-red-300 leading-relaxed" },
+                            "props": { "className": "text-info-soft leading-relaxed" },
                             "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_refunded_hint"
                         },
                         {
@@ -124,17 +124,17 @@
                             "name": "Div",
                             "props": { "className": "grid grid-cols-[100px_1fr] sm:grid-cols-[120px_1fr_120px_1fr] gap-x-3 gap-y-1 text-xs" },
                             "children": [
-                                { "type": "basic", "name": "Span", "props": { "className": "text-red-700 dark:text-red-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_tid" },
+                                { "type": "basic", "name": "Span", "props": { "className": "font-semiboldtext-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_tid" },
                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-red-950 dark:text-red-100 break-all" }, "text": "{{kginicis_cbt_reconciliation.data?.tid ?? '-'}}" },
-                                { "type": "basic", "name": "Span", "props": { "className": "text-red-700 dark:text-red-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_amount" },
+                                { "type": "basic", "name": "Span", "props": { "className": "font-semiboldtext-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_amount" },
                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-red-950 dark:text-red-100" }, "text": "{{kginicis_cbt_reconciliation.data?.amount ?? '-'}}" },
-                                { "type": "basic", "name": "Span", "props": { "className": "text-red-700 dark:text-red-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_reason" },
+                                { "type": "basic", "name": "Span", "props": { "className": "font-semiboldtext-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_reason" },
                                 { "type": "basic", "name": "Span", "props": { "className": "text-red-950 dark:text-red-100 col-span-1 sm:col-span-3 break-all" }, "text": "{{kginicis_cbt_reconciliation.data?.reason ?? '-'}}" },
-                                { "type": "basic", "name": "Span", "if": "{{kginicis_cbt_reconciliation.data?.refund_error}}", "props": { "className": "text-red-700 dark:text-red-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_refund_error" },
+                                { "type": "basic", "name": "Span", "if": "{{kginicis_cbt_reconciliation.data?.refund_error}}", "props": { "className": "font-semiboldtext-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_refund_error" },
                                 { "type": "basic", "name": "Span", "if": "{{kginicis_cbt_reconciliation.data?.refund_error}}", "props": { "className": "text-red-950 dark:text-red-100 col-span-1 sm:col-span-3 break-all" }, "text": "{{kginicis_cbt_reconciliation.data?.refund_error}}" },
-                                { "type": "basic", "name": "Span", "props": { "className": "text-red-700 dark:text-red-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_updated_at" },
+                                { "type": "basic", "name": "Span", "props": { "className": "font-semiboldtext-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_updated_at" },
                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-red-950 dark:text-red-100" }, "text": "{{kginicis_cbt_reconciliation.data?.updated_at ?? '-'}}" },
-                                { "type": "basic", "name": "Span", "props": { "className": "text-red-700 dark:text-red-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_retry_count" },
+                                { "type": "basic", "name": "Span", "props": { "className": "font-semiboldtext-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_reconciliation_retry_count" },
                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-red-950 dark:text-red-100" }, "text": "{{kginicis_cbt_reconciliation.data?.retry_count ?? 0}}" }
                             ]
                         },
@@ -283,7 +283,7 @@
                         {
                             "type": "basic",
                             "name": "P",
-                            "props": { "className": "text-xs text-blue-800 dark:text-blue-300 leading-relaxed" },
+                            "props": { "className": "text-danger-soft leading-relaxed" },
                             "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_ops_description"
                         },
                         {
@@ -291,19 +291,19 @@
                             "name": "Div",
                             "props": { "className": "grid grid-cols-[110px_1fr] sm:grid-cols-[130px_1fr_130px_1fr] gap-x-3 gap-y-1 text-xs" },
                             "children": [
-                                { "type": "basic", "name": "Span", "props": { "className": "text-blue-700 dark:text-blue-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_payment_status" },
+                                { "type": "basic", "name": "Span", "props": { "className": "text-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_payment_status" },
                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-blue-950 dark:text-blue-100" }, "text": "{{kginicis_cbt_cvs.data?.payment_status ?? '-'}}" },
-                                { "type": "basic", "name": "Span", "props": { "className": "text-blue-700 dark:text-blue-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_cvs_status" },
+                                { "type": "basic", "name": "Span", "props": { "className": "text-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_cvs_status" },
                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-blue-950 dark:text-blue-100" }, "text": "{{kginicis_cbt_cvs.data?.cvs_status ?? '-'}}" },
-                                { "type": "basic", "name": "Span", "props": { "className": "text-blue-700 dark:text-blue-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_amount" },
+                                { "type": "basic", "name": "Span", "props": { "className": "text-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_amount" },
                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-blue-950 dark:text-blue-100" }, "text": "{{(kginicis_cbt_cvs.data?.amount ?? '-') + ' ' + (kginicis_cbt_cvs.data?.currency ?? '')}}" },
-                                { "type": "basic", "name": "Span", "props": { "className": "text-blue-700 dark:text-blue-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_due_at" },
+                                { "type": "basic", "name": "Span", "props": { "className": "text-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_due_at" },
                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-blue-950 dark:text-blue-100" }, "text": "{{kginicis_cbt_cvs.data?.payment_term_formatted ?? kginicis_cbt_cvs.data?.payment_term ?? '-'}}" },
-                                { "type": "basic", "name": "Span", "props": { "className": "text-blue-700 dark:text-blue-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_last_notify" },
+                                { "type": "basic", "name": "Span", "props": { "className": "text-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_last_notify" },
                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-blue-950 dark:text-blue-100 break-all" }, "text": "{{(kginicis_cbt_cvs.data?.last_notify_at ?? '-') + ' / ' + (kginicis_cbt_cvs.data?.last_notify_result ?? '-') + ' / ' + (kginicis_cbt_cvs.data?.last_notify_reason ?? '-')}}" },
-                                { "type": "basic", "name": "Span", "props": { "className": "text-blue-700 dark:text-blue-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_last_recheck" },
+                                { "type": "basic", "name": "Span", "props": { "className": "text-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_last_recheck" },
                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-blue-950 dark:text-blue-100 break-all" }, "text": "{{(kginicis_cbt_cvs.data?.last_recheck_at ?? '-') + ' / ' + (kginicis_cbt_cvs.data?.last_recheck_result ?? '-')}}" },
-                                { "type": "basic", "name": "Span", "props": { "className": "text-blue-700 dark:text-blue-300" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_notify_url" },
+                                { "type": "basic", "name": "Span", "props": { "className": "text-info-soft" }, "text": "$t:sirsoft-pay_kginicis.admin.cbt_cvs_notify_url" },
                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-blue-950 dark:text-blue-100 col-span-1 sm:col-span-3 break-all" }, "text": "{{kginicis_cbt_cvs.data?.notify_url ?? '-'}}" }
                             ]
                         },
@@ -342,7 +342,7 @@
                                             "props": { "className": "grid grid-cols-[120px_1fr] sm:grid-cols-[150px_90px_1fr_80px] gap-x-2 gap-y-1 rounded-md bg-white/70 dark:bg-gray-900/30 px-2 py-1.5 text-[11px]" },
                                             "children": [
                                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-blue-950 dark:text-blue-100" }, "text": "{{notify.received_at ?? '-'}}" },
-                                                { "type": "basic", "name": "Span", "props": { "className": "font-semibold text-blue-800 dark:text-blue-200" }, "text": "{{notify.result ?? '-'}}" },
+                                                { "type": "basic", "name": "Span", "props": { "className": "text-danger-soft" }, "text": "{{notify.result ?? '-'}}" },
                                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-blue-950 dark:text-blue-100 break-all" }, "text": "{{(notify.reason ?? '-') + ' / ' + (notify.tid ?? '-')}}" },
                                                 { "type": "basic", "name": "Span", "props": { "className": "font-mono text-blue-950 dark:text-blue-100" }, "text": "{{(notify.amount ?? '-') + ' ' + (notify.currency ?? '')}}" }
                                             ]
@@ -658,7 +658,7 @@
                                             "type": "basic",
                                             "name": "Div",
                                             "if": "{{(_local._kginicisActiveTid === payment.transaction_id && _local._kginicisResult) || kginicis_status.data}}",
-                                            "props": { "className": "mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" },
+                                            "props": { "className": "mt-3 pt-3" },
                                             "children": [
                                                 {
                                                     "type": "basic",
@@ -880,7 +880,7 @@
                                                             "props": { "className": "grid grid-cols-[120px_1fr] sm:grid-cols-[140px_1fr_140px_1fr] gap-x-4 gap-y-1.5 text-xs" },
                                                             "children": [
                                                                 { "type": "basic", "name": "Span", "props": { "className": "text-gray-500 dark:text-gray-400" }, "text": "$t:sirsoft-pay_kginicis.admin.result_cancel_price" },
-                                                                { "type": "basic", "name": "Span", "props": { "className": "text-red-700 dark:text-red-300 font-mono font-semibold" }, "text": "{{(_local._kginicisResult ?? kginicis_status.data)?._cancel_price ?? '-'}}" },
+                                                                { "type": "basic", "name": "Span", "props": { "className": "text-danger-soft font-mono font-semibold" }, "text": "{{(_local._kginicisResult ?? kginicis_status.data)?._cancel_price ?? '-'}}" },
                                                                 { "type": "basic", "name": "Span", "props": { "className": "text-gray-500 dark:text-gray-400" }, "text": "$t:sirsoft-pay_kginicis.admin.result_cancel_date" },
                                                                 { "type": "basic", "name": "Span", "props": { "className": "text-gray-900 dark:text-gray-100 font-mono" }, "text": "{{(_local._kginicisResult ?? kginicis_status.data)?._cancel_date ?? '-'}}" }
                                                             ]
@@ -936,7 +936,7 @@
                                                                                     "props": { "className": "border-t border-gray-100 dark:border-gray-700" },
                                                                                     "children": [
                                                                                         { "type": "basic", "name": "Td", "props": { "className": "px-2 py-1.5 text-gray-500 dark:text-gray-400 font-mono" }, "text": "{{pcIdx + 1}}" },
-                                                                                        { "type": "basic", "name": "Td", "props": { "className": "px-2 py-1.5 text-red-700 dark:text-red-300 font-mono" }, "text": "{{pcItem.price ?? '-'}}" },
+                                                                                        { "type": "basic", "name": "Td", "props": { "className": "px-2 py-1.5text-danger-soft font-mono" }, "text": "{{pcItem.price ?? '-'}}" },
                                                                                         { "type": "basic", "name": "Td", "props": { "className": "px-2 py-1.5 text-gray-900 dark:text-gray-100 font-mono" }, "text": "{{pcItem.date ?? '-'}}" },
                                                                                         { "type": "basic", "name": "Td", "props": { "className": "px-2 py-1.5 text-gray-700 dark:text-gray-300" }, "text": "{{pcItem.msg ?? '-'}}" }
                                                                                     ]
