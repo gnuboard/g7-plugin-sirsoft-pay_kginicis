@@ -209,7 +209,7 @@
                                                 "type": "basic",
                                                 "name": "H3",
                                                 "props": {
-                                                    "className": "text-sm font-semiboldtext-warning-soft"
+                                                    "className": "text-sm font-semibold text-warning-soft"
                                                 },
                                                 "text": "$t:sirsoft-pay_kginicis.settings.live_mode_warning_title"
                                             },
@@ -1354,7 +1354,7 @@
                                                                 "type": "basic",
                                                                 "name": "P",
                                                                 "props": {
-                                                                    "className": "font-semiboldtext-success-soft"
+                                                                    "className": "font-semibold text-success-soft"
                                                                 },
                                                                 "text": "$t:sirsoft-pay_kginicis.settings.cbt_helper_create_success"
                                                             },
@@ -1362,7 +1362,7 @@
                                                                 "type": "basic",
                                                                 "name": "Div",
                                                                 "props": {
-                                                                    "className": "flex flex-wrap gap-3text-success-soft"
+                                                                    "className": "flex flex-wrap gap-3 text-success-soft"
                                                                 },
                                                                 "children": [
                                                                     {
@@ -1574,7 +1574,7 @@
                                                                                 "type": "basic",
                                                                                 "name": "Span",
                                                                                 "props": {
-                                                                                    "className": "font-monotext-warning-soft font-bold select-all"
+                                                                                    "className": "font-mono text-warning-soft font-bold select-all"
                                                                                 },
                                                                                 "text": "{{_local.cbtConnCheckResult?.egress_ip ?? '$t:sirsoft-pay_kginicis.settings.cbt_connectivity_unknown'}}"
                                                                             }
@@ -1850,7 +1850,7 @@
                                                                                         "name": "Span",
                                                                                         "if": "{{host.tcp_443_reachable}}",
                                                                                         "props": {
-                                                                                            "className": "px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/40text-success-soft font-medium"
+                                                                                            "className": "px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/40 text-success-soft font-medium"
                                                                                         },
                                                                                         "text": "✓ {{host.tcp_443_latency_ms}}ms"
                                                                                     },
