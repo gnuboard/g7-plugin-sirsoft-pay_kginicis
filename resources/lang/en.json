@@ -1,4 +1,14 @@
 {
+    "editor": {
+        "data_source": {
+            "kginicis_cbt_reconciliation": "Cross-border Reconciliation",
+            "kginicis_escrow_delivery": "Escrow Delivery",
+            "kginicis_status": "Payment Status",
+            "kginicis_test_map": "Test Payment Map",
+            "settings": "Payment Settings",
+            "vbank_info": "Virtual Account Info"
+        }
+    },
     "messages": {
         "refund": {
             "missing_tid": "Cannot process refund: transaction ID is missing.",
