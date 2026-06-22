@@ -444,6 +444,7 @@ async function requestKoreanPayment(
             buyer_email: pgPaymentData.customer_email ?? '',
             buyer_phone: pgPaymentData.customer_phone ?? '',
             payment_method: paymentMethod,
+            completionUrl: callbackUrl,
         });
     }
 
