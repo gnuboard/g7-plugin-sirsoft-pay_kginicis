@@ -38,6 +38,7 @@ describe('paymentCloseMessageListener', () => {
         delete windowRecord().__sirsoftKginicisPaymentCloseListenerInstalled;
         clearStandardPaymentCloseReportContext();
         clearMobilePaymentReturnPending();
+        document.body.innerHTML = '';
         vi.restoreAllMocks();
         vi.useRealTimers();
     });
@@ -225,6 +226,87 @@ describe('paymentCloseMessageListener', () => {
                 reason: 'inicis-overlay-closed',
             }),
         );
+    });
+
+    it('정상 결제 완료로 체크아웃 페이지 이탈이 시작되면 close-report 를 호출하지 않는다', async () => {
+        vi.useFakeTimers();
+        const apiPost = vi.fn().mockResolvedValue({ success: true });
+        windowRecord().G7Core = {
+            api: { post: apiPost },
+            state: { setLocal },
+        };
+        markStandardPaymentCloseReportContext({
+            closeReportUrl: '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            oid: 'ORD-CLOSE-SUCCESS-001',
+            price: 10000,
+        });
+        installPaymentCloseMessageListener();
+
+        monitorStandardPaymentWindowClose([], 'inicis-overlay-closed');
+
+        const modal = document.createElement('div');
+        modal.id = 'inicisModalDiv';
+        modal.className = 'inipay_modal fade in';
+        modal.style.width = '640px';
+        modal.style.height = '640px';
+        document.body.appendChild(modal);
+
+        const iframe = document.createElement('iframe');
+        iframe.className = 'inipay_iframe';
+        iframe.src = 'https://stgstdpay.inicis.com/payMain/pay';
+        iframe.style.width = '640px';
+        iframe.style.height = '640px';
+        modal.appendChild(iframe);
+
+        await vi.advanceTimersByTimeAsync(600);
+
+        window.dispatchEvent(new Event('pagehide'));
+        modal.remove();
+        await vi.advanceTimersByTimeAsync(1200);
+
+        expect(apiPost).not.toHaveBeenCalled();
+    });
+
+    it('정상 결제 완료 callback form 이 감지되면 close-report 를 호출하지 않는다', async () => {
+        vi.useFakeTimers();
+        const apiPost = vi.fn().mockResolvedValue({ success: true });
+        const completionUrl = `${window.location.origin}/plugins/sirsoft-pay_kginicis/payment/callback`;
+        windowRecord().G7Core = {
+            api: { post: apiPost },
+            state: { setLocal },
+        };
+        markStandardPaymentCloseReportContext({
+            closeReportUrl: '/plugins/sirsoft-pay_kginicis/payment/close-report',
+            oid: 'ORD-CLOSE-SUCCESS-002',
+            price: 10000,
+            completionUrl,
+        });
+
+        monitorStandardPaymentWindowClose([], 'inicis-overlay-closed');
+
+        const modal = document.createElement('div');
+        modal.id = 'inicisModalDiv';
+        modal.className = 'inipay_modal fade in';
+        modal.style.width = '640px';
+        modal.style.height = '640px';
+        document.body.appendChild(modal);
+
+        const iframe = document.createElement('iframe');
+        iframe.className = 'inipay_iframe';
+        iframe.src = 'https://stgstdpay.inicis.com/payMain/pay';
+        iframe.style.width = '640px';
+        iframe.style.height = '640px';
+        modal.appendChild(iframe);
+
+        await vi.advanceTimersByTimeAsync(600);
+
+        const completionForm = document.createElement('form');
+        completionForm.action = `${completionUrl}?selectedPaymentMethod=card`;
+        document.body.appendChild(completionForm);
+        modal.remove();
+        await vi.advanceTimersByTimeAsync(1200);
+
+        expect(apiPost).not.toHaveBeenCalled();
     });
 
     it('KG 이니시스 공식 모달 안의 빈 표준결제 iframe 은 중단된 결제창으로 보고한다', async () => {
