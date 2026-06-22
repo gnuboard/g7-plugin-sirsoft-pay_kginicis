@@ -10,6 +10,7 @@ use Modules\Sirsoft\Ecommerce\Enums\PaymentMethodEnum;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Models\OrderAddress;
+use Modules\Sirsoft\Ecommerce\Models\OrderPayment;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Tests\PluginTestCase;
 
@@ -131,6 +132,44 @@ class PaymentCloseReportControllerTest extends PluginTestCase
             ->assertJsonPath('data.reason', 'order_not_payable');
     }
 
+    public function test_close_report_ignores_order_when_payment_already_paid(): void
+    {
+        // race 재현: 승인 콜백이 payment 를 먼저 PAID 로 갱신했으나 order_status 는 아직 PENDING_ORDER.
+        $order = $this->makeOrder('ORD-CLOSE-PAID-001', 10000);
+        $order->setRelation('shippingAddress', new OrderAddress([
+            'address_type' => 'shipping',
+            'orderer_email' => 'buyer@example.com',
+            'orderer_phone' => '010-1234-5678',
+        ]));
+        $order->setRelation('payment', new OrderPayment([
+            'payment_status' => PaymentStatusEnum::PAID,
+        ]));
+
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldReceive('findByOrderNumber')
+            ->once()
+            ->with('ORD-CLOSE-PAID-001')
+            ->andReturn($order);
+        // 결제가 이미 성공했으므로 실패/취소 처리를 호출하면 안 된다.
+        $orderService->shouldNotReceive('failPayment');
+        $orderService->shouldNotReceive('recordPaymentCancellation');
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/payment/close-report', [
+            'oid' => 'ORD-CLOSE-PAID-001',
+            'price' => 10000,
+            'buyer_email' => 'buyer@example.com',
+            'buyer_phone' => '01012345678',
+            'payment_method' => 'card',
+            'reason' => 'inicis-overlay-closed',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.status', 'ignored')
+            ->assertJsonPath('data.reason', 'payment_already_paid');
+    }
+
     public function test_close_report_preserves_easy_pay_context_on_cancelled_order(): void
     {
         $order = OrderFactory::new()->create([
@@ -179,7 +218,7 @@ class PaymentCloseReportControllerTest extends PluginTestCase
 
     private function makeOrder(string $orderNumber, int $amount, string $currency = 'KRW'): Order
     {
-        $order = new Order();
+        $order = new Order;
         $order->order_number = $orderNumber;
         $order->order_status = OrderStatusEnum::PENDING_ORDER;
         $order->currency = $currency;
