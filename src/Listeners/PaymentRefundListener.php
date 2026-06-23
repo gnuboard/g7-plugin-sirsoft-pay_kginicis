@@ -98,6 +98,8 @@ class PaymentRefundListener implements HookListenerInterface
             $isCbt = $this->isCbtPayment($payment);
             if ($isCbt) {
                 $this->useStoredCbtCredentials($apiService, $payment);
+            } else {
+                $this->useStoredStandardCredentials($apiService, $payment, $tid);
             }
 
             $response = $isCbt
@@ -151,6 +153,46 @@ class PaymentRefundListener implements HookListenerInterface
         return (bool) ($meta['is_cbt'] ?? false)
             || ($meta['cbt_type'] ?? null) !== null
             || strtoupper((string) ($meta['pay_method'] ?? '')) === 'CBT';
+    }
+
+    private function useStoredStandardCredentials(KgInicisApiService $apiService, OrderPayment $payment, string $tid): void
+    {
+        $meta = $payment->payment_meta ?? [];
+        $raw = is_array($meta['pg_raw_response'] ?? null) ? $meta['pg_raw_response'] : [];
+        $mid = $this->resolvePaymentMid($meta, $raw, $tid);
+
+        if ($mid === null) {
+            return;
+        }
+
+        $isTestMode = $meta['is_test_mode'] ?? ! str_starts_with($mid, 'SIR');
+
+        $apiService->useStoredCredentials((bool) $isTestMode, $mid);
+    }
+
+    /**
+     * 결제 시점에 사용된 표준 MID를 payment_meta/raw/TID 순서로 복원한다.
+     */
+    private function resolvePaymentMid(array $meta, array $raw, string $tid): ?string
+    {
+        if (! empty($meta['mid']) && is_string($meta['mid'])) {
+            return $meta['mid'];
+        }
+
+        foreach (['mid', 'MID'] as $key) {
+            if (! empty($raw[$key]) && is_string($raw[$key])) {
+                return $raw[$key];
+            }
+        }
+
+        if (strlen($tid) >= 20) {
+            $candidate = substr($tid, 10, 10);
+            if (preg_match('/^[A-Za-z0-9]{10}$/', $candidate) === 1) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     private function useStoredCbtCredentials(KgInicisApiService $apiService, OrderPayment $payment): void
