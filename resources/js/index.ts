@@ -7,6 +7,7 @@ import { installVbankInfoInjector } from './vbankInfoInjector';
 import { installPaymentCloseMessageListener } from './paymentCloseMessageListener';
 import { installCheckoutJpyPaymentMethodRestrictor } from './checkoutJpyPaymentMethodRestrictor';
 import { installCheckoutNaverpayBrandButton } from './checkoutNaverpayBrandButton';
+import { installAdminPaymentMethodBrandInjector } from './adminPaymentMethodBrandInjector';
 
 const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
@@ -91,6 +92,7 @@ installCheckoutNaverpayBrandButton();
 
 installMypageOrderShowInjector();
 installAdminOrderPaymentDisplayInjector();
+installAdminPaymentMethodBrandInjector();
 installOrderCompleteReceiptInjector();
 installVbankInfoInjector();
 installPaymentCloseMessageListener();
