@@ -506,7 +506,7 @@
                     "name": "Div",
                     "if": "{{(order.data?.payments?.filter(p => p.transaction_id && p.pg_provider === 'kginicis') ?? []).length > 0}}",
                     "props": {
-                        "className": "card"
+                        "className": "admin-card"
                     },
                     "children": [
                         {
@@ -996,7 +996,7 @@
                     "type": "basic",
                     "name": "Div",
                     "if": "{{kginicis_escrow_delivery.data?.has_escrow_payment === true}}",
-                    "props": { "className": "card mt-4" },
+                    "props": { "className": "admin-card mt-4" },
                     "children": [
                         {
                             "type": "basic",
@@ -1300,7 +1300,7 @@
                     "type": "basic",
                     "name": "Div",
                     "if": "{{kginicis_escrow_delivery.data?.has_escrow_payment === true && kginicis_escrow_delivery.data?.escrow_confirm?.type === 'deny'}}",
-                    "props": { "className": "card mt-4" },
+                    "props": { "className": "admin-card mt-4" },
                     "children": [
                         {
                             "type": "basic",
@@ -1492,7 +1492,7 @@
                     "type": "basic",
                     "name": "Div",
                     "if": "{{false}}",
-                    "props": { "className": "card mt-4" },
+                    "props": { "className": "admin-card mt-4" },
                     "children": [
                         {
                             "type": "basic",
