@@ -20,16 +20,28 @@ class AdminCbtReconciliationController extends AdminBaseController
         parent::__construct();
     }
 
+    /**
+     * CBT 조정 레코드를 조회합니다.
+     *
+     * @param  string  $orderNumber  주문번호
+     * @return JsonResponse 조정 레코드 응답
+     */
     public function show(string $orderNumber): JsonResponse
     {
         return ResponseHelper::success('messages.success', $this->reconciliationService->get($orderNumber));
     }
 
+    /**
+     * CBT 자동환불 재시도를 수행합니다.
+     *
+     * @param  string  $orderNumber  주문번호
+     * @return JsonResponse 재시도 결과 응답
+     */
     public function retryRefund(string $orderNumber): JsonResponse
     {
-        $record = $this->reconciliationService->get($orderNumber);
+        $record = $this->reconciliationService->claimRefundRetry($orderNumber);
 
-        if (! $record || ! ($record['can_retry'] ?? false)) {
+        if (! $record) {
             return ResponseHelper::pluginError(
                 'sirsoft-pay_kginicis',
                 'messages.cbt_reconciliation.not_retryable',
@@ -39,7 +51,7 @@ class AdminCbtReconciliationController extends AdminBaseController
 
         $tid = (string) $record['tid'];
         $amount = (int) ($record['amount'] ?? 0);
-        $retryCount = (int) ($record['retry_count'] ?? 0) + 1;
+        $retryCount = (int) ($record['retry_count'] ?? 0);
         $reason = '관리자 CBT 자동환불 재시도';
 
         try {

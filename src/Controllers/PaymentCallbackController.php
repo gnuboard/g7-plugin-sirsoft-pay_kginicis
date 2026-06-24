@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Modules\Sirsoft\Ecommerce\Enums\PaymentMethodEnum;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Exceptions\PaymentAmountMismatchException;
 use Modules\Sirsoft\Ecommerce\Helpers\DeviceDetector;
@@ -357,7 +358,6 @@ class PaymentCallbackController
             'moid'     => $moid,
             'amt'      => $amt,
             'bank'     => $validated['nm_inputbank'] ?? null,
-            'depositor' => $validated['nm_input'] ?? null,
         ]);
 
         try {
@@ -373,6 +373,16 @@ class PaymentCallbackController
                 $this->logReplayDetected($tid, $moid, 'PC vbankNotify');
 
                 return response('OK', 200)->header('Content-Type', 'text/plain');
+            }
+
+            if (! $this->validateVbankNotifyContext($order, [
+                'tid' => $tid,
+                'mid' => (string) ($validated['id_merchant'] ?? ''),
+                'amount' => $amt,
+                'account' => (string) ($validated['no_vacct'] ?? ''),
+                'source' => 'PC vbankNotify',
+            ])) {
+                return response('FAIL', 200)->header('Content-Type', 'text/plain');
             }
 
             $this->orderService->completePayment($order, [
@@ -439,7 +449,6 @@ class PaymentCallbackController
             'moid'     => $moid,
             'amt'      => $amt,
             'bank'     => $validated['P_FN_NM'] ?? null,
-            'depositor' => $validated['P_UNAME'] ?? null,
         ]);
 
         try {
@@ -455,6 +464,16 @@ class PaymentCallbackController
                 $this->logReplayDetected($tid, $moid, 'mobile vbankNotify');
 
                 return response('OK', 200)->header('Content-Type', 'text/plain');
+            }
+
+            if (! $this->validateVbankNotifyContext($order, [
+                'tid' => $tid,
+                'mid' => (string) ($validated['P_MID'] ?? ''),
+                'amount' => $amt,
+                'account' => $this->extractMobileVbankAccount((string) ($validated['P_RMESG1'] ?? '')),
+                'source' => 'mobile vbankNotify',
+            ])) {
+                return response('FAIL', 200)->header('Content-Type', 'text/plain');
             }
 
             $this->orderService->completePayment($order, [
@@ -487,6 +506,125 @@ class PaymentCallbackController
 
             return response('FAIL', 200)->header('Content-Type', 'text/plain');
         }
+    }
+
+    /**
+     * 입금통보가 실제로 이 주문에서 발급한 가상계좌 결제 건인지 확인한다.
+     *
+     * KG 이니시스 PC 노티는 별도 서명 필드를 제공하지 않으므로, IP 화이트리스트에 더해
+     * 결제행에 저장된 발급 시점 TID/MID/계좌/금액을 대조해 위조 통보 표면을 줄인다.
+     *
+     * @param  array{tid:string,mid:string,amount:int,account:string,source:string}  $notify
+     */
+    private function validateVbankNotifyContext(Order $order, array $notify): bool
+    {
+        $payment = $order->payment()->first();
+        $meta = is_array($payment?->payment_meta) ? $payment->payment_meta : [];
+        $source = $notify['source'];
+
+        if (! $payment) {
+            Log::warning('KG Inicis: vbank notify rejected - payment missing', [
+                'source' => $source,
+                'moid' => $order->order_number,
+                'tid' => $notify['tid'],
+            ]);
+
+            return false;
+        }
+
+        $paymentStatus = $this->enumValue($payment->payment_status);
+        if ($paymentStatus !== PaymentStatusEnum::WAITING_DEPOSIT->value) {
+            Log::warning('KG Inicis: vbank notify rejected - payment is not waiting deposit', [
+                'source' => $source,
+                'moid' => $order->order_number,
+                'tid' => $notify['tid'],
+                'payment_status' => $paymentStatus,
+            ]);
+
+            return false;
+        }
+
+        $paymentMethod = $this->enumValue($payment->payment_method);
+        if ($paymentMethod !== PaymentMethodEnum::VBANK->value) {
+            Log::warning('KG Inicis: vbank notify rejected - payment method mismatch', [
+                'source' => $source,
+                'moid' => $order->order_number,
+                'tid' => $notify['tid'],
+                'payment_method' => $paymentMethod,
+            ]);
+
+            return false;
+        }
+
+        $expectedTid = trim((string) $payment->transaction_id);
+        if ($expectedTid === '' || ! hash_equals($expectedTid, $notify['tid'])) {
+            Log::warning('KG Inicis: vbank notify rejected - tid mismatch', [
+                'source' => $source,
+                'moid' => $order->order_number,
+                'received_tid' => $notify['tid'],
+                'expected_tid' => $expectedTid,
+            ]);
+
+            return false;
+        }
+
+        $expectedMid = trim((string) ($meta['mid'] ?? $this->apiService->getMid()));
+        if ($expectedMid !== '' && ! hash_equals($expectedMid, $notify['mid'])) {
+            Log::warning('KG Inicis: vbank notify rejected - mid mismatch', [
+                'source' => $source,
+                'moid' => $order->order_number,
+                'tid' => $notify['tid'],
+                'received_mid' => $notify['mid'],
+                'expected_mid' => $expectedMid,
+            ]);
+
+            return false;
+        }
+
+        $expectedAmount = (int) round((float) $order->total_due_amount);
+        if ($expectedAmount > 0 && $notify['amount'] !== $expectedAmount) {
+            Log::warning('KG Inicis: vbank notify rejected - amount mismatch', [
+                'source' => $source,
+                'moid' => $order->order_number,
+                'tid' => $notify['tid'],
+                'received_amount' => $notify['amount'],
+                'expected_amount' => $expectedAmount,
+            ]);
+
+            return false;
+        }
+
+        $expectedAccount = preg_replace('/\D+/', '', (string) $payment->vbank_number);
+        $receivedAccount = preg_replace('/\D+/', '', $notify['account']);
+        if ($expectedAccount !== '' && $receivedAccount !== '' && ! hash_equals($expectedAccount, $receivedAccount)) {
+            Log::warning('KG Inicis: vbank notify rejected - account mismatch', [
+                'source' => $source,
+                'moid' => $order->order_number,
+                'tid' => $notify['tid'],
+                'received_account_suffix' => substr($receivedAccount, -4),
+                'expected_account_suffix' => substr($expectedAccount, -4),
+            ]);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function extractMobileVbankAccount(string $message): string
+    {
+        $parts = explode('|', $message);
+
+        return trim((string) ($parts[0] ?? ''));
+    }
+
+    private function enumValue(mixed $value): string
+    {
+        if ($value instanceof \BackedEnum) {
+            return (string) $value->value;
+        }
+
+        return (string) $value;
     }
 
     private function resolveSuccessUrl(string $orderId): string
