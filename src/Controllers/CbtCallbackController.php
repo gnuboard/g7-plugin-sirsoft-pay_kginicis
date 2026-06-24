@@ -225,6 +225,8 @@ class CbtCallbackController
             }
 
             $this->assertCbtApproveResponseMatchesOrder($order, $pgResponse, $request, $payMethod);
+            // PG 승인금액이 누락되어 검증 예외가 발생해도 자동환불 대사 레코드에는 주문금액을 남긴다.
+            $approvedAmount = (int) round((float) $order->total_due_amount);
             $approvedAmount = $this->resolveApprovedAmount($pgResponse, $order);
             $authResponse = $this->sanitizePgResponse($request->except(['_token']), self::CBT_AUTH_RESPONSE_KEYS);
             $approveResponse = $this->sanitizePgResponse($pgResponse, self::CBT_APPROVE_RESPONSE_KEYS);
@@ -402,7 +404,7 @@ class CbtCallbackController
         $pgAmount = $pgResponse['amount'] ?? $pgResponse['price'] ?? null;
 
         if ($pgAmount === null || $pgAmount === '') {
-            return $expectedAmount;
+            throw new \RuntimeException('KG Inicis CBT approved amount missing.');
         }
 
         $approvedAmount = (int) $pgAmount;

@@ -3,6 +3,7 @@
 namespace Plugins\Sirsoft\PayKginicis\Tests\Feature\Controllers;
 
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Modules\Sirsoft\Ecommerce\Database\Factories\OrderFactory;
 use Modules\Sirsoft\Ecommerce\Database\Factories\OrderPaymentFactory;
@@ -361,9 +362,11 @@ class PaymentCallbackControllerTest extends PluginTestCase
     public function test_vbank_notify_returns_ok_on_successful_deposit(): void
     {
         $order = $this->createTestOrder(30000);
+        $this->markVbankIssued($order, 'VBANK_TID_SUCCESS', '1234567890');
         $this->mockPluginSettings();
 
         $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $this->makeVbankNotifyPayload([
+            'no_tid' => 'VBANK_TID_SUCCESS',
             'no_oid' => $order->order_number,
             'amt_input' => '30000',
         ]));
@@ -383,6 +386,51 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $this->assertArrayHasKey('no_tid', $meta['pg_raw_response']);
         $this->assertArrayNotHasKey('no_vacct', $meta['pg_raw_response']);
         $this->assertArrayNotHasKey('nm_input', $meta['pg_raw_response']);
+    }
+
+    public function test_vbank_notify_rejects_unissued_or_mismatched_account_context(): void
+    {
+        $order = $this->createTestOrder(30000);
+        $this->markVbankIssued($order, 'VBANK_TID_ISSUED', '1234567890');
+        $this->mockPluginSettings();
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $this->makeVbankNotifyPayload([
+            'no_tid' => 'VBANK_TID_ATTACKER',
+            'no_oid' => $order->order_number,
+            'no_vacct' => '9999999999',
+            'amt_input' => '30000',
+        ]));
+
+        $response->assertOk();
+        $this->assertSame('FAIL', $response->getContent());
+
+        $order->refresh();
+        $this->assertEquals(OrderStatusEnum::PENDING_ORDER, $order->order_status);
+        $this->assertEquals(PaymentStatusEnum::WAITING_DEPOSIT, $order->payment->fresh()->payment_status);
+    }
+
+    public function test_vbank_notify_does_not_write_depositor_name_to_application_log(): void
+    {
+        $order = $this->createTestOrder(30000);
+        $this->markVbankIssued($order, 'VBANK_TID_LOG', '1234567890');
+        $this->mockPluginSettings();
+
+        Log::spy();
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $this->makeVbankNotifyPayload([
+            'no_tid' => 'VBANK_TID_LOG',
+            'no_oid' => $order->order_number,
+            'amt_input' => '30000',
+            'nm_input' => '홍길동',
+        ]));
+
+        $response->assertOk();
+
+        Log::shouldHaveReceived('info')
+            ->with('KG Inicis: PC vbank deposit notify received', \Mockery::on(function (array $context): bool {
+                return ! array_key_exists('depositor', $context);
+            }))
+            ->once();
     }
 
     public function test_mobile_callback_stores_sanitized_pg_response_only(): void
@@ -445,12 +493,72 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $this->assertArrayNotHasKey('P_MOBILE', $meta['pg_raw_response']);
     }
 
+    public function test_mobile_vbank_notify_rejects_unissued_or_mismatched_account_context(): void
+    {
+        $order = $this->createTestOrder(30000);
+        $this->markVbankIssued($order, 'MOBILE_VBANK_TID_ISSUED', '1234567890');
+        $this->mockPluginSettings();
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/mobile/vbank-notify', [
+            'P_STATUS' => '02',
+            'P_TYPE' => 'VBANK',
+            'P_TID' => 'MOBILE_VBANK_TID_ATTACKER',
+            'P_MID' => self::TEST_MID,
+            'P_OID' => $order->order_number,
+            'P_AMT' => '30000',
+            'P_AUTH_DT' => now()->format('YmdHis'),
+            'P_FN_CD1' => '04',
+            'P_FN_NM' => '국민은행',
+            'P_RMESG1' => '9999999999|20260630235959',
+            'P_UNAME' => '홍길동',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('FAIL', $response->getContent());
+
+        $order->refresh();
+        $this->assertEquals(OrderStatusEnum::PENDING_ORDER, $order->order_status);
+        $this->assertEquals(PaymentStatusEnum::WAITING_DEPOSIT, $order->payment->fresh()->payment_status);
+    }
+
+    public function test_mobile_vbank_notify_does_not_write_depositor_name_to_application_log(): void
+    {
+        $order = $this->createTestOrder(30000);
+        $this->markVbankIssued($order, 'MOBILE_VBANK_TID_LOG', '1234567890');
+        $this->mockPluginSettings();
+
+        Log::spy();
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/mobile/vbank-notify', [
+            'P_STATUS' => '02',
+            'P_TYPE' => 'VBANK',
+            'P_TID' => 'MOBILE_VBANK_TID_LOG',
+            'P_MID' => self::TEST_MID,
+            'P_OID' => $order->order_number,
+            'P_AMT' => '30000',
+            'P_AUTH_DT' => now()->format('YmdHis'),
+            'P_FN_CD1' => '04',
+            'P_FN_NM' => '국민은행',
+            'P_RMESG1' => '1234567890|20260630235959',
+            'P_UNAME' => '홍길동',
+        ]);
+
+        $response->assertOk();
+
+        Log::shouldHaveReceived('info')
+            ->with('KG Inicis: mobile vbank deposit notify received', \Mockery::on(function (array $context): bool {
+                return ! array_key_exists('depositor', $context);
+            }))
+            ->once();
+    }
+
     /**
      * 동일 TID 가 두 번 통보되어도 중복 결제 처리하지 않고 OK 반환 (replay 방어).
      */
     public function test_vbank_notify_is_idempotent_on_duplicate_tid(): void
     {
         $order = $this->createTestOrder(30000);
+        $this->markVbankIssued($order, 'VBANK_TID_DUP', '1234567890');
         $this->mockPluginSettings();
 
         $payload = $this->makeVbankNotifyPayload([
@@ -501,5 +609,20 @@ class PaymentCallbackControllerTest extends PluginTestCase
             'nm_inputbank' => '국민은행',
             'nm_input'     => '홍길동',
         ], $overrides);
+    }
+
+    private function markVbankIssued(Order $order, string $tid, string $vbankNumber): void
+    {
+        $order->payment()->update([
+            'payment_status' => PaymentStatusEnum::WAITING_DEPOSIT,
+            'payment_method' => PaymentMethodEnum::VBANK,
+            'transaction_id' => $tid,
+            'vbank_number' => $vbankNumber,
+            'payment_meta' => [
+                'pay_method' => 'VBank',
+                'mid' => self::TEST_MID,
+                'is_test_mode' => true,
+            ],
+        ]);
     }
 }
