@@ -7,12 +7,17 @@ namespace Plugins\Sirsoft\PayKginicis\Concerns;
 use Illuminate\Http\Request;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Models\OrderAddress;
+use Modules\Sirsoft\Ecommerce\Services\CurrencyConversionService;
 
 trait ValidatesCbtOrderContext
 {
     protected function expectedPaymentPrice(Order $order): int
     {
-        return (int) round((float) $order->total_due_amount);
+        // PG 청구 금액 = base total_due_amount 를 주문 스냅샷 환율로 결제 통화 환산한
+        // 최소 화폐단위 정수. 모듈의 환산 SSoT(resolveSnapshotPaymentCharge)를 재사용해
+        // buildPgPaymentData(클라이언트가 보내는 price)와 검증 기준을 동일하게 맞춘다.
+        return app(CurrencyConversionService::class)
+            ->resolveSnapshotPaymentCharge((float) $order->total_due_amount, $order->currency_snapshot ?? [])['minor_unit_amount'];
     }
 
     protected function cbtExpectedPrice(Order $order): int
