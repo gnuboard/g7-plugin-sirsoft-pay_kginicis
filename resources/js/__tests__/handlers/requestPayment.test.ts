@@ -157,6 +157,89 @@ describe('requestPaymentHandler — PC closeUrl', () => {
         expect(fields.payViewType).toBe('overlay');
     });
 
+    it('한국 표준 결제 폼은 KRW 주문을 WON 통화코드로만 전송한다', async () => {
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: { ...PG_PAYMENT, currency: 'KRW' },
+                paymentMethod: 'card',
+            },
+        });
+
+        expect(paySpy).toHaveBeenCalledTimes(1);
+        const fields = getLastPaymentFormFields();
+        expect(fields.currency).toBe('WON');
+    });
+
+    it('USD 같은 제3통화는 한국 표준 결제로 보내지 않고 중단한다', async () => {
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: { ...PG_PAYMENT, currency: 'USD' },
+                paymentMethod: 'card',
+            },
+        });
+
+        expect(apiPost).not.toHaveBeenCalled();
+        expect(paySpy).not.toHaveBeenCalled();
+        expect(document.body.querySelector('form')).toBeNull();
+        expect((window as any).G7Core.state.setLocal).toHaveBeenCalledWith(
+            expect.objectContaining({
+                isSubmittingOrder: false,
+                paymentErrorMessage: 'KG Inicis supports only KRW standard payments or JPY Japan CBT payments.',
+            }),
+        );
+    });
+
+    it('라이브 표준 결제 설정이 미완료이면 결제창 호출 전에 중단한다', async () => {
+        apiGet.mockResolvedValue({
+            data: {
+                ...CLIENT_CONFIG.data,
+                standard_configured: false,
+            },
+        });
+
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: PG_PAYMENT,
+                paymentMethod: 'card',
+            },
+        });
+
+        expect(apiPost).not.toHaveBeenCalled();
+        expect(paySpy).not.toHaveBeenCalled();
+        expect(document.body.querySelector('form')).toBeNull();
+        expect((window as any).G7Core.state.setLocal).toHaveBeenCalledWith(
+            expect.objectContaining({
+                isSubmittingOrder: false,
+                paymentErrorMessage: 'KG Inicis live standard payment is not configured.',
+            }),
+        );
+    });
+
+    it('비활성화된 KG 이니시스 간편결제 수단은 직접 결제 호출을 중단한다', async () => {
+        apiGet.mockResolvedValue({
+            data: {
+                ...CLIENT_CONFIG.data,
+                easy_pay_enabled_methods: ['kginicis_kakaopay'],
+            },
+        });
+
+        await requestPaymentHandler({
+            params: {
+                pgPaymentData: PG_PAYMENT,
+                paymentMethod: 'kginicis_naverpay',
+            },
+        });
+
+        expect(apiPost).not.toHaveBeenCalled();
+        expect(paySpy).not.toHaveBeenCalled();
+        expect((window as any).G7Core.state.setLocal).toHaveBeenCalledWith(
+            expect.objectContaining({
+                isSubmittingOrder: false,
+                paymentErrorMessage: 'Selected KG Inicis easy pay method is disabled.',
+            }),
+        );
+    });
+
     it('이전 KG 결제 폼 잔재를 제거하고 새 폼만 생성한다', async () => {
         const staleForm = document.createElement('form');
         staleForm.id = 'kginicis_pay_form_stale';

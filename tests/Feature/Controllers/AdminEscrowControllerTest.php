@@ -22,7 +22,7 @@ class AdminEscrowControllerTest extends PluginTestCase
     {
         parent::setUp();
 
-        $this->adminUser = $this->createAdminUser();
+        $this->adminUser = $this->createAdminUser(['sirsoft-ecommerce.orders.update']);
     }
 
     public function test_escrow_delivery_register_sanitizes_pg_response_before_storing(): void

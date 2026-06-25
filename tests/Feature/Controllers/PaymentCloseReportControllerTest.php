@@ -76,6 +76,29 @@ class PaymentCloseReportControllerTest extends PluginTestCase
             ->assertJsonPath('errors.message.0', 'Payment amount does not match the order amount.');
     }
 
+    public function test_close_report_rejects_non_krw_order_without_failing_payment(): void
+    {
+        $order = $this->makeOrder('ORD-CLOSE-USD-001', 10000, 'USD');
+
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldReceive('findByOrderNumber')
+            ->once()
+            ->with('ORD-CLOSE-USD-001')
+            ->andReturn($order);
+        $orderService->shouldNotReceive('failPayment');
+        $orderService->shouldNotReceive('recordPaymentCancellation');
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/payment/close-report', [
+            'oid' => 'ORD-CLOSE-USD-001',
+            'price' => 10000,
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('errors.message.0', 'Standard KG Inicis close report is only available for KRW orders.');
+    }
+
     public function test_close_report_rejects_buyer_mismatch(): void
     {
         $order = $this->makeOrder('ORD-CLOSE-003', 10000);

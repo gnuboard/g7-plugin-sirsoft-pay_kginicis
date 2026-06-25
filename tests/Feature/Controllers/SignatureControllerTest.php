@@ -27,6 +27,7 @@ class SignatureControllerTest extends PluginTestCase
             ->andReturn($order);
 
         $apiService = Mockery::mock(KgInicisApiService::class);
+        $apiService->shouldReceive('hasStandardPaymentCredentials')->andReturnTrue();
         $apiService->shouldReceive('generateSignature')
             ->with('ORD-SIGN-001', 10000, Mockery::type('string'))
             ->andReturn('signature-ok');
@@ -78,6 +79,32 @@ class SignatureControllerTest extends PluginTestCase
             ->assertJsonPath('message', 'Payment amount does not match the order amount.');
     }
 
+    public function test_pc_signature_rejects_non_krw_order(): void
+    {
+        $order = $this->makePendingOrder('ORD-SIGN-USD-001', 10000, 'USD');
+
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldReceive('findByOrderNumber')
+            ->with('ORD-SIGN-USD-001')
+            ->andReturn($order);
+
+        $apiService = Mockery::mock(KgInicisApiService::class);
+        $apiService->shouldNotReceive('generateSignature');
+        $apiService->shouldNotReceive('generateVerification');
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+        $this->app->instance(KgInicisApiService::class, $apiService);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/payment/signature', [
+            'oid' => 'ORD-SIGN-USD-001',
+            'price' => 10000,
+            'timestamp' => $this->freshEpochMs(),
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('message', 'Standard KG Inicis signature is only available for KRW orders.');
+    }
+
     public function test_pc_signature_rejects_order_buyer_mismatch(): void
     {
         $order = $this->makePendingOrder('ORD-SIGN-003', 10000);
@@ -111,7 +138,34 @@ class SignatureControllerTest extends PluginTestCase
             ->assertJsonPath('message', 'Order buyer verification failed.');
     }
 
-    public function test_mobile_signature_rejects_jpy_order(): void
+    public function test_pc_signature_rejects_missing_standard_credentials(): void
+    {
+        $order = $this->makePendingOrder('ORD-SIGN-NOCFG-001', 10000);
+
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldReceive('findByOrderNumber')
+            ->with('ORD-SIGN-NOCFG-001')
+            ->andReturn($order);
+
+        $apiService = Mockery::mock(KgInicisApiService::class);
+        $apiService->shouldReceive('hasStandardPaymentCredentials')->andReturnFalse();
+        $apiService->shouldNotReceive('generateSignature');
+        $apiService->shouldNotReceive('generateVerification');
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+        $this->app->instance(KgInicisApiService::class, $apiService);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/payment/signature', [
+            'oid' => 'ORD-SIGN-NOCFG-001',
+            'price' => 10000,
+            'timestamp' => $this->freshEpochMs(),
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('message', 'KG Inicis standard payment credentials are not configured.');
+    }
+
+    public function test_mobile_signature_rejects_non_krw_order(): void
     {
         $order = $this->makePendingOrder('ORD-SIGN-004', 100, 'JPY');
 
@@ -133,7 +187,33 @@ class SignatureControllerTest extends PluginTestCase
         ]);
 
         $response->assertStatus(422)
-            ->assertJsonPath('message', 'Standard KG Inicis signature is not available for JPY orders.');
+            ->assertJsonPath('message', 'Standard KG Inicis signature is only available for KRW orders.');
+    }
+
+    public function test_mobile_signature_rejects_missing_mobile_credentials(): void
+    {
+        $order = $this->makePendingOrder('ORD-SIGN-NOCFG-002', 10000);
+
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldReceive('findByOrderNumber')
+            ->with('ORD-SIGN-NOCFG-002')
+            ->andReturn($order);
+
+        $apiService = Mockery::mock(KgInicisApiService::class);
+        $apiService->shouldReceive('hasMobilePaymentCredentials')->andReturnFalse();
+        $apiService->shouldNotReceive('generateMobileChkfake');
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+        $this->app->instance(KgInicisApiService::class, $apiService);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/payment/mobile/signature', [
+            'oid' => 'ORD-SIGN-NOCFG-002',
+            'price' => 10000,
+            'timestamp' => $this->freshEpochMs(),
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('message', 'KG Inicis mobile payment credentials are not configured.');
     }
 
     private function makePendingOrder(string $orderNumber, int $amount, string $currency = 'KRW'): Order

@@ -51,6 +51,9 @@ interface ClientConfig {
     japan_enabled: boolean;
     japan_restrict_jpy_payment_methods?: boolean;
     japan_configured?: boolean;
+    standard_configured?: boolean;
+    mobile_configured?: boolean;
+    easy_pay_enabled_methods?: string[];
     use_escrow: boolean;
     japan_mid: string;
     cbt_extra_data?: CbtExtraData;
@@ -158,6 +161,12 @@ function appendSelectedPaymentMethod(url: string, paymentMethod: string): string
     return resolved.toString();
 }
 
+function normalizePaymentCurrency(currency?: string): string {
+    const normalized = (currency ?? '').trim().toUpperCase();
+
+    return normalized === '' || normalized === 'WON' ? 'KRW' : normalized;
+}
+
 function submitForm(action: string, fields: Record<string, string>, charset = 'utf-8', formId?: string): void {
     const form = document.createElement('form');
     if (formId) {
@@ -246,6 +255,12 @@ const CBT_PAYMETHODS_BY_PAYMENT_METHOD: Record<string, string[]> = {
 };
 
 const CBT_ALLOWED_PAYMENT_METHODS = new Set(Object.keys(CBT_PAYMETHODS_BY_PAYMENT_METHOD));
+const DOMESTIC_EASY_PAY_METHODS = new Set([
+    'kginicis_samsung_pay',
+    'kginicis_naverpay',
+    'kginicis_lpay',
+    'kginicis_kakaopay',
+]);
 
 /**
  * KG 이니시스 한국 모바일 결제
@@ -414,7 +429,7 @@ async function requestKoreanPayment(
         oid:          pgPaymentData.order_number,
         goodname:     pgPaymentData.order_name,
         price:        String(pgPaymentData.amount),
-        currency:     pgPaymentData.currency === 'KRW' ? 'WON' : (pgPaymentData.currency ?? 'WON'),
+        currency:     'WON',
         buyername:    pgPaymentData.customer_name ?? '',
         buyeremail:   pgPaymentData.customer_email ?? '',
         buyertel:     pgPaymentData.customer_phone ?? '',
@@ -616,9 +631,11 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
         }
 
         const config: ClientConfig = configJson.data;
-        const currency = pgPaymentData.currency ?? 'WON';
+        const currency = normalizePaymentCurrency(pgPaymentData.currency);
         const isJpy = currency === 'JPY';
+        const isKrw = currency === 'KRW';
         const isJapanPaymentMethod = paymentMethod.startsWith('kginicis_japan_');
+        const isDomesticEasyPayMethod = DOMESTIC_EASY_PAY_METHODS.has(paymentMethod);
         const isJapanConfigured =
             config.japan_enabled &&
             !!config.japan_mid &&
@@ -629,6 +646,16 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
             throw new Error('KG Inicis Japan payment methods require a JPY order.');
         }
 
+        if (isDomesticEasyPayMethod && Array.isArray(config.easy_pay_enabled_methods)
+            && !config.easy_pay_enabled_methods.includes(paymentMethod)
+        ) {
+            throw new Error('Selected KG Inicis easy pay method is disabled.');
+        }
+
+        if (!isJpy && !isKrw) {
+            throw new Error('KG Inicis supports only KRW standard payments or JPY Japan CBT payments.');
+        }
+
         if (isJpy && !isJapanConfigured) {
             throw new Error('KG Inicis Japan CBT payment is not configured.');
         }
@@ -637,9 +664,19 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
             throw new Error('JPY orders can only use KG Inicis Japan CBT payment methods.');
         }
 
+        const isMobile = isMobileUserAgent();
+
+        if (isKrw && config.standard_configured === false) {
+            throw new Error('KG Inicis live standard payment is not configured.');
+        }
+
+        if (isKrw && isMobile && config.mobile_configured === false) {
+            throw new Error('KG Inicis live mobile payment is not configured.');
+        }
+
         if (isJpy) {
             await requestCbtPayment(G7Core, config, pgPaymentData, paymentMethod);
-        } else if (isMobileUserAgent()) {
+        } else if (isMobile) {
             await requestMobileKoreanPayment(G7Core, config, pgPaymentData, paymentMethod);
         } else {
             await requestKoreanPayment(G7Core, config, pgPaymentData, paymentMethod);

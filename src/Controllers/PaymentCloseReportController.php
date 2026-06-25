@@ -53,9 +53,9 @@ class PaymentCloseReportController
             ]);
         }
 
-        if (strtoupper((string) $order->currency) === 'JPY') {
+        if (strtoupper((string) $order->currency) !== 'KRW') {
             return ResponseHelper::error('messages.failed', 422, [
-                'message' => ['Standard KG Inicis close report is not available for JPY orders.'],
+                'message' => ['Standard KG Inicis close report is only available for KRW orders.'],
             ]);
         }
 
