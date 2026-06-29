@@ -95,6 +95,28 @@ class ValidateCbtSettingsListenerTest extends PluginTestCase
         ]);
     }
 
+    public function test_backend_settings_validation_messages_are_localized(): void
+    {
+        $this->mockCurrentSettings([]);
+        app()->setLocale('ko');
+
+        $listener = new ValidateCbtSettingsListener();
+
+        try {
+            $listener->validateBeforeSave('sirsoft-pay_kginicis', [
+                'japan_enabled' => true,
+                'is_test_mode' => false,
+                'live_japan_mid' => '',
+                'live_japan_sign_key' => '',
+            ]);
+            $this->fail('ValidationException was not thrown.');
+        } catch (ValidationException $e) {
+            $message = $e->errors()['live_japan_mid'][0] ?? '';
+            $this->assertSame('운영 모드에서 일본 결제(CBT)를 사용하려면 라이브 일본 MID가 필요합니다.', $message);
+            $this->assertStringNotContainsString('sirsoft-pay_kginicis::messages', $message);
+        }
+    }
+
     public function test_live_japan_payment_rejects_sample_jppg_display_values(): void
     {
         $this->mockCurrentSettings([]);

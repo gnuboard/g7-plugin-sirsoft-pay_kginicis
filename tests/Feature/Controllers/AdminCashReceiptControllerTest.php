@@ -15,7 +15,7 @@ class AdminCashReceiptControllerTest extends PluginTestCase
 {
     public function test_cash_receipt_issue_returns_sanitized_pg_response(): void
     {
-        $admin = $this->createAdminUser();
+        $admin = $this->createAdminUser(['sirsoft-ecommerce.orders.update']);
         $order = OrderFactory::new()->paid()->create([
             'order_number' => 'ORD-CASH-RECEIPT-001',
             'total_amount' => 30000,
@@ -23,7 +23,7 @@ class AdminCashReceiptControllerTest extends PluginTestCase
             'total_paid_amount' => 30000,
         ]);
 
-        OrderPaymentFactory::new()->forOrder($order)->create([
+        $payment = OrderPaymentFactory::new()->forOrder($order)->create([
             'payment_status' => PaymentStatusEnum::PAID,
             'payment_method' => PaymentMethodEnum::VBANK,
             'pg_provider' => 'kginicis',
@@ -63,5 +63,9 @@ class AdminCashReceiptControllerTest extends PluginTestCase
             ->assertJsonMissingPath('data.pg_response.buyerName')
             ->assertJsonMissingPath('data.pg_response.buyerTel')
             ->assertJsonMissingPath('data.pg_response.buyerEmail');
+
+        $payment->refresh();
+        $this->assertSame('*******5678', $payment->cash_receipt_identifier);
+        $this->assertNotSame('01012345678', $payment->cash_receipt_identifier);
     }
 }

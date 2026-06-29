@@ -19,6 +19,13 @@ class RegisterPgProviderListener implements HookListenerInterface
 
     private const CBT_AUTH_URL_LIVE = 'https://cbt.inicis.com/cbtauth';
 
+    private const DOMESTIC_EASY_PAY_SETTINGS = [
+        'kginicis_samsung_pay' => 'easy_pay_samsung_pay',
+        'kginicis_naverpay' => 'easy_pay_naverpay',
+        'kginicis_lpay' => 'easy_pay_lpay',
+        'kginicis_kakaopay' => 'easy_pay_kakaopay',
+    ];
+
 /**
 
  * getSubscribedHooks
@@ -120,6 +127,8 @@ class RegisterPgProviderListener implements HookListenerInterface
             'japan_enabled'                      => $settings['japan_enabled'] ?? false,
             'japan_restrict_jpy_payment_methods' => (bool) ($settings['japan_restrict_jpy_payment_methods'] ?? false),
             'japan_configured'                   => $this->isJapanConfigured($settings, $isTest),
+            'standard_configured'                => $this->isStandardConfigured($settings, $isTest),
+            'mobile_configured'                  => $this->isMobileConfigured($settings, $isTest),
             'use_escrow'                         => $settings['use_escrow'] ?? false,
             'japan_mid'                          => $isTest
                 ? KgInicisApiService::JAPAN_TEST_MID
@@ -127,6 +136,7 @@ class RegisterPgProviderListener implements HookListenerInterface
             'cbt_extra_data'                     => $this->buildCbtExtraData($settings),
             'use_credit_point'                   => (bool) ($settings['use_credit_point'] ?? false),
             'easy_pay_show_brand_button'         => (bool) ($settings['easy_pay_show_brand_button'] ?? false),
+            'easy_pay_enabled_methods'           => $this->enabledDomesticEasyPayMethods($settings),
         ]);
     }
 
@@ -180,6 +190,60 @@ class RegisterPgProviderListener implements HookListenerInterface
 
         return trim((string) ($settings['live_japan_mid'] ?? '')) !== ''
             && trim((string) ($settings['live_japan_sign_key'] ?? '')) !== '';
+    }
+
+    /**
+     * 현재 모드의 표준결제 MID/signKey 준비 여부를 반환합니다.
+     *
+     * @param  array<string, mixed>  $settings
+     * @param  bool  $isTest
+     * @return bool
+     */
+    private function isStandardConfigured(array $settings, bool $isTest): bool
+    {
+        if ($isTest) {
+            return trim((string) ($settings['test_mid'] ?? '')) !== ''
+                && trim((string) ($settings['test_sign_key'] ?? '')) !== '';
+        }
+
+        return trim((string) ($settings['live_mid'] ?? '')) !== ''
+            && trim((string) ($settings['live_sign_key'] ?? '')) !== '';
+    }
+
+    /**
+     * 현재 모드의 모바일결제 MID/hashKey 준비 여부를 반환합니다.
+     *
+     * @param  array<string, mixed>  $settings
+     * @param  bool  $isTest
+     * @return bool
+     */
+    private function isMobileConfigured(array $settings, bool $isTest): bool
+    {
+        if ($isTest) {
+            return trim((string) ($settings['test_mid'] ?? '')) !== ''
+                && trim((string) ($settings['test_mobile_hash_key'] ?? '')) !== '';
+        }
+
+        return trim((string) ($settings['live_mid'] ?? '')) !== ''
+            && trim((string) ($settings['live_mobile_hash_key'] ?? '')) !== '';
+    }
+
+    /**
+     * 국내 간편결제 중 플러그인 설정에서 활성화된 수단 ID 목록을 반환합니다.
+     *
+     * @param  array<string, mixed>  $settings
+     * @return list<string>
+     */
+    private function enabledDomesticEasyPayMethods(array $settings): array
+    {
+        $enabled = [];
+        foreach (self::DOMESTIC_EASY_PAY_SETTINGS as $method => $settingKey) {
+            if ((bool) ($settings[$settingKey] ?? false)) {
+                $enabled[] = $method;
+            }
+        }
+
+        return $enabled;
     }
 
     private function setting(array $settings, string $key, string $default): string

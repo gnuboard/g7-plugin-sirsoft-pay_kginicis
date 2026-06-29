@@ -9,7 +9,6 @@ import {
 } from '../paymentDomCleanup';
 import {
     markStandardPaymentCloseReportContext,
-    monitorStandardPaymentWindowClose,
 } from '../paymentCloseMessageListener';
 
 interface PgPaymentData {
@@ -51,6 +50,9 @@ interface ClientConfig {
     japan_enabled: boolean;
     japan_restrict_jpy_payment_methods?: boolean;
     japan_configured?: boolean;
+    standard_configured?: boolean;
+    mobile_configured?: boolean;
+    easy_pay_enabled_methods?: string[];
     use_escrow: boolean;
     japan_mid: string;
     cbt_extra_data?: CbtExtraData;
@@ -158,6 +160,12 @@ function appendSelectedPaymentMethod(url: string, paymentMethod: string): string
     return resolved.toString();
 }
 
+function normalizePaymentCurrency(currency?: string): string {
+    const normalized = (currency ?? '').trim().toUpperCase();
+
+    return normalized === '' || normalized === 'WON' ? 'KRW' : normalized;
+}
+
 function submitForm(action: string, fields: Record<string, string>, charset = 'utf-8', formId?: string): void {
     const form = document.createElement('form');
     if (formId) {
@@ -246,6 +254,12 @@ const CBT_PAYMETHODS_BY_PAYMENT_METHOD: Record<string, string[]> = {
 };
 
 const CBT_ALLOWED_PAYMENT_METHODS = new Set(Object.keys(CBT_PAYMETHODS_BY_PAYMENT_METHOD));
+const DOMESTIC_EASY_PAY_METHODS = new Set([
+    'kginicis_samsung_pay',
+    'kginicis_naverpay',
+    'kginicis_lpay',
+    'kginicis_kakaopay',
+]);
 
 /**
  * KG 이니시스 한국 모바일 결제
@@ -414,7 +428,7 @@ async function requestKoreanPayment(
         oid:          pgPaymentData.order_number,
         goodname:     pgPaymentData.order_name,
         price:        String(pgPaymentData.amount),
-        currency:     pgPaymentData.currency === 'KRW' ? 'WON' : (pgPaymentData.currency ?? 'WON'),
+        currency:     'WON',
         buyername:    pgPaymentData.customer_name ?? '',
         buyeremail:   pgPaymentData.customer_email ?? '',
         buyertel:     pgPaymentData.customer_phone ?? '',
@@ -462,7 +476,10 @@ async function requestKoreanPayment(
 
     document.body.appendChild(form);
 
-    const baselineIframes = Array.from(document.querySelectorAll('iframe'));
+    // KG 이니시스 표준결제 닫힘 감지는 closeUrl(/payment/close) 페이지가 부모로 보내는
+    // postMessage('payment-window-closed') 한 경로로만 처리한다. INIStdPay 가 사용자의
+    // 명시적 닫기에서만 closeUrl 을 로드하므로, 성공(returnUrl 최상위 전송)·단순 이탈과
+    // 확실히 구분된다. (iframe 존재 폴링 휴리스틱은 성공/이탈 오탐 때문에 제거됨)
     if (config.callback_urls.close_report) {
         markStandardPaymentCloseReportContext({
             closeReportUrl: config.callback_urls.close_report,
@@ -471,15 +488,10 @@ async function requestKoreanPayment(
             buyer_email: pgPaymentData.customer_email ?? '',
             buyer_phone: pgPaymentData.customer_phone ?? '',
             payment_method: paymentMethod,
-            completionUrl: callbackUrl,
         });
     }
 
     window.INIStdPay.pay(formId);
-
-    if (config.callback_urls.close_report) {
-        monitorStandardPaymentWindowClose(baselineIframes);
-    }
 }
 
 /**
@@ -616,9 +628,11 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
         }
 
         const config: ClientConfig = configJson.data;
-        const currency = pgPaymentData.currency ?? 'WON';
+        const currency = normalizePaymentCurrency(pgPaymentData.currency);
         const isJpy = currency === 'JPY';
+        const isKrw = currency === 'KRW';
         const isJapanPaymentMethod = paymentMethod.startsWith('kginicis_japan_');
+        const isDomesticEasyPayMethod = DOMESTIC_EASY_PAY_METHODS.has(paymentMethod);
         const isJapanConfigured =
             config.japan_enabled &&
             !!config.japan_mid &&
@@ -629,6 +643,16 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
             throw new Error('KG Inicis Japan payment methods require a JPY order.');
         }
 
+        if (isDomesticEasyPayMethod && Array.isArray(config.easy_pay_enabled_methods)
+            && !config.easy_pay_enabled_methods.includes(paymentMethod)
+        ) {
+            throw new Error('Selected KG Inicis easy pay method is disabled.');
+        }
+
+        if (!isJpy && !isKrw) {
+            throw new Error('KG Inicis supports only KRW standard payments or JPY Japan CBT payments.');
+        }
+
         if (isJpy && !isJapanConfigured) {
             throw new Error('KG Inicis Japan CBT payment is not configured.');
         }
@@ -637,9 +661,19 @@ export async function requestPaymentHandler(action: any, _context?: any): Promis
             throw new Error('JPY orders can only use KG Inicis Japan CBT payment methods.');
         }
 
+        const isMobile = isMobileUserAgent();
+
+        if (isKrw && config.standard_configured === false) {
+            throw new Error('KG Inicis live standard payment is not configured.');
+        }
+
+        if (isKrw && isMobile && config.mobile_configured === false) {
+            throw new Error('KG Inicis live mobile payment is not configured.');
+        }
+
         if (isJpy) {
             await requestCbtPayment(G7Core, config, pgPaymentData, paymentMethod);
-        } else if (isMobileUserAgent()) {
+        } else if (isMobile) {
             await requestMobileKoreanPayment(G7Core, config, pgPaymentData, paymentMethod);
         } else {
             await requestKoreanPayment(G7Core, config, pgPaymentData, paymentMethod);

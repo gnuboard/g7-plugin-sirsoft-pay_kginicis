@@ -40,4 +40,18 @@ class PayKginicisServiceProvider extends BasePluginServiceProvider
         // 값 동기화: IssuesReceiptCookie::RECEIPT_COOKIE_NAME 과 동일해야 함.
         EncryptCookies::except(['kginicis_receipt_token']);
     }
+
+    /**
+     * KG 이니시스 플러그인의 루트 lang 디렉토리를 로드합니다.
+     *
+     * @return void
+     */
+    protected function loadExtensionTranslations(): void
+    {
+        $langPath = dirname($this->getProviderPath(), 2).'/lang';
+
+        if (is_dir($langPath)) {
+            $this->loadTranslationsFrom($langPath, $this->translationNamespace());
+        }
+    }
 }

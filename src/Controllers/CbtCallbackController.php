@@ -139,12 +139,7 @@ class CbtCallbackController
         }
 
         if ($authResultCode !== '' && $authResultCode !== 'OK') {
-            $order = $this->orderService->findByOrderNumber($oid);
-            if ($order) {
-                $order = $this->orderService->failPayment($order, $authResultCode, $authResultMsg);
-                $this->markCbtAuthFailurePayment($order, $request, $authResultCode, $authResultMsg);
-            }
-
+            // 브라우저가 전달한 CBT 인증 실패값은 무인증 콜백이므로 주문 상태 변경에는 사용하지 않는다.
             Log::warning('KG Inicis CBT: auth failed', [
                 'oid' => $oid,
                 'result_code' => $authResultCode,
@@ -274,8 +269,21 @@ class CbtCallbackController
         } catch (\Exception $e) {
             Log::error('KG Inicis CBT: callback exception', [
                 'oid' => $oid,
+                'tid' => $approvedTid,
                 'error' => $e->getMessage(),
             ]);
+
+            if ($this->wasAlreadyPaid($approvedTid)) {
+                Log::warning('KG Inicis CBT: local payment already completed, auto-refund skipped after exception', [
+                    'oid' => $oid,
+                    'tid' => $approvedTid,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $this->queueReceiptCookie($oid);
+
+                return redirect($this->resolveSuccessUrl($oid));
+            }
 
             $this->refundApprovedCbtPaymentOrFlagManualReconciliation(
                 $approvedTid,
@@ -337,42 +345,6 @@ class CbtCallbackController
             'message' => $resultMsg,
             'orderId' => $orderId,
         ];
-    }
-
-    private function markCbtAuthFailurePayment(
-        Order $order,
-        CbtCallbackRequest $request,
-        string $resultCode,
-        string $resultMsg,
-    ): void {
-        $payment = $order->payment()->first();
-
-        if (! $payment) {
-            return;
-        }
-
-        $payMethod = (string) $request->input('paymethod', '');
-        $selectedPaymentMethod = $this->resolveSelectedCbtPaymentMethod($request, $payMethod);
-        $meta = is_array($payment->payment_meta) ? $payment->payment_meta : [];
-        $authResponse = $this->sanitizePgResponse($request->except(['_token']), self::CBT_AUTH_RESPONSE_KEYS);
-
-        $payment->update([
-            'payment_status' => PaymentStatusEnum::FAILED,
-            'payment_meta' => array_merge($meta, [
-                'result_code' => $resultCode,
-                'result_msg' => $resultMsg,
-                'pay_method' => $payMethod !== '' ? $this->normalizeCbtPayMethod($payMethod) : null,
-                'cbt_type' => 'JPPG',
-                'cbt_mid' => $this->apiService->getJapanMid(),
-                'mid' => $this->apiService->getJapanMid(),
-                'currency' => 'JPY',
-                'is_cbt' => true,
-                'is_test_mode' => $this->apiService->isTestMode(),
-                'pg_response_sanitized' => true,
-                'pg_auth_response' => $authResponse,
-                'cbt_failure_at' => now()->toIso8601String(),
-            ], $this->buildCbtSelectionPaymentMeta($selectedPaymentMethod)),
-        ]);
     }
 
     private function isPayPayProcessingFailure(string $resultCode, string $resultMsg, string $payMethod): bool

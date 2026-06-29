@@ -9,6 +9,8 @@ abstract class PluginTestCase extends TestCase
 {
     use RefreshDatabase;
 
+    private static bool $pluginAutoloadRegistered = false;
+
     protected function shouldSeed(): bool
     {
         return true;
@@ -35,13 +37,15 @@ abstract class PluginTestCase extends TestCase
 
     protected function setUp(): void
     {
+        $this->registerPluginAutoload();
+
         parent::setUp();
 
         $this->registerModuleAutoload();
-        $this->registerPluginAutoload();
 
         $this->app->register(\Modules\Sirsoft\Ecommerce\Providers\EcommerceServiceProvider::class);
         $this->app->register(\Plugins\Sirsoft\PayKginicis\Providers\PayKginicisServiceProvider::class);
+        $this->app['translator']->addNamespace('sirsoft-pay_kginicis', dirname(__DIR__).'/lang');
 
         $this->registerModuleRoutes();
         $this->registerPluginRoutes();
@@ -116,10 +120,14 @@ abstract class PluginTestCase extends TestCase
 
     protected function registerPluginAutoload(): void
     {
-        $pluginBasePath = base_path('plugins/sirsoft-pay_kginicis/src/');
+        if (self::$pluginAutoloadRegistered) {
+            return;
+        }
+
+        $pluginBasePath = dirname(__DIR__).'/src/';
 
         spl_autoload_register(function ($class) use ($pluginBasePath) {
-            $prefix = 'Plugins\\Sirsoft\\Kginicis\\';
+            $prefix = 'Plugins\\Sirsoft\\PayKginicis\\';
             $len = strlen($prefix);
 
             if (strncmp($prefix, $class, $len) !== 0) {
@@ -132,7 +140,9 @@ abstract class PluginTestCase extends TestCase
             if (file_exists($file)) {
                 require $file;
             }
-        });
+        }, true, true);
+
+        self::$pluginAutoloadRegistered = true;
     }
 
     protected function registerModuleRoutes(): void
@@ -149,7 +159,7 @@ abstract class PluginTestCase extends TestCase
 
     protected function registerPluginRoutes(): void
     {
-        $webRoutesFile = base_path('plugins/sirsoft-pay_kginicis/src/routes/web.php');
+        $webRoutesFile = base_path('plugins/_bundled/sirsoft-pay_kginicis/src/routes/web.php');
 
         if (file_exists($webRoutesFile)) {
             \Illuminate\Support\Facades\Route::prefix('plugins/sirsoft-pay_kginicis')
@@ -158,7 +168,7 @@ abstract class PluginTestCase extends TestCase
                 ->group($webRoutesFile);
         }
 
-        $apiRoutesFile = base_path('plugins/sirsoft-pay_kginicis/src/routes/api.php');
+        $apiRoutesFile = base_path('plugins/_bundled/sirsoft-pay_kginicis/src/routes/api.php');
 
         if (file_exists($apiRoutesFile)) {
             \Illuminate\Support\Facades\Route::prefix('api/plugins/sirsoft-pay_kginicis')

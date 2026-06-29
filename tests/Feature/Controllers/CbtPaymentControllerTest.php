@@ -13,6 +13,8 @@ use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Models\OrderPayment;
 use Modules\Sirsoft\Ecommerce\Models\OrderAddress;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
+use Plugins\Sirsoft\PayKginicis\Repositories\CbtCvsOperationsRepositoryInterface;
+use Plugins\Sirsoft\PayKginicis\Services\CbtCvsOperationsService;
 use Plugins\Sirsoft\PayKginicis\Services\CbtCheckoutTokenService;
 use Plugins\Sirsoft\PayKginicis\Services\CbtReconciliationService;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
@@ -190,11 +192,12 @@ class CbtPaymentControllerTest extends PluginTestCase
 
         $order->refresh();
         $payment = OrderPayment::query()->where('order_id', $order->id)->firstOrFail();
-        $this->assertEquals(OrderStatusEnum::CANCELLED, $order->order_status);
-        $this->assertEquals(PaymentStatusEnum::FAILED, $payment->payment_status);
-        $this->assertSame('PAYPAY', $payment->payment_meta['pay_method'] ?? null);
-        $this->assertSame('kginicis_japan_paypay', $payment->payment_meta['selected_payment_method'] ?? null);
-        $this->assertSame('processing_failure', $payment->payment_meta['result_code'] ?? null);
+        $paymentMeta = is_array($payment->payment_meta) ? $payment->payment_meta : [];
+        $this->assertEquals(OrderStatusEnum::PENDING_ORDER, $order->order_status);
+        $this->assertEquals(PaymentStatusEnum::READY, $payment->payment_status);
+        $this->assertArrayNotHasKey('pay_method', $paymentMeta);
+        $this->assertArrayNotHasKey('selected_payment_method', $paymentMeta);
+        $this->assertArrayNotHasKey('result_code', $paymentMeta);
     }
 
     public function test_cbt_cvs_notify_completes_waiting_deposit_payment(): void
@@ -467,7 +470,7 @@ class CbtPaymentControllerTest extends PluginTestCase
     {
         $this->createPersistedPendingCbtCvsOrder('JP-ORDER-CVS-ADMIN-001', 100);
 
-        $admin = $this->createAdminUser();
+        $admin = $this->createAdminUser(['sirsoft-ecommerce.orders.read']);
         $this->actingAs($admin);
 
         $response = $this->getJson('/api/plugins/sirsoft-pay_kginicis/admin/orders/JP-ORDER-CVS-ADMIN-001/cbt-cvs');
@@ -489,7 +492,7 @@ class CbtPaymentControllerTest extends PluginTestCase
     {
         $order = $this->createPersistedPendingCbtCvsOrder('JP-ORDER-CVS-SIM-001', 100);
 
-        $admin = $this->createAdminUser();
+        $admin = $this->createAdminUser(['sirsoft-ecommerce.orders.update']);
         $this->actingAs($admin);
 
         $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/admin/orders/JP-ORDER-CVS-SIM-001/cbt-cvs/simulate-notify');
@@ -512,7 +515,7 @@ class CbtPaymentControllerTest extends PluginTestCase
             'is_test_mode' => false,
         ]);
 
-        $admin = $this->createAdminUser();
+        $admin = $this->createAdminUser(['sirsoft-ecommerce.orders.update']);
         $this->actingAs($admin);
 
         $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/admin/orders/JP-ORDER-CVS-LIVE-001/cbt-cvs/simulate-notify');
@@ -531,7 +534,7 @@ class CbtPaymentControllerTest extends PluginTestCase
             'cvs_payment_term' => now()->subDay()->format('YmdHis'),
         ]);
 
-        $admin = $this->createAdminUser();
+        $admin = $this->createAdminUser(['sirsoft-ecommerce.orders.update']);
         $this->actingAs($admin);
 
         $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/admin/orders/JP-ORDER-CVS-EXP-001/cbt-cvs/expire');
@@ -549,11 +552,57 @@ class CbtPaymentControllerTest extends PluginTestCase
         $this->assertSame('expired', $payment->payment_meta['cvs_status'] ?? null);
     }
 
+    public function test_cbt_cvs_expire_rechecks_locked_payment_status_before_marking_expired(): void
+    {
+        $order = $this->createPersistedPendingCbtCvsOrder('JP-ORDER-CVS-RACE-001', 100, [
+            'cvs_payment_term' => now()->subDay()->format('YmdHis'),
+        ]);
+
+        $repository = Mockery::mock(CbtCvsOperationsRepositoryInterface::class);
+        $repository->shouldReceive('findOrderWithPayment')
+            ->once()
+            ->with('JP-ORDER-CVS-RACE-001')
+            ->andReturn($order->fresh('payment'));
+        $repository->shouldReceive('lockPayment')
+            ->once()
+            ->with(Mockery::type(OrderPayment::class))
+            ->andReturnUsing(function (OrderPayment $payment): OrderPayment {
+                $meta = is_array($payment->payment_meta) ? $payment->payment_meta : [];
+                $payment->forceFill([
+                    'payment_status' => PaymentStatusEnum::PAID,
+                    'payment_meta' => array_merge($meta, [
+                        'cvs_status' => 'paid',
+                    ]),
+                ])->save();
+
+                return $payment->fresh();
+            });
+        $repository->shouldReceive('updatePayment')->never();
+
+        $service = new CbtCvsOperationsService(
+            $this->app->make(OrderProcessingService::class),
+            $this->app->make(KgInicisApiService::class),
+            $repository,
+        );
+
+        $result = $service->expireOverdue('JP-ORDER-CVS-RACE-001');
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('messages.cbt_cvs.not_expirable', $result['message_key']);
+
+        $payment = OrderPayment::query()
+            ->whereHas('order', fn ($query) => $query->where('order_number', 'JP-ORDER-CVS-RACE-001'))
+            ->firstOrFail();
+
+        $this->assertEquals(PaymentStatusEnum::PAID, $payment->payment_status);
+        $this->assertSame('paid', $payment->payment_meta['cvs_status'] ?? null);
+    }
+
     public function test_admin_can_recheck_cbt_cvs_local_status(): void
     {
         $this->createPersistedPendingCbtCvsOrder('JP-ORDER-CVS-RECHECK-001', 100);
 
-        $admin = $this->createAdminUser();
+        $admin = $this->createAdminUser(['sirsoft-ecommerce.orders.read']);
         $this->actingAs($admin);
 
         $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/admin/orders/JP-ORDER-CVS-RECHECK-001/cbt-cvs/recheck');
@@ -612,6 +661,72 @@ class CbtPaymentControllerTest extends PluginTestCase
             ]));
 
         $response->assertRedirect('http://localhost/shop/checkout?error=cbt_failed&orderId=JP-ORDER-003');
+    }
+
+    public function test_cbt_callback_skips_auto_refund_when_local_payment_was_already_completed_before_exception(): void
+    {
+        $order = $this->createPersistedPendingJpyOrder('JP-ORDER-CBT-POST-COMMIT', 100);
+
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldReceive('findByOrderNumber')
+            ->with('JP-ORDER-CBT-POST-COMMIT')
+            ->andReturn($order);
+        $orderService->shouldReceive('completePayment')
+            ->once()
+            ->andReturnUsing(function (Order $callbackOrder, array $paymentData, ?int $paidAmount): void {
+                DB::transaction(function () use ($callbackOrder, $paymentData, $paidAmount): void {
+                    $callbackOrder->forceFill([
+                        'order_status' => OrderStatusEnum::PAYMENT_COMPLETE,
+                        'total_paid_amount' => $paidAmount,
+                        'total_due_amount' => 0,
+                        'paid_at' => now(),
+                    ])->save();
+
+                    $callbackOrder->payment()->update([
+                        'payment_status' => PaymentStatusEnum::PAID,
+                        'transaction_id' => $paymentData['transaction_id'] ?? null,
+                        'card_approval_number' => $paymentData['card_approval_number'] ?? null,
+                        'payment_meta' => $paymentData['payment_meta'] ?? [],
+                        'paid_amount_local' => $paidAmount,
+                        'paid_at' => now(),
+                    ]);
+                });
+
+                throw new \RuntimeException('cbt post commit hook failed');
+            });
+
+        $apiService = Mockery::mock(KgInicisApiService::class);
+        $apiService->shouldReceive('getJapanMid')->andReturn(KgInicisApiService::JAPAN_TEST_MID);
+        $apiService->shouldReceive('isTestMode')->andReturn(true);
+        $apiService->shouldReceive('approveCbtPayment')
+            ->with('SID_POST_COMMIT')
+            ->andReturn([
+                'resultCode' => 'OK',
+                'tid' => 'CBT_TID_POST_COMMIT',
+                'paymethod' => 'CARD',
+                'amount' => 100,
+            ]);
+        $apiService->shouldNotReceive('refundCbtPayment');
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+        $this->app->instance(KgInicisApiService::class, $apiService);
+
+        $response = $this->get('/plugins/sirsoft-pay_kginicis/payment/cbt/callback?'
+            . http_build_query([
+                'oid' => 'JP-ORDER-CBT-POST-COMMIT',
+                'sid' => 'SID_POST_COMMIT',
+                'resultCode' => 'OK',
+                'mid' => KgInicisApiService::JAPAN_TEST_MID,
+            ]));
+
+        $response->assertRedirect('http://localhost/shop/orders/JP-ORDER-CBT-POST-COMMIT/complete');
+
+        $order->refresh();
+        $this->assertEquals(OrderStatusEnum::PAYMENT_COMPLETE, $order->order_status);
+
+        $payment = OrderPayment::query()->where('order_id', $order->id)->firstOrFail();
+        $this->assertEquals(PaymentStatusEnum::PAID, $payment->payment_status);
+        $this->assertSame('CBT_TID_POST_COMMIT', $payment->transaction_id);
     }
 
     public function test_cbt_callback_auto_refunds_when_approved_amount_mismatches_order(): void
@@ -1047,7 +1162,7 @@ class CbtPaymentControllerTest extends PluginTestCase
             ],
         ]);
 
-        $admin = $this->createAdminUser();
+        $admin = $this->createAdminUser(['sirsoft-ecommerce.orders.update']);
         $this->actingAs($admin);
 
         $apiService = Mockery::mock(KgInicisApiService::class);
