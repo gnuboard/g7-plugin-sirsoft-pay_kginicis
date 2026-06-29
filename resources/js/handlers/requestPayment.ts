@@ -9,7 +9,6 @@ import {
 } from '../paymentDomCleanup';
 import {
     markStandardPaymentCloseReportContext,
-    monitorStandardPaymentWindowClose,
 } from '../paymentCloseMessageListener';
 
 interface PgPaymentData {
@@ -477,7 +476,10 @@ async function requestKoreanPayment(
 
     document.body.appendChild(form);
 
-    const baselineIframes = Array.from(document.querySelectorAll('iframe'));
+    // KG 이니시스 표준결제 닫힘 감지는 closeUrl(/payment/close) 페이지가 부모로 보내는
+    // postMessage('payment-window-closed') 한 경로로만 처리한다. INIStdPay 가 사용자의
+    // 명시적 닫기에서만 closeUrl 을 로드하므로, 성공(returnUrl 최상위 전송)·단순 이탈과
+    // 확실히 구분된다. (iframe 존재 폴링 휴리스틱은 성공/이탈 오탐 때문에 제거됨)
     if (config.callback_urls.close_report) {
         markStandardPaymentCloseReportContext({
             closeReportUrl: config.callback_urls.close_report,
@@ -486,15 +488,10 @@ async function requestKoreanPayment(
             buyer_email: pgPaymentData.customer_email ?? '',
             buyer_phone: pgPaymentData.customer_phone ?? '',
             payment_method: paymentMethod,
-            completionUrl: callbackUrl,
         });
     }
 
     window.INIStdPay.pay(formId);
-
-    if (config.callback_urls.close_report) {
-        monitorStandardPaymentWindowClose(baselineIframes);
-    }
 }
 
 /**

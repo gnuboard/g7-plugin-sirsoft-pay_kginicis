@@ -12,11 +12,6 @@ const LISTENER_INSTALLED_KEY = '__sirsoftKginicisPaymentCloseListenerInstalled';
 const ACTIVE_STANDARD_PAYMENT_CLOSE_CONTEXT_KEY = '__sirsoftKginicisActiveStandardPaymentCloseContext';
 const RESET_RETRY_LIMIT = 20;
 const RESET_RETRY_INTERVAL_MS = 100;
-const STANDARD_PAY_MONITOR_INITIAL_DELAY_MS = 500;
-const STANDARD_PAY_MONITOR_INTERVAL_MS = 400;
-const STANDARD_PAY_MONITOR_DISAPPEAR_GRACE_MS = 800;
-const STANDARD_PAY_ORPHAN_IFRAME_MIN_AGE_MS = 2500;
-const STANDARD_PAY_MONITOR_TIMEOUT_MS = 120000;
 
 const logger = {
     info: (...args: unknown[]) => console.info(`[${PLUGIN_IDENTIFIER}]`, ...args),
@@ -36,7 +31,6 @@ export interface StandardPaymentCloseReportContext {
     buyer_email?: string;
     buyer_phone?: string;
     payment_method?: string;
-    completionUrl?: string;
     reported?: boolean;
 }
 
@@ -80,42 +74,6 @@ function resolveApiUrl(url: string): string {
     }
 
     return url;
-}
-
-function normalizedCompletionUrl(url: string): string {
-    const parsed = new URL(url, window.location.origin);
-
-    return `${parsed.origin}${parsed.pathname}`;
-}
-
-function isStandardPaymentCompletionUrl(
-    action: string | null | undefined,
-    context: StandardPaymentCloseReportContext,
-): boolean {
-    if (!action) {
-        return false;
-    }
-
-    try {
-        const normalizedAction = normalizedCompletionUrl(action);
-        if (context.completionUrl) {
-            return normalizedAction === normalizedCompletionUrl(context.completionUrl);
-        }
-
-        return normalizedAction.endsWith('/plugins/sirsoft-pay_kginicis/payment/callback');
-    } catch {
-        return false;
-    }
-}
-
-function hasStandardPaymentCompletionForm(
-    context: StandardPaymentCloseReportContext,
-): boolean {
-    return Array.from(document.querySelectorAll<HTMLFormElement>('form'))
-        .some((form) => isStandardPaymentCompletionUrl(
-            form.getAttribute('action') || form.action,
-            context,
-        ));
 }
 
 export function markStandardPaymentCloseReportContext(
@@ -175,152 +133,6 @@ export async function reportStandardPaymentWindowClosed(
     } finally {
         clearStandardPaymentCloseReportContext();
     }
-}
-
-function isVisibleElement(element: Element): boolean {
-    const rect = element.getBoundingClientRect();
-    const style = window.getComputedStyle(element);
-    const cssWidth = Number.parseFloat(style.width || '0');
-    const cssHeight = Number.parseFloat(style.height || '0');
-
-    return (rect.width > 0 || cssWidth > 0)
-        && (rect.height > 0 || cssHeight > 0)
-        && style.display !== 'none'
-        && style.visibility !== 'hidden'
-        && style.opacity !== '0';
-}
-
-function looksLikeStandardPayIframe(iframe: HTMLIFrameElement): boolean {
-    return iframe.classList.contains('inipay_iframe')
-        || iframe.id.toLowerCase().includes('inipay')
-        || iframe.name.toLowerCase().includes('iframe_');
-}
-
-function isInsideDialog(iframe: HTMLIFrameElement): boolean {
-    return !!iframe.closest('dialog');
-}
-
-function isInsideInicisModal(iframe: HTMLIFrameElement): boolean {
-    return !!iframe.closest('#inicisModalDiv, .inipay_modal');
-}
-
-function isBlankStandardPayIframe(iframe: HTMLIFrameElement): boolean {
-    if (!looksLikeStandardPayIframe(iframe)) {
-        return false;
-    }
-
-    const srcAttr = iframe.getAttribute('src')?.trim() ?? '';
-    const src = iframe.src?.trim() ?? '';
-    if (srcAttr !== '' && src !== 'about:blank') {
-        return false;
-    }
-
-    try {
-        const doc = iframe.contentDocument;
-        if (!doc) {
-            return srcAttr === '';
-        }
-
-        const isBlankUrl = doc.location.href === 'about:blank'
-            || doc.URL === 'about:blank';
-        const bodyIsEmpty = (doc.body?.textContent ?? '').trim() === ''
-            && (doc.body?.children.length ?? 0) === 0;
-
-        return isBlankUrl && bodyIsEmpty;
-    } catch {
-        return false;
-    }
-}
-
-function isActiveStandardPaymentIframe(
-    iframe: HTMLIFrameElement,
-    baselineIframes: Set<HTMLIFrameElement>,
-): boolean {
-    if (looksLikeStandardPayIframe(iframe) && !isInsideDialog(iframe) && !isInsideInicisModal(iframe)) {
-        return false;
-    }
-
-    return !baselineIframes.has(iframe)
-        && isVisibleElement(iframe)
-        && !isBlankStandardPayIframe(iframe);
-}
-
-function hasStandardPaymentWindowCandidate(baselineIframes: Set<HTMLIFrameElement>): boolean {
-    const hasNewIframe = Array.from(document.querySelectorAll('iframe'))
-        .some((iframe) => isActiveStandardPaymentIframe(iframe, baselineIframes));
-    if (hasNewIframe) {
-        return true;
-    }
-
-    return Array.from(document.querySelectorAll('dialog'))
-        .some((dialog) => Array.from(dialog.querySelectorAll('iframe'))
-            .some((iframe) => isActiveStandardPaymentIframe(iframe, baselineIframes)));
-}
-
-function hasOrphanStandardPaymentIframe(baselineIframes: Set<HTMLIFrameElement>): boolean {
-    return Array.from(document.querySelectorAll('iframe'))
-        .some((iframe) => !baselineIframes.has(iframe)
-            && looksLikeStandardPayIframe(iframe)
-            && isBlankStandardPayIframe(iframe)
-            && isVisibleElement(iframe));
-}
-
-export function monitorStandardPaymentWindowClose(
-    baselineIframes: HTMLIFrameElement[],
-    reason = 'inicis-overlay-closed',
-): void {
-    const baseline = new Set(baselineIframes);
-    const startedAt = Date.now();
-    let hasSeenPaymentWindow = false;
-    let disappearedAt: number | null = null;
-    let orphanIframeSince: number | null = null;
-
-    const tick = (): void => {
-        const context = getActiveStandardPaymentCloseContext();
-        if (!context || context.reported) {
-            return;
-        }
-
-        if (!isCheckoutPage()) {
-            clearStandardPaymentCloseReportContext();
-            return;
-        }
-
-        if (hasStandardPaymentCompletionForm(context)) {
-            markStandardPaymentCompletionStarted();
-            return;
-        }
-
-        const hasPaymentWindow = hasStandardPaymentWindowCandidate(baseline);
-        if (hasPaymentWindow) {
-            hasSeenPaymentWindow = true;
-            disappearedAt = null;
-            orphanIframeSince = null;
-        } else if (
-            hasOrphanStandardPaymentIframe(baseline)
-            && Date.now() - startedAt >= STANDARD_PAY_ORPHAN_IFRAME_MIN_AGE_MS
-        ) {
-            orphanIframeSince ??= Date.now();
-            if (Date.now() - orphanIframeSince >= STANDARD_PAY_MONITOR_DISAPPEAR_GRACE_MS) {
-                void reportStandardPaymentWindowClosed(reason);
-                return;
-            }
-        } else if (hasSeenPaymentWindow) {
-            disappearedAt ??= Date.now();
-            if (Date.now() - disappearedAt >= STANDARD_PAY_MONITOR_DISAPPEAR_GRACE_MS) {
-                void reportStandardPaymentWindowClosed(reason);
-                return;
-            }
-        }
-
-        if (Date.now() - startedAt >= STANDARD_PAY_MONITOR_TIMEOUT_MS) {
-            return;
-        }
-
-        window.setTimeout(tick, STANDARD_PAY_MONITOR_INTERVAL_MS);
-    };
-
-    window.setTimeout(tick, STANDARD_PAY_MONITOR_INITIAL_DELAY_MS);
 }
 
 export function resetCheckoutSubmittingState(
