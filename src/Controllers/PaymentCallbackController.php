@@ -220,6 +220,7 @@ class PaymentCallbackController
         // 화이트리스트 검증 통과 → 수신된 URL을 그대로 사용 (PC/모바일 자동 대응)
         $authUrl = $receivedAuthUrl;
         $netCancelUrl = $this->apiService->resolveIdcNetCancelUrl($idcName);
+        $tid = '';
 
         try {
             $order = $this->orderService->findByOrderNumber($moid);
@@ -254,7 +255,7 @@ class PaymentCallbackController
                 ]));
             }
 
-            $tid = $pgResponse['tid'] ?? '';
+            $tid = (string) ($pgResponse['tid'] ?? '');
 
             // 가상계좌: completePayment 없이 계좌 정보만 저장 (입금 통보 시 completePayment)
             if (($pgResponse['payMethod'] ?? '') === 'VBank') {
@@ -326,8 +327,21 @@ class PaymentCallbackController
         } catch (\Exception $e) {
             Log::error('KG Inicis: authorize exception', [
                 'moid' => $moid,
+                'tid' => $tid,
                 'error' => $e->getMessage(),
             ]);
+
+            if ($this->wasAlreadyPaid($tid)) {
+                Log::warning('KG Inicis: local payment already completed, net cancel skipped after exception', [
+                    'moid' => $moid,
+                    'tid' => $tid,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $this->queueReceiptCookie($moid);
+
+                return redirect($this->resolveSuccessUrl($moid));
+            }
 
             $this->apiService->sendNetCancel($netCancelUrl, $authToken);
 

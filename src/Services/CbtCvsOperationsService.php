@@ -386,25 +386,35 @@ class CbtCvsOperationsService
 
         /** @var OrderPayment $payment */
         $payment = $context['payment'];
-        $meta = $context['meta'];
-        $summary = $this->summary($orderNumber);
 
-        if (! ($summary['can_mark_expired'] ?? false)) {
-            return $this->operationError('messages.cbt_cvs.not_expirable', 422);
-        }
+        $expired = DB::transaction(function () use ($payment): bool {
+            $lockedPayment = $this->repository->lockPayment($payment);
+            if (! $lockedPayment instanceof OrderPayment) {
+                return false;
+            }
 
-        $updatedMeta = array_merge($meta, [
-            'cvs_status' => 'expired',
-            'cvs_expired_at' => now()->toIso8601String(),
-            'cvs_expiry_reason' => 'payment_term_elapsed',
-        ]);
+            $lockedMeta = is_array($lockedPayment->payment_meta) ? $lockedPayment->payment_meta : [];
+            if (! $this->canMarkExpired($lockedPayment, $lockedMeta)) {
+                return false;
+            }
 
-        DB::transaction(function () use ($payment, $updatedMeta): void {
-            $this->repository->updatePayment($payment, [
+            $updatedMeta = array_merge($lockedMeta, [
+                'cvs_status' => 'expired',
+                'cvs_expired_at' => now()->toIso8601String(),
+                'cvs_expiry_reason' => 'payment_term_elapsed',
+            ]);
+
+            $this->repository->updatePayment($lockedPayment, [
                 'payment_status' => PaymentStatusEnum::EXPIRED,
                 'payment_meta' => $updatedMeta,
             ]);
+
+            return true;
         });
+
+        if (! $expired) {
+            return $this->operationError('messages.cbt_cvs.not_expirable', 422);
+        }
 
         return [
             'ok' => true,
@@ -498,8 +508,17 @@ class CbtCvsOperationsService
         string $source,
         ?string $remoteIp
     ): array {
-        $updatedMeta = $this->appendNotifyHistory($existingMeta, $payload, $result, $reason, $source, $remoteIp);
-        $this->savePaymentMeta($payment, $updatedMeta);
+        $updatedMeta = DB::transaction(function () use ($payment, $existingMeta, $payload, $result, $reason, $source, $remoteIp): array {
+            $lockedPayment = $this->repository->lockPayment($payment);
+            $currentMeta = $lockedPayment instanceof OrderPayment && is_array($lockedPayment->payment_meta)
+                ? $lockedPayment->payment_meta
+                : $existingMeta;
+
+            $mergedMeta = $this->appendNotifyHistory($currentMeta, $payload, $result, $reason, $source, $remoteIp);
+            $this->savePaymentMeta($lockedPayment ?? $payment, $mergedMeta);
+
+            return $mergedMeta;
+        });
 
         return $updatedMeta;
     }
@@ -555,6 +574,28 @@ class CbtCvsOperationsService
     {
         return ($meta['is_cbt'] ?? false) === true
             && strtoupper((string) ($meta['pay_method'] ?? '')) === 'CVS';
+    }
+
+    /**
+     * 잠금된 결제 row 기준으로 CVS 만료 전환 가능 여부를 다시 판정합니다.
+     *
+     * @param  OrderPayment  $payment  잠금된 결제 row
+     * @param  array<string, mixed>  $meta  결제 메타
+     * @return bool 만료 전환 가능 여부
+     */
+    private function canMarkExpired(OrderPayment $payment, array $meta): bool
+    {
+        if (! $this->isCbtCvsMeta($meta)) {
+            return false;
+        }
+
+        if (! $this->paymentStatusEquals($payment->payment_status, PaymentStatusEnum::WAITING_DEPOSIT)) {
+            return false;
+        }
+
+        $paymentTermAt = $this->parseCbtDateTime((string) ($meta['cvs_payment_term'] ?? ''));
+
+        return $paymentTermAt instanceof CarbonImmutable && $paymentTermAt->isPast();
     }
 
     private function resolveExpectedCvsAmount(Order $order, array $paymentMeta): int
