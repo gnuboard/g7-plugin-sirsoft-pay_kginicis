@@ -131,9 +131,9 @@ class VbankNotifyReplayTest extends PluginTestCase
      * @scenario context=vbankNotify, threat=replay, callback_state=first_arrival
      * @effects replay_first_arrival_proceeds_normally
      */
-    public function test_first_arrival_with_unknown_tid_proceeds_to_complete_payment_path(): void
+    public function test_first_arrival_with_issued_tid_proceeds_to_complete_payment_path(): void
     {
-        // READY 상태의 결제 row 를 가진 주문 — 1차 vbankNotify 도착 시 처리 경로 검증
+        // 가상계좌 발급 완료 상태의 결제 row 를 가진 주문 — 1차 vbankNotify 도착 시 처리 경로 검증
         $user = User::factory()->create();
         $order = OrderFactory::new()->create([
             'user_id' => $user->id,
@@ -156,17 +156,23 @@ class VbankNotifyReplayTest extends PluginTestCase
             'total_paid_amount' => 0,
         ]);
 
+        $tid = 'TID_FIRST_001';
         OrderPaymentFactory::new()->create([
             'order_id' => $order->id,
-            'payment_status' => PaymentStatusEnum::READY,
+            'payment_status' => PaymentStatusEnum::WAITING_DEPOSIT,
             'payment_method' => PaymentMethodEnum::VBANK,
             'pg_provider' => 'kginicis',
             'paid_amount_local' => 0,
             'paid_at' => null,
-            'transaction_id' => null,
+            'transaction_id' => $tid,
+            'vbank_number' => '1234567890123',
+            'payment_meta' => [
+                'mid' => 'INIpayTest',
+                'is_test_mode' => true,
+            ],
         ]);
 
-        $payload = $this->makeVbankNotifyParams('TID_FIRST_001', $order->order_number, 30000);
+        $payload = $this->makeVbankNotifyParams($tid, $order->order_number, 30000);
 
         $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/vbank-notify', $payload);
 
