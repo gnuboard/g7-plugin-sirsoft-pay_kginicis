@@ -10,7 +10,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
-use Modules\Sirsoft\Ecommerce\Services\CurrencyConversionService;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\IssuesReceiptCookie;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
@@ -109,10 +108,10 @@ class CbtCallbackController
     ) {}
 
     /**
-     * CBT(일본 엔화) 결제 인증 콜백을 받아 승인 처리 후 결과 페이지로 리다이렉트합니다.
+     * handle
      *
-     * @param  CbtCallbackRequest  $request  CBT 인증 콜백 요청
-     * @return RedirectResponse 성공/실패 결과 페이지 리다이렉트
+     * @param  CbtCallbackRequest  $request
+     * @return RedirectResponse
      */
     public function handle(CbtCallbackRequest $request): RedirectResponse
     {
@@ -139,12 +138,7 @@ class CbtCallbackController
         }
 
         if ($authResultCode !== '' && $authResultCode !== 'OK') {
-            $order = $this->orderService->findByOrderNumber($oid);
-            if ($order) {
-                $order = $this->orderService->failPayment($order, $authResultCode, $authResultMsg);
-                $this->markCbtAuthFailurePayment($order, $request, $authResultCode, $authResultMsg);
-            }
-
+            // 브라우저가 전달한 CBT 인증 실패값은 무인증 콜백이므로 주문 상태 변경에는 사용하지 않는다.
             Log::warning('KG Inicis CBT: auth failed', [
                 'oid' => $oid,
                 'result_code' => $authResultCode,
@@ -226,9 +220,8 @@ class CbtCallbackController
             }
 
             $this->assertCbtApproveResponseMatchesOrder($order, $pgResponse, $request, $payMethod);
-            // PG 승인금액이 누락되어 검증 예외가 발생해도 자동환불 대사 레코드에는 결제 통화 청구액을 남긴다
-            // (buildPgPaymentData 와 동일 SSoT — base≠결제 통화에서도 PG 청구 통화와 단위 일치).
-            $approvedAmount = app(CurrencyConversionService::class)->resolveOrderPaymentChargeAmount($order);
+            // PG 승인금액이 누락되어 검증 예외가 발생해도 자동환불 대사 레코드에는 주문금액을 남긴다.
+            $approvedAmount = (int) round((float) $order->total_due_amount);
             $approvedAmount = $this->resolveApprovedAmount($pgResponse, $order);
             $authResponse = $this->sanitizePgResponse($request->except(['_token']), self::CBT_AUTH_RESPONSE_KEYS);
             $approveResponse = $this->sanitizePgResponse($pgResponse, self::CBT_APPROVE_RESPONSE_KEYS);
@@ -339,42 +332,6 @@ class CbtCallbackController
         ];
     }
 
-    private function markCbtAuthFailurePayment(
-        Order $order,
-        CbtCallbackRequest $request,
-        string $resultCode,
-        string $resultMsg,
-    ): void {
-        $payment = $order->payment()->first();
-
-        if (! $payment) {
-            return;
-        }
-
-        $payMethod = (string) $request->input('paymethod', '');
-        $selectedPaymentMethod = $this->resolveSelectedCbtPaymentMethod($request, $payMethod);
-        $meta = is_array($payment->payment_meta) ? $payment->payment_meta : [];
-        $authResponse = $this->sanitizePgResponse($request->except(['_token']), self::CBT_AUTH_RESPONSE_KEYS);
-
-        $payment->update([
-            'payment_status' => PaymentStatusEnum::FAILED,
-            'payment_meta' => array_merge($meta, [
-                'result_code' => $resultCode,
-                'result_msg' => $resultMsg,
-                'pay_method' => $payMethod !== '' ? $this->normalizeCbtPayMethod($payMethod) : null,
-                'cbt_type' => 'JPPG',
-                'cbt_mid' => $this->apiService->getJapanMid(),
-                'mid' => $this->apiService->getJapanMid(),
-                'currency' => 'JPY',
-                'is_cbt' => true,
-                'is_test_mode' => $this->apiService->isTestMode(),
-                'pg_response_sanitized' => true,
-                'pg_auth_response' => $authResponse,
-                'cbt_failure_at' => now()->toIso8601String(),
-            ], $this->buildCbtSelectionPaymentMeta($selectedPaymentMethod)),
-        ]);
-    }
-
     private function isPayPayProcessingFailure(string $resultCode, string $resultMsg, string $payMethod): bool
     {
         $normalizedPayMethod = strtoupper($payMethod);
@@ -402,10 +359,7 @@ class CbtCallbackController
 
     private function resolveApprovedAmount(array $pgResponse, Order $order): int
     {
-        // 결제 청구액 SSoT = 결제 통화(order_currency) 환산액 (buildPgPaymentData 와 동일 기준).
-        // CBT 는 order_currency=JPY 강제이나 base 통화는 다를 수 있어(예: base KRW, 결제 JPY)
-        // total_due_amount(base) 직접 비교 시 PG 승인액(JPY)과 단위가 어긋난다.
-        $expectedAmount = app(CurrencyConversionService::class)->resolveOrderPaymentChargeAmount($order);
+        $expectedAmount = (int) round((float) $order->total_due_amount);
         $pgAmount = $pgResponse['amount'] ?? $pgResponse['price'] ?? null;
 
         if ($pgAmount === null || $pgAmount === '') {
@@ -450,8 +404,8 @@ class CbtCallbackController
     }
 
     /**
-     * @param  array<string,mixed>  $source
-     * @param  array<int,string>  $keys
+     * @param array<string,mixed> $source
+     * @param array<int,string> $keys
      */
     private function firstNonEmptyString(array $source, array $keys): ?string
     {
@@ -607,7 +561,7 @@ class CbtCallbackController
             $refundResult = $this->apiService->refundCbtPayment(
                 $tid,
                 null,
-                'CBT approved but local payment completion failed: '.mb_substr($reason, 0, 80),
+                'CBT approved but local payment completion failed: ' . mb_substr($reason, 0, 80),
             );
 
             $this->recordCbtReconciliationStatus($oid, [
@@ -655,8 +609,8 @@ class CbtCallbackController
         }
 
         Log::error('KG Inicis CBT: post-approve failure — MANUAL CANCEL REQUIRED on KG Inicis JP merchant admin', [
-            'tid' => $tid,
-            'oid' => $oid,
+            'tid'    => $tid,
+            'oid'    => $oid,
             'amount' => $amount,
             'reason' => $reason,
         ]);
@@ -705,7 +659,7 @@ class CbtCallbackController
         $query = http_build_query(array_filter($queryParams));
         $separator = str_contains($baseUrl, '?') ? '&' : '?';
 
-        return $baseUrl.$separator.$query;
+        return $baseUrl . $separator . $query;
     }
 
     /**
@@ -723,8 +677,8 @@ class CbtCallbackController
         }
 
         $base = rtrim((string) config('app.url'), '/');
-        $path = $url === '' ? '/' : ($url[0] === '/' ? $url : '/'.$url);
+        $path = $url === '' ? '/' : ($url[0] === '/' ? $url : '/' . $url);
 
-        return $base.$path;
+        return $base . $path;
     }
 }

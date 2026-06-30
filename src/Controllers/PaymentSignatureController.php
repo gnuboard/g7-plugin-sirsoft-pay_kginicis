@@ -57,6 +57,13 @@ class PaymentSignatureController
             return $contextError;
         }
 
+        if (! $this->apiService->hasStandardPaymentCredentials()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'KG Inicis standard payment credentials are not configured.',
+            ], 422);
+        }
+
         $signature = $this->apiService->generateSignature($oid, $price, $timestamp);
         $verification = $this->apiService->generateVerification($oid, $price, $timestamp);
         $mKey = $this->apiService->getMKey();
@@ -87,10 +94,10 @@ class PaymentSignatureController
             ], 422);
         }
 
-        if (strtoupper((string) $order->currency) === 'JPY') {
+        if (strtoupper((string) $order->currency) !== 'KRW') {
             return response()->json([
                 'success' => false,
-                'message' => 'Standard KG Inicis signature is not available for JPY orders.',
+                'message' => 'Standard KG Inicis signature is only available for KRW orders.',
             ], 422);
         }
 

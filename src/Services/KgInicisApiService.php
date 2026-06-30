@@ -245,6 +245,26 @@ class KgInicisApiService
     }
 
     /**
+     * 표준 결제 서명 생성에 필요한 자격증명 준비 여부를 반환합니다.
+     *
+     * @return bool
+     */
+    public function hasStandardPaymentCredentials(): bool
+    {
+        return trim($this->mid) !== '' && trim($this->signKey) !== '';
+    }
+
+    /**
+     * 모바일 결제 서명 생성에 필요한 자격증명 준비 여부를 반환합니다.
+     *
+     * @return bool
+     */
+    public function hasMobilePaymentCredentials(): bool
+    {
+        return trim($this->mid) !== '' && trim($this->mobileHashKey) !== '';
+    }
+
+    /**
      * getEscrowConfirmMKey
      *
      * @return string

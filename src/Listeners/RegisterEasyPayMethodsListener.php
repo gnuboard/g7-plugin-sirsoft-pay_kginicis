@@ -25,6 +25,13 @@ class RegisterEasyPayMethodsListener implements HookListenerInterface
 {
     private const PLUGIN_IDENTIFIER = 'sirsoft-pay_kginicis';
 
+    private const DOMESTIC_EASY_PAY_SETTINGS = [
+        'kginicis_samsung_pay' => 'easy_pay_samsung_pay',
+        'kginicis_naverpay' => 'easy_pay_naverpay',
+        'kginicis_lpay' => 'easy_pay_lpay',
+        'kginicis_kakaopay' => 'easy_pay_kakaopay',
+    ];
+
     /**
      * 구독할 훅 매핑 반환.
      *
@@ -56,39 +63,48 @@ class RegisterEasyPayMethodsListener implements HookListenerInterface
      */
     public function injectEasyPayMethods(array $methods): array
     {
-        $kgInicisMethods = [
+        $kgInicisMethods = [];
+
+        $this->appendIfEnabled($kgInicisMethods, 'kginicis_samsung_pay',
             $this->buildEntry(
                 id: 'kginicis_samsung_pay',
                 nameKey: 'sirsoft-pay_kginicis::payment_methods.samsung_pay.name',
                 descriptionKey: 'sirsoft-pay_kginicis::payment_methods.samsung_pay.description',
                 icon: 'mobile-screen-button',
-            ),
-            $this->buildNaverPayEntry(),
+            )
+        );
+        $this->appendIfEnabled($kgInicisMethods, 'kginicis_naverpay', $this->buildNaverPayEntry());
+        $this->appendIfEnabled($kgInicisMethods, 'kginicis_lpay',
             $this->buildEntry(
                 id: 'kginicis_lpay',
                 nameKey: 'sirsoft-pay_kginicis::payment_methods.lpay.name',
                 descriptionKey: 'sirsoft-pay_kginicis::payment_methods.lpay.description',
                 icon: 'mobile-screen-button',
-            ),
+            )
+        );
+        $this->appendIfEnabled($kgInicisMethods, 'kginicis_kakaopay',
             $this->buildEntry(
                 id: 'kginicis_kakaopay',
                 nameKey: 'sirsoft-pay_kginicis::payment_methods.kakaopay.name',
                 descriptionKey: 'sirsoft-pay_kginicis::payment_methods.kakaopay.description',
                 icon: 'mobile-screen-button',
-            ),
-            $this->buildEntry(
+            )
+        );
+
+        if ($this->settingEnabled('japan_enabled')) {
+            $kgInicisMethods[] = $this->buildEntry(
                 id: 'kginicis_japan_paypay',
                 nameKey: 'sirsoft-pay_kginicis::payment_methods.japan_paypay.name',
                 descriptionKey: 'sirsoft-pay_kginicis::payment_methods.japan_paypay.description',
                 icon: 'wallet',
-            ),
-            $this->buildEntry(
+            );
+            $kgInicisMethods[] = $this->buildEntry(
                 id: 'kginicis_japan_cvs',
                 nameKey: 'sirsoft-pay_kginicis::payment_methods.japan_cvs.name',
                 descriptionKey: 'sirsoft-pay_kginicis::payment_methods.japan_cvs.description',
                 icon: 'store',
-            ),
-        ];
+            );
+        }
 
         // 'phone' 뒤, 'point' 앞에 삽입. 둘 중 하나라도 없으면 끝에 append.
         $insertAfter = null;
@@ -125,13 +141,47 @@ class RegisterEasyPayMethodsListener implements HookListenerInterface
         );
     }
 
+    /**
+     * 간편결제 버튼에 브랜드 중심 설명을 사용할지 반환합니다.
+     *
+     * @return bool
+     */
     private function usesBrandButton(): bool
+    {
+        return $this->settingEnabled('easy_pay_show_brand_button');
+    }
+
+    /**
+     * 플러그인 설정에서 활성화된 국내 간편결제 수단만 목록에 추가합니다.
+     *
+     * @param  array<int, array<string, mixed>>  $methods
+     * @param  string  $id
+     * @param  array<string, mixed>  $entry
+     * @return void
+     */
+    private function appendIfEnabled(array &$methods, string $id, array $entry): void
+    {
+        $settingKey = self::DOMESTIC_EASY_PAY_SETTINGS[$id] ?? null;
+        if ($settingKey === null || ! $this->settingEnabled($settingKey)) {
+            return;
+        }
+
+        $methods[] = $entry;
+    }
+
+    /**
+     * KG 이니시스 플러그인 boolean 설정을 조회합니다.
+     *
+     * @param  string  $key  설정 키
+     * @return bool
+     */
+    private function settingEnabled(string $key): bool
     {
         if (! \function_exists('plugin_setting')) {
             return false;
         }
 
-        return (bool) \plugin_setting(self::PLUGIN_IDENTIFIER, 'easy_pay_show_brand_button', false);
+        return (bool) \plugin_setting(self::PLUGIN_IDENTIFIER, $key, false);
     }
 
     /**

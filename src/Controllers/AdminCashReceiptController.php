@@ -158,7 +158,7 @@ class AdminCashReceiptController extends AdminBaseController
                 ->update([
                     'is_cash_receipt_issued'   => true,
                     'cash_receipt_type'        => $issueType === '0' ? 'income_deduction' : 'expenditure_proof',
-                    'cash_receipt_identifier'  => $issueNumber,
+                    'cash_receipt_identifier'  => $this->maskCashReceiptIdentifier($issueNumber),
                     'cash_receipt_issued_at'   => now(),
                     'updated_at'               => now(),
                 ]);
@@ -185,5 +185,26 @@ class AdminCashReceiptController extends AdminBaseController
                 'message' => [$e->getMessage()],
             ]);
         }
+    }
+
+    /**
+     * 현금영수증 발행 식별번호를 저장용 마스킹 값으로 변환합니다.
+     *
+     * @param  string  $identifier  PG 발행 요청에 사용한 원본 식별번호
+     * @return string 끝 4자리만 남긴 마스킹 값
+     */
+    private function maskCashReceiptIdentifier(string $identifier): string
+    {
+        $digits = preg_replace('/\D+/', '', $identifier) ?? '';
+        if ($digits === '') {
+            return str_repeat('*', max(1, mb_strlen($identifier)));
+        }
+
+        $length = strlen($digits);
+        if ($length <= 4) {
+            return str_repeat('*', $length);
+        }
+
+        return str_repeat('*', $length - 4) . substr($digits, -4);
     }
 }

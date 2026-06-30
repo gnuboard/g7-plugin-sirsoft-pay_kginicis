@@ -22,7 +22,6 @@ use Modules\Sirsoft\Ecommerce\Models\OrderPayment;
 use Modules\Sirsoft\Ecommerce\Models\OrderRefund;
 use Modules\Sirsoft\Ecommerce\Models\OrderShipping;
 use Modules\Sirsoft\Ecommerce\Models\Sequence;
-use PHPUnit\Framework\MockObject\MockObject;
 use Plugins\Sirsoft\PayKginicis\Listeners\PaymentRefundListener;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 use Plugins\Sirsoft\PayKginicis\Tests\PluginTestCase;
@@ -45,8 +44,8 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
 
     private const CANCEL_SUCCESS = [
         'resultCode' => '00',
-        'resultMsg' => '취소 성공',
-        'tid' => 'TID_CANCEL_KGINICIS',
+        'resultMsg'  => '취소 성공',
+        'tid'        => 'TID_CANCEL_KGINICIS',
     ];
 
     protected User $adminUser;
@@ -85,7 +84,7 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
         $this->app->instance(KgInicisApiService::class, $mock);
     }
 
-    private function expectKgInicisCancelOnce(): MockObject
+    private function expectKgInicisCancelOnce(): \PHPUnit\Framework\MockObject\MockObject
     {
         $mock = $this->createMock(KgInicisApiService::class);
         $mock->expects($this->once())
@@ -116,8 +115,8 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
             'sirsoft-ecommerce.coupon.restore',
             function (Order $order, array $couponIssueIds) {
                 CouponIssue::whereIn('id', $couponIssueIds)->update([
-                    'status' => CouponIssueRecordStatus::AVAILABLE->value,
-                    'used_at' => null,
+                    'status'   => CouponIssueRecordStatus::AVAILABLE->value,
+                    'used_at'  => null,
                     'order_id' => null,
                 ]);
             },
@@ -136,14 +135,14 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
             Sequence::firstOrCreate(
                 ['type' => $type->value],
                 [
-                    'algorithm' => $cfg['algorithm']->value,
-                    'prefix' => $cfg['prefix'],
+                    'algorithm'     => $cfg['algorithm']->value,
+                    'prefix'        => $cfg['prefix'],
                     'current_value' => 0,
-                    'increment' => 1,
-                    'min_value' => 1,
-                    'max_value' => $cfg['max_value'],
-                    'cycle' => false,
-                    'pad_length' => $cfg['pad_length'],
+                    'increment'     => 1,
+                    'min_value'     => 1,
+                    'max_value'     => $cfg['max_value'],
+                    'cycle'         => false,
+                    'pad_length'    => $cfg['pad_length'],
                 ]
             );
         }
@@ -158,35 +157,35 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
         int $shippingFee = 3000,
         string $tid = self::TID,
     ): array {
-        $user = User::factory()->create();
+        $user     = User::factory()->create();
         $subtotal = $unitPrice * $optionCount;
-        $total = $subtotal + $shippingFee;
+        $total    = $subtotal + $shippingFee;
 
         $order = Order::factory()->create([
-            'user_id' => $user->id,
-            'order_status' => OrderStatusEnum::PAYMENT_COMPLETE,
-            'subtotal_amount' => $subtotal,
-            'total_shipping_amount' => $shippingFee,
-            'total_amount' => $total,
-            'total_paid_amount' => $total,
-            'total_due_amount' => 0,
-            'total_cancelled_amount' => 0,
-            'cancellation_count' => 0,
-            'paid_at' => now(),
-            'promotions_applied_snapshot' => [],
+            'user_id'                          => $user->id,
+            'order_status'                     => OrderStatusEnum::PAYMENT_COMPLETE,
+            'subtotal_amount'                  => $subtotal,
+            'total_shipping_amount'            => $shippingFee,
+            'total_amount'                     => $total,
+            'total_paid_amount'                => $total,
+            'total_due_amount'                 => 0,
+            'total_cancelled_amount'           => 0,
+            'cancellation_count'               => 0,
+            'paid_at'                          => now(),
+            'promotions_applied_snapshot'      => [],
             'shipping_policy_applied_snapshot' => [],
         ]);
 
         $options = [];
         for ($i = 0; $i < $optionCount; $i++) {
             $options[] = OrderOption::factory()->forOrder($order)->create([
-                'quantity' => 1,
-                'unit_price' => $unitPrice,
-                'subtotal_price' => $unitPrice,
-                'subtotal_paid_amount' => $unitPrice,
+                'quantity'                 => 1,
+                'unit_price'               => $unitPrice,
+                'subtotal_price'           => $unitPrice,
+                'subtotal_paid_amount'     => $unitPrice,
                 'subtotal_discount_amount' => 0,
-                'option_status' => OrderStatusEnum::PAYMENT_COMPLETE,
-                'product_snapshot' => [
+                'option_status'            => OrderStatusEnum::PAYMENT_COMPLETE,
+                'product_snapshot'         => [
                     'id' => null, 'name' => ['ko' => '테스트상품', 'en' => 'Test Product'],
                     'product_code' => null, 'sku' => null, 'brand_id' => null,
                     'list_price' => $unitPrice, 'selling_price' => $unitPrice,
@@ -194,7 +193,7 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
                     'tax_status' => 'taxable', 'tax_rate' => 10,
                     'has_options' => false, 'option_groups' => null, 'thumbnail_url' => null,
                 ],
-                'option_snapshot' => [
+                'option_snapshot'          => [
                     'id' => null, 'option_code' => null, 'option_values' => null,
                     'option_name' => '기본', 'price_adjustment' => 0,
                     'list_price' => $unitPrice, 'selling_price' => $unitPrice,
@@ -207,20 +206,20 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
         // payment_meta.pay_method 는 PaymentRefundListener 가 KG 이니시스 cancelPayment 의
         // payMethod 인자로 그대로 사용. 'Card' 가 기본 (신용카드 결제).
         $payment = OrderPaymentFactory::new()->forOrder($order)->create([
-            'payment_status' => PaymentStatusEnum::PAID,
-            'payment_method' => PaymentMethodEnum::CARD,
-            'pg_provider' => 'kginicis',
+            'payment_status'    => PaymentStatusEnum::PAID,
+            'payment_method'    => PaymentMethodEnum::CARD,
+            'pg_provider'       => 'kginicis',
             'paid_amount_local' => $total,
-            'paid_amount_base' => $total,
-            'cancelled_amount' => 0,
-            'paid_at' => now(),
-            'transaction_id' => $tid,
-            'payment_meta' => ['pay_method' => 'Card'],
+            'paid_amount_base'  => $total,
+            'cancelled_amount'  => 0,
+            'paid_at'           => now(),
+            'transaction_id'    => $tid,
+            'payment_meta'      => ['pay_method' => 'Card'],
         ]);
 
         $shipping = OrderShipping::factory()->forOrder($order)->create([
-            'order_option_id' => $options[0]->id,
-            'base_shipping_amount' => $shippingFee,
+            'order_option_id'       => $options[0]->id,
+            'base_shipping_amount'  => $shippingFee,
             'total_shipping_amount' => $shippingFee,
         ]);
 
@@ -237,40 +236,40 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
         int $minOrderAmount = 0,
         string $tid = self::TID,
     ): array {
-        $user = User::factory()->create();
+        $user     = User::factory()->create();
         $subtotal = $unitPrice * $optionCount;
-        $paid = $subtotal - $couponDiscount;
+        $paid     = $subtotal - $couponDiscount;
 
         $order = Order::factory()->create([
-            'user_id' => $user->id,
-            'order_status' => OrderStatusEnum::PAYMENT_COMPLETE,
-            'subtotal_amount' => $subtotal,
-            'total_shipping_amount' => 0,
-            'total_amount' => $subtotal,
-            'total_coupon_discount_amount' => $couponDiscount,
+            'user_id'                            => $user->id,
+            'order_status'                       => OrderStatusEnum::PAYMENT_COMPLETE,
+            'subtotal_amount'                    => $subtotal,
+            'total_shipping_amount'              => 0,
+            'total_amount'                       => $subtotal,
+            'total_coupon_discount_amount'       => $couponDiscount,
             'total_order_coupon_discount_amount' => $couponDiscount,
-            'total_paid_amount' => $paid,
-            'total_due_amount' => 0,
-            'total_cancelled_amount' => 0,
-            'cancellation_count' => 0,
-            'paid_at' => now(),
-            'shipping_policy_applied_snapshot' => [],
+            'total_paid_amount'                  => $paid,
+            'total_due_amount'                   => 0,
+            'total_cancelled_amount'             => 0,
+            'cancellation_count'                 => 0,
+            'paid_at'                            => now(),
+            'shipping_policy_applied_snapshot'   => [],
         ]);
 
         $options = [];
         $perBase = (int) round($couponDiscount / $optionCount);
         for ($i = 0; $i < $optionCount; $i++) {
-            $perDisc = $i < ($optionCount - 1)
+            $perDisc   = $i < ($optionCount - 1)
                 ? $perBase
                 : $couponDiscount - $perBase * ($optionCount - 1);
             $options[] = OrderOption::factory()->forOrder($order)->create([
-                'quantity' => 1,
-                'unit_price' => $unitPrice,
-                'subtotal_price' => $unitPrice,
-                'subtotal_paid_amount' => $unitPrice - $perDisc,
+                'quantity'                 => 1,
+                'unit_price'               => $unitPrice,
+                'subtotal_price'           => $unitPrice,
+                'subtotal_paid_amount'     => $unitPrice - $perDisc,
                 'subtotal_discount_amount' => $perDisc,
-                'option_status' => OrderStatusEnum::PAYMENT_COMPLETE,
-                'product_snapshot' => [
+                'option_status'            => OrderStatusEnum::PAYMENT_COMPLETE,
+                'product_snapshot'         => [
                     'id' => null, 'name' => ['ko' => '테스트상품', 'en' => 'Test Product'],
                     'product_code' => null, 'sku' => null, 'brand_id' => null,
                     'list_price' => $unitPrice, 'selling_price' => $unitPrice,
@@ -278,7 +277,7 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
                     'tax_status' => 'taxable', 'tax_rate' => 10,
                     'has_options' => false, 'option_groups' => null, 'thumbnail_url' => null,
                 ],
-                'option_snapshot' => [
+                'option_snapshot'          => [
                     'id' => null, 'option_code' => null, 'option_values' => null,
                     'option_name' => '기본', 'price_adjustment' => 0,
                     'list_price' => $unitPrice, 'selling_price' => $unitPrice,
@@ -289,40 +288,40 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
         }
 
         $payment = OrderPaymentFactory::new()->forOrder($order)->create([
-            'payment_status' => PaymentStatusEnum::PAID,
-            'payment_method' => PaymentMethodEnum::CARD,
-            'pg_provider' => 'kginicis',
+            'payment_status'    => PaymentStatusEnum::PAID,
+            'payment_method'    => PaymentMethodEnum::CARD,
+            'pg_provider'       => 'kginicis',
             'paid_amount_local' => $paid,
-            'paid_amount_base' => $paid,
-            'cancelled_amount' => 0,
-            'paid_at' => now(),
-            'transaction_id' => $tid,
-            'payment_meta' => ['pay_method' => 'Card'],
+            'paid_amount_base'  => $paid,
+            'cancelled_amount'  => 0,
+            'paid_at'           => now(),
+            'transaction_id'    => $tid,
+            'payment_meta'      => ['pay_method' => 'Card'],
         ]);
 
         $coupon = Coupon::create([
-            'name' => '검수용 테스트 쿠폰',
-            'target_type' => 'order_amount',
-            'discount_type' => 'fixed',
-            'discount_value' => $couponDiscount,
-            'issue_method' => 'direct',
+            'name'            => '검수용 테스트 쿠폰',
+            'target_type'     => 'order_amount',
+            'discount_type'   => 'fixed',
+            'discount_value'  => $couponDiscount,
+            'issue_method'    => 'direct',
             'issue_condition' => 'manual',
-            'issue_status' => 'issuing',
-            'total_quantity' => 100,
-            'issued_count' => 1,
-            'per_user_limit' => 1,
-            'valid_type' => 'period',
-            'is_combinable' => false,
+            'issue_status'    => 'issuing',
+            'total_quantity'  => 100,
+            'issued_count'    => 1,
+            'per_user_limit'  => 1,
+            'valid_type'      => 'period',
+            'is_combinable'   => false,
         ]);
 
         $couponIssue = CouponIssue::create([
-            'coupon_id' => $coupon->id,
-            'user_id' => $order->user_id,
-            'coupon_code' => 'TEST-'.strtoupper(uniqid()),
-            'status' => CouponIssueRecordStatus::USED->value,
-            'issued_at' => now(),
-            'used_at' => now(),
-            'order_id' => $order->id,
+            'coupon_id'       => $coupon->id,
+            'user_id'         => $order->user_id,
+            'coupon_code'     => 'TEST-' . strtoupper(uniqid()),
+            'status'          => CouponIssueRecordStatus::USED->value,
+            'issued_at'       => now(),
+            'used_at'         => now(),
+            'order_id'        => $order->id,
             'discount_amount' => $couponDiscount,
         ]);
 
@@ -331,11 +330,11 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
                 'coupon_issue_ids' => [$couponIssue->id],
                 'order_promotions' => [
                     'coupons' => [[
-                        'coupon_issue_id' => $couponIssue->id,
-                        'discount_type' => 'fixed',
-                        'discount_value' => $couponDiscount,
+                        'coupon_issue_id'  => $couponIssue->id,
+                        'discount_type'    => 'fixed',
+                        'discount_value'   => $couponDiscount,
                         'min_order_amount' => $minOrderAmount,
-                        'applied_amount' => $couponDiscount,
+                        'applied_amount'   => $couponDiscount,
                     ]],
                 ],
             ],
@@ -352,13 +351,13 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
     {
         $this->expectKgInicisCancelOnce();
 
-        $data = $this->createKgInicisOrderWithShipping(optionCount: 1, unitPrice: 20000, shippingFee: 3000);
+        $data  = $this->createKgInicisOrderWithShipping(optionCount: 1, unitPrice: 20000, shippingFee: 3000);
         $order = $data['order'];
 
         $response = $this->actingAs($this->adminUser)
             ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type' => 'full',
-                'reason' => 'changed_mind',
+                'type'      => 'full',
+                'reason'    => 'changed_mind',
                 'cancel_pg' => true,
             ]);
 
@@ -389,13 +388,13 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
             ->willReturn(self::CANCEL_SUCCESS);
         $this->app->instance(KgInicisApiService::class, $mock);
 
-        $data = $this->createKgInicisOrderWithShipping(optionCount: 1, unitPrice: 20000, shippingFee: 3000);
+        $data  = $this->createKgInicisOrderWithShipping(optionCount: 1, unitPrice: 20000, shippingFee: 3000);
         $order = $data['order'];
 
         $this->actingAs($this->adminUser)
             ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type' => 'full',
-                'reason' => 'changed_mind',
+                'type'      => 'full',
+                'reason'    => 'changed_mind',
                 'cancel_pg' => true,
             ])->assertOk()->assertJsonPath('success', true);
     }
@@ -436,13 +435,13 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
     {
         $this->stubKgInicisCancelSuccess();
 
-        $data = $this->createKgInicisOrderWithShipping(optionCount: 1, unitPrice: 30000, shippingFee: 0);
+        $data  = $this->createKgInicisOrderWithShipping(optionCount: 1, unitPrice: 30000, shippingFee: 0);
         $order = $data['order'];
 
         $response = $this->actingAs($this->adminUser)
             ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type' => 'full',
-                'reason' => 'changed_mind',
+                'type'      => 'full',
+                'reason'    => 'changed_mind',
                 'cancel_pg' => true,
             ]);
 
@@ -473,23 +472,22 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
             ->willReturn(self::CANCEL_SUCCESS);
         $this->app->instance(KgInicisApiService::class, $mock);
 
-        $data = $this->createKgInicisOrderWithShipping(optionCount: 2, unitPrice: 20000, shippingFee: 3000);
-        $order = $data['order'];
+        $data    = $this->createKgInicisOrderWithShipping(optionCount: 2, unitPrice: 20000, shippingFee: 3000);
+        $order   = $data['order'];
         $options = $data['options'];
 
         $response = $this->actingAs($this->adminUser)
             ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type' => 'partial',
-                'items' => [['order_option_id' => $options[0]->id, 'cancel_quantity' => 1]],
-                'reason' => 'changed_mind',
+                'type'      => 'partial',
+                'items'     => [['order_option_id' => $options[0]->id, 'cancel_quantity' => 1]],
+                'reason'    => 'changed_mind',
                 'cancel_pg' => true,
             ]);
 
         $response->assertOk()->assertJsonPath('success', true);
 
-        // 부분취소는 별도 주문 상태(partial_cancelled)를 두지 않는다 — 일부 옵션만 CANCELLED 로
-        // 전이되고 isPartiallyCancelled() 가 옵션 상태로 부분취소를 판정한다 (OrderCancellationService 정책).
-        $this->assertTrue($order->fresh(['options'])->isPartiallyCancelled(), '부분취소 후 부분취소 상태로 판정되어야 합니다');
+        $order->refresh();
+        $this->assertEquals(OrderStatusEnum::PARTIAL_CANCELLED, $order->order_status);
 
         $refund = OrderRefund::where('order_id', $order->id)->first();
         $this->assertNotNull($refund, '부분취소 후 환불 레코드가 생성되어야 합니다');
@@ -501,16 +499,16 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
     {
         $this->expectKgInicisCancelNever();
 
-        $data = $this->createKgInicisOrderWithShipping(optionCount: 2, unitPrice: 20000, shippingFee: 3000);
-        $order = $data['order'];
+        $data    = $this->createKgInicisOrderWithShipping(optionCount: 2, unitPrice: 20000, shippingFee: 3000);
+        $order   = $data['order'];
         $options = $data['options'];
         $originalPaid = (float) $order->total_paid_amount;
 
         $response = $this->actingAs($this->adminUser)
             ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type' => 'partial',
-                'items' => [['order_option_id' => $options[0]->id, 'cancel_quantity' => 1]],
-                'reason' => 'changed_mind',
+                'type'      => 'partial',
+                'items'     => [['order_option_id' => $options[0]->id, 'cancel_quantity' => 1]],
+                'reason'    => 'changed_mind',
                 'cancel_pg' => false,
             ]);
 
@@ -531,14 +529,14 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
         $this->stubKgInicisCancelSuccess();
         $this->mockCouponRestore();
 
-        $data = $this->createKgInicisOrderWithCoupon(optionCount: 1, unitPrice: 30000, couponDiscount: 3000);
-        $order = $data['order'];
+        $data        = $this->createKgInicisOrderWithCoupon(optionCount: 1, unitPrice: 30000, couponDiscount: 3000);
+        $order       = $data['order'];
         $couponIssue = $data['couponIssue'];
 
         $response = $this->actingAs($this->adminUser)
             ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type' => 'full',
-                'reason' => 'changed_mind',
+                'type'      => 'full',
+                'reason'    => 'changed_mind',
                 'cancel_pg' => true,
             ]);
 
@@ -571,13 +569,13 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
 
         $this->mockCouponRestore();
 
-        $data = $this->createKgInicisOrderWithCoupon(optionCount: 1, unitPrice: 30000, couponDiscount: 3000);
+        $data  = $this->createKgInicisOrderWithCoupon(optionCount: 1, unitPrice: 30000, couponDiscount: 3000);
         $order = $data['order'];
 
         $this->actingAs($this->adminUser)
             ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type' => 'full',
-                'reason' => 'changed_mind',
+                'type'      => 'full',
+                'reason'    => 'changed_mind',
                 'cancel_pg' => true,
             ])->assertOk()->assertJsonPath('success', true);
     }
@@ -591,40 +589,40 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
         $this->stubKgInicisCancelSuccess();
         $this->mockCouponRestore();
 
-        $data = $this->createKgInicisOrderWithCoupon(
+        $data    = $this->createKgInicisOrderWithCoupon(
             optionCount: 2, unitPrice: 30000, couponDiscount: 3000, minOrderAmount: 20000
         );
-        $order = $data['order'];
+        $order   = $data['order'];
         $options = $data['options'];
 
         $response = $this->actingAs($this->adminUser)
             ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type' => 'partial',
-                'items' => [['order_option_id' => $options[0]->id, 'cancel_quantity' => 1]],
-                'reason' => 'changed_mind',
+                'type'      => 'partial',
+                'items'     => [['order_option_id' => $options[0]->id, 'cancel_quantity' => 1]],
+                'reason'    => 'changed_mind',
                 'cancel_pg' => true,
             ]);
 
         $response->assertOk()->assertJsonPath('success', true);
-        // 부분취소는 별도 주문 상태를 두지 않고, 옵션 상태(일부 CANCELLED)로 부분취소를 판정한다.
-        $this->assertTrue($order->fresh(['options'])->isPartiallyCancelled(), '부분취소 후 부분취소 상태로 판정되어야 합니다');
+        $order->refresh();
+        $this->assertEquals(OrderStatusEnum::PARTIAL_CANCELLED, $order->order_status);
     }
 
     public function test_partial_cancel_rejected_when_coupon_condition_no_longer_met(): void
     {
         $this->expectKgInicisCancelNever();
 
-        $data = $this->createKgInicisOrderWithCoupon(
+        $data    = $this->createKgInicisOrderWithCoupon(
             optionCount: 2, unitPrice: 20000, couponDiscount: 22000, minOrderAmount: 30000
         );
-        $order = $data['order'];
+        $order   = $data['order'];
         $options = $data['options'];
 
         $response = $this->actingAs($this->adminUser)
             ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type' => 'partial',
-                'items' => [['order_option_id' => $options[0]->id, 'cancel_quantity' => 1]],
-                'reason' => 'changed_mind',
+                'type'      => 'partial',
+                'items'     => [['order_option_id' => $options[0]->id, 'cancel_quantity' => 1]],
+                'reason'    => 'changed_mind',
                 'cancel_pg' => true,
             ]);
 
@@ -639,13 +637,13 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
     {
         $this->stubKgInicisCancelFailure('KG 이니시스 취소 실패: 거래가 만료되었습니다');
 
-        $data = $this->createKgInicisOrderWithShipping(optionCount: 1, unitPrice: 20000, shippingFee: 3000);
+        $data  = $this->createKgInicisOrderWithShipping(optionCount: 1, unitPrice: 20000, shippingFee: 3000);
         $order = $data['order'];
 
         $response = $this->actingAs($this->adminUser)
             ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type' => 'full',
-                'reason' => 'changed_mind',
+                'type'      => 'full',
+                'reason'    => 'changed_mind',
                 'cancel_pg' => true,
             ]);
 
@@ -663,16 +661,16 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
     {
         $this->expectKgInicisCancelNever();
 
-        $data = $this->createKgInicisOrderWithShipping(optionCount: 1, unitPrice: 20000, shippingFee: 3000);
-        $order = $data['order'];
+        $data    = $this->createKgInicisOrderWithShipping(optionCount: 1, unitPrice: 20000, shippingFee: 3000);
+        $order   = $data['order'];
         $payment = $data['payment'];
 
         $payment->update(['pg_provider' => 'other_pg']);
 
         $response = $this->actingAs($this->adminUser)
             ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type' => 'full',
-                'reason' => 'changed_mind',
+                'type'      => 'full',
+                'reason'    => 'changed_mind',
                 'cancel_pg' => false,
             ]);
 

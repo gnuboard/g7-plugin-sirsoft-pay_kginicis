@@ -55,6 +55,13 @@ class MobileSignatureController
             return $contextError;
         }
 
+        if (! $this->apiService->hasMobilePaymentCredentials()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'KG Inicis mobile payment credentials are not configured.',
+            ], 422);
+        }
+
         $chkfake = $this->apiService->generateMobileChkfake(
             $oid,
             $price,
@@ -86,10 +93,10 @@ class MobileSignatureController
             ], 422);
         }
 
-        if (strtoupper((string) $order->currency) === 'JPY') {
+        if (strtoupper((string) $order->currency) !== 'KRW') {
             return response()->json([
                 'success' => false,
-                'message' => 'Standard KG Inicis signature is not available for JPY orders.',
+                'message' => 'Standard KG Inicis signature is only available for KRW orders.',
             ], 422);
         }
 

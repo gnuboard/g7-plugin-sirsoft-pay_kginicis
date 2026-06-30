@@ -22,7 +22,7 @@ class AdminCbtTestProductControllerTest extends PluginTestCase
      */
     public function test_cbt_test_product_name_is_multilingual_array(): void
     {
-        $admin = $this->createAdminUser();
+        $admin = $this->createAdminUser(['sirsoft-ecommerce.products.create']);
         $this->actingAs($admin);
 
         $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/admin/cbt-test-product');
@@ -62,7 +62,7 @@ class AdminCbtTestProductControllerTest extends PluginTestCase
     {
         Http::fake();
 
-        $admin = $this->createAdminUser();
+        $admin = $this->createAdminUser(['sirsoft-ecommerce.orders.read']);
         $this->actingAs($admin);
 
         $order = OrderFactory::new()->create([
@@ -127,7 +127,7 @@ class AdminCbtTestProductControllerTest extends PluginTestCase
     {
         Http::fake();
 
-        $admin = $this->createAdminUser();
+        $admin = $this->createAdminUser(['sirsoft-ecommerce.orders.read']);
         $this->actingAs($admin);
 
         $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/admin/transaction/query', [

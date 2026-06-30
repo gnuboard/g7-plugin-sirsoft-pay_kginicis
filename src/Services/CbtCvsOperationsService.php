@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Log;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Models\OrderPayment;
-use Modules\Sirsoft\Ecommerce\Services\CurrencyConversionService;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
 use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
@@ -207,7 +206,7 @@ class CbtCvsOperationsService
             $completedMeta = array_merge($completedMeta, [
                 'result_code' => $status,
                 'pay_method' => 'CVS',
-                'auth_date' => ($payload['applDt'] ?? '').($payload['applTm'] ?? ''),
+                'auth_date' => ($payload['applDt'] ?? '') . ($payload['applTm'] ?? ''),
                 'mid' => $mid,
                 'currency' => $payload['currencyCd'] ?? 'JPY',
                 'is_cbt' => true,
@@ -340,7 +339,7 @@ class CbtCvsOperationsService
 
         $now = now();
         $payload = [
-            'tid' => $payment->transaction_id ?: 'ADMIN_CVS_'.$order->order_number,
+            'tid' => $payment->transaction_id ?: 'ADMIN_CVS_' . $order->order_number,
             'mid' => (string) ($meta['cbt_mid'] ?? $this->apiService->getJapanMid()),
             'applDt' => $now->format('Ymd'),
             'applTm' => $now->format('His'),
@@ -565,9 +564,7 @@ class CbtCvsOperationsService
             return $metaAmount;
         }
 
-        // 결제 청구액 SSoT = 결제 통화(order_currency) 환산액 (buildPgPaymentData 와 동일 기준).
-        // base≠결제 통화에서 CVS 통보 금액(결제 통화)과 단위가 일치하도록 한다.
-        return app(CurrencyConversionService::class)->resolveOrderPaymentChargeAmount($order);
+        return (int) round((float) $order->total_due_amount);
     }
 
     private function parseCbtDateTime(?string $value): ?CarbonImmutable
