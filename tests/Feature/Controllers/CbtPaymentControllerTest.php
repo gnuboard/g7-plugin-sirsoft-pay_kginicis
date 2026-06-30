@@ -822,11 +822,8 @@ class CbtPaymentControllerTest extends PluginTestCase
         $response->assertRedirect('http://localhost/shop/checkout?error=cbt_failed&orderId=JP-ORDER-012');
     }
 
-    public function test_cbt_callback_completes_with_order_amount_when_pg_amount_field_absent(): void
+    public function test_cbt_callback_auto_refunds_when_approved_amount_is_missing(): void
     {
-        // KG 이니시스 일본 CBT 승인 응답에는 금액 필드가 없다(매뉴얼상 미사용).
-        // 카드 승인 응답에 amount/price 가 없어도 PG 가 OK 승인했으면
-        // 주문 결제예정액(100)을 승인액으로 신뢰해 결제를 완료해야 한다.
         $this->insertOrderRow('JP-ORDER-013', 100);
         $order = $this->makePendingJpyOrder('JP-ORDER-013', 100);
 
@@ -834,13 +831,7 @@ class CbtPaymentControllerTest extends PluginTestCase
         $orderService->shouldReceive('findByOrderNumber')
             ->with('JP-ORDER-013')
             ->andReturn($order);
-        $orderService->shouldReceive('completePayment')
-            ->once()
-            ->with(
-                $order,
-                Mockery::on(fn (array $data): bool => ($data['transaction_id'] ?? null) === 'CBT_TID_013'),
-                100,
-            );
+        $orderService->shouldNotReceive('completePayment');
 
         $apiService = Mockery::mock(KgInicisApiService::class);
         $apiService->shouldReceive('getJapanMid')->andReturn(KgInicisApiService::JAPAN_TEST_MID);
@@ -855,8 +846,14 @@ class CbtPaymentControllerTest extends PluginTestCase
                 'currencyCd' => 'JPY',
                 'paymethod' => 'CARD',
             ]);
-        // 금액 누락은 정상 동작이므로 자동환불은 호출되지 않아야 한다.
-        $apiService->shouldNotReceive('refundCbtPayment');
+        $apiService->shouldReceive('refundCbtPayment')
+            ->once()
+            ->with(
+                'CBT_TID_013',
+                null,
+                Mockery::on(fn (string $msg): bool => str_contains($msg, 'approved amount missing')),
+            )
+            ->andReturn(['resultCode' => '00']);
 
         $this->app->instance(OrderProcessingService::class, $orderService);
         $this->app->instance(KgInicisApiService::class, $apiService);
@@ -871,68 +868,11 @@ class CbtPaymentControllerTest extends PluginTestCase
                 'selectedPaymentMethod' => 'card',
             ]));
 
-        $response->assertRedirect('http://localhost/shop/orders/JP-ORDER-013/complete');
-    }
+        $response->assertRedirect('http://localhost/shop/checkout?error=cbt_failed&orderId=JP-ORDER-013');
 
-    public function test_cbt_callback_completes_paypay_when_boku_amount_fields_are_blank(): void
-    {
-        // 실제 일본 PayPay(BOKU) 승인 응답 재현: bokuApplPrice/bokuLocalApplPrice 가
-        // 모두 빈 문자열로 오고 amount/price 키 자체가 없다. 이때도 결제예정액(500)으로
-        // 완료되어야 한다(회귀: approved amount missing 예외로 정상 결제가 실패 처리되던 버그).
-        $this->insertOrderRow('JP-ORDER-PAYPAY-OK', 500);
-        $order = $this->makePendingJpyOrder('JP-ORDER-PAYPAY-OK', 500);
-
-        $orderService = Mockery::mock(OrderProcessingService::class);
-        $orderService->shouldReceive('findByOrderNumber')
-            ->with('JP-ORDER-PAYPAY-OK')
-            ->andReturn($order);
-        $orderService->shouldReceive('completePayment')
-            ->once()
-            ->with(
-                $order,
-                Mockery::on(fn (array $data): bool => ($data['transaction_id'] ?? null) === 'CBT_TID_PAYPAY_OK'),
-                500,
-            );
-
-        $apiService = Mockery::mock(KgInicisApiService::class);
-        $apiService->shouldReceive('getJapanMid')->andReturn(KgInicisApiService::JAPAN_TEST_MID);
-        $apiService->shouldReceive('isTestMode')->andReturn(true);
-        $apiService->shouldReceive('approveCbtPayment')
-            ->with('SID-PAYPAY-OK')
-            ->andReturn([
-                'resultCode' => 'OK',
-                'errorCode' => '',
-                'tid' => 'CBT_TID_PAYPAY_OK',
-                'resultMsg' => '決済が完了しました。',
-                'paymethod' => 'PAYpay',
-                'applDate' => '20260629',
-                'applTime' => '223645',
-                'bokuApplPrice' => '',
-                'bokuLocalApplPrice' => '',
-                'bokuApplCurrency' => '',
-                'bokuLocalApplCurrency' => '',
-                'bokuChargeId' => '',
-                'convenience' => '',
-                'confNo' => '',
-                'receiptNo' => '',
-                'paymentTerm' => '',
-            ]);
-        $apiService->shouldNotReceive('refundCbtPayment');
-
-        $this->app->instance(OrderProcessingService::class, $orderService);
-        $this->app->instance(KgInicisApiService::class, $apiService);
-
-        $response = $this->get('/plugins/sirsoft-pay_kginicis/payment/cbt/callback?'
-            . http_build_query([
-                'oid' => 'JP-ORDER-PAYPAY-OK',
-                'sid' => 'SID-PAYPAY-OK',
-                'resultCode' => 'OK',
-                'mid' => KgInicisApiService::JAPAN_TEST_MID,
-                'paymethod' => 'PAYpay',
-                'selectedPaymentMethod' => 'kginicis_japan_paypay',
-            ]));
-
-        $response->assertRedirect('http://localhost/shop/orders/JP-ORDER-PAYPAY-OK/complete');
+        $record = $this->orderMeta('JP-ORDER-013')[CbtReconciliationService::META_KEY] ?? [];
+        $this->assertSame(CbtReconciliationService::STATUS_AUTO_REFUNDED, $record['status'] ?? null);
+        $this->assertSame(100, $record['amount'] ?? null);
     }
 
     public function test_cbt_hash_data_rejects_amount_mismatch(): void

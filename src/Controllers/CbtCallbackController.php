@@ -10,7 +10,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
-use Modules\Sirsoft\Ecommerce\Services\CurrencyConversionService;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\IssuesReceiptCookie;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
@@ -109,10 +108,10 @@ class CbtCallbackController
     ) {}
 
     /**
-     * CBT(일본 엔화) 결제 인증 콜백을 받아 승인 처리 후 결과 페이지로 리다이렉트합니다.
+     * handle
      *
-     * @param  CbtCallbackRequest  $request  CBT 인증 콜백 요청
-     * @return RedirectResponse 성공/실패 결과 페이지 리다이렉트
+     * @param  CbtCallbackRequest  $request
+     * @return RedirectResponse
      */
     public function handle(CbtCallbackRequest $request): RedirectResponse
     {
@@ -221,9 +220,8 @@ class CbtCallbackController
             }
 
             $this->assertCbtApproveResponseMatchesOrder($order, $pgResponse, $request, $payMethod);
-            // PG 승인금액이 누락되어 검증 예외가 발생해도 자동환불 대사 레코드에는 결제 통화 청구액을 남긴다
-            // (buildPgPaymentData 와 동일 SSoT — base≠결제 통화에서도 PG 청구 통화와 단위 일치).
-            $approvedAmount = app(CurrencyConversionService::class)->resolveOrderPaymentChargeAmount($order);
+            // PG 승인금액이 누락되어 검증 예외가 발생해도 자동환불 대사 레코드에는 주문금액을 남긴다.
+            $approvedAmount = (int) round((float) $order->total_due_amount);
             $approvedAmount = $this->resolveApprovedAmount($pgResponse, $order);
             $authResponse = $this->sanitizePgResponse($request->except(['_token']), self::CBT_AUTH_RESPONSE_KEYS);
             $approveResponse = $this->sanitizePgResponse($pgResponse, self::CBT_APPROVE_RESPONSE_KEYS);
@@ -372,40 +370,15 @@ class CbtCallbackController
         }
     }
 
-    /**
-     * CBT 승인액을 확정합니다.
-     *
-     * KG 이니시스 일본 CBT 승인 응답(/cbtapprove)에는 신뢰할 금액 필드가 없다.
-     * 공식 매뉴얼(manual.inicis.com/jppay) 기준 승인 응답 파라미터는 결제수단별로
-     *  - 신용카드: cardCode/approve/payType/installMonth (금액 없음)
-     *  - 편의점(CVS): convenience/confNo/receiptNo/paymentTerm (금액 없음)
-     *  - PayPay(BOKU): bokuApplPrice/bokuApplCurrency (모두 "일본결제 미사용" → 항상 공란)
-     * 이며 amount/price 키 자체가 존재하지 않는다. 금액의 권위는 인증요청(cbtauth)
-     * 시 가맹점이 보낸 금액(= 주문 결제예정액)과 NOTI(입금통보)의 amount 뿐이다.
-     *
-     * 따라서 승인 응답에 금액 필드가 채워져 오면 그 값으로 위변조를 검증하고,
-     * 비어 있으면(일본 CBT 정상 동작) 주문 결제예정액(order_currency=JPY 환산액)을
-     * 승인액으로 신뢰한다.
-     *
-     * @param  array<string,mixed>  $pgResponse  CBT 승인 응답
-     * @param  Order  $order  결제 대상 주문
-     * @return int 확정된 승인 금액 (결제 통화 단위)
-     */
     private function resolveApprovedAmount(array $pgResponse, Order $order): int
     {
-        // 결제 청구액 SSoT = 결제 통화(order_currency) 환산액 (buildPgPaymentData 와 동일 기준).
-        // CBT 는 order_currency=JPY 강제이나 base 통화는 다를 수 있어(예: base KRW, 결제 JPY)
-        // total_due_amount(base) 직접 비교 시 PG 승인액(JPY)과 단위가 어긋난다.
-        $expectedAmount = app(CurrencyConversionService::class)->resolveOrderPaymentChargeAmount($order);
-        $pgAmount = $this->firstNonEmptyString($pgResponse, ['amount', 'price', 'bokuApplPrice', 'bokuLocalApplPrice']);
+        $expectedAmount = (int) round((float) $order->total_due_amount);
+        $pgAmount = $pgResponse['amount'] ?? $pgResponse['price'] ?? null;
 
-        // 일본 CBT 승인 응답은 금액 필드가 비어 온다(매뉴얼상 미사용). 금액이 없으면
-        // 주문 결제예정액을 승인액으로 신뢰한다(승인 권위 = resultCode OK + tid).
-        if ($pgAmount === null) {
-            return $expectedAmount;
+        if ($pgAmount === null || $pgAmount === '') {
+            throw new \RuntimeException('KG Inicis CBT approved amount missing.');
         }
 
-        // 라이브/타 결제수단에서 금액이 채워져 오면 위변조 검증을 유지한다.
         $approvedAmount = (int) $pgAmount;
         if ($approvedAmount !== $expectedAmount) {
             throw new \RuntimeException('KG Inicis CBT approved amount mismatch.');
@@ -444,8 +417,8 @@ class CbtCallbackController
     }
 
     /**
-     * @param  array<string,mixed>  $source
-     * @param  array<int,string>  $keys
+     * @param array<string,mixed> $source
+     * @param array<int,string> $keys
      */
     private function firstNonEmptyString(array $source, array $keys): ?string
     {
@@ -601,7 +574,7 @@ class CbtCallbackController
             $refundResult = $this->apiService->refundCbtPayment(
                 $tid,
                 null,
-                'CBT approved but local payment completion failed: '.mb_substr($reason, 0, 80),
+                'CBT approved but local payment completion failed: ' . mb_substr($reason, 0, 80),
             );
 
             $this->recordCbtReconciliationStatus($oid, [
@@ -649,8 +622,8 @@ class CbtCallbackController
         }
 
         Log::error('KG Inicis CBT: post-approve failure — MANUAL CANCEL REQUIRED on KG Inicis JP merchant admin', [
-            'tid' => $tid,
-            'oid' => $oid,
+            'tid'    => $tid,
+            'oid'    => $oid,
             'amount' => $amount,
             'reason' => $reason,
         ]);
@@ -699,7 +672,7 @@ class CbtCallbackController
         $query = http_build_query(array_filter($queryParams));
         $separator = str_contains($baseUrl, '?') ? '&' : '?';
 
-        return $baseUrl.$separator.$query;
+        return $baseUrl . $separator . $query;
     }
 
     /**
@@ -717,8 +690,8 @@ class CbtCallbackController
         }
 
         $base = rtrim((string) config('app.url'), '/');
-        $path = $url === '' ? '/' : ($url[0] === '/' ? $url : '/'.$url);
+        $path = $url === '' ? '/' : ($url[0] === '/' ? $url : '/' . $url);
 
-        return $base.$path;
+        return $base . $path;
     }
 }

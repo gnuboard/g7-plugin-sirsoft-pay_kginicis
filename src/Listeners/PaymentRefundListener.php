@@ -14,11 +14,16 @@ class PaymentRefundListener implements HookListenerInterface
 {
     private const PG_PROVIDER_ID = 'kginicis';
 
-    /**
-     * 구독할 훅 매핑을 반환합니다.
-     *
-     * @return array 훅 구독 설정
-     */
+/**
+
+ * getSubscribedHooks
+
+ *
+
+ * @return array
+
+ */
+
     public static function getSubscribedHooks(): array
     {
         return [
@@ -37,16 +42,26 @@ class PaymentRefundListener implements HookListenerInterface
      */
     public function handle(...$args): void {}
 
-    /**
-     * KG 이니시스 결제 환불을 처리합니다.
-     *
-     * @param  array  $result  환불 결과 (기본값)
-     * @param  Order  $order  주문
-     * @param  OrderPayment  $payment  결제 정보
-     * @param  float  $refundAmount  환불 금액 (결제 통화 order_currency 기준)
-     * @param  string|null  $reason  환불 사유
-     * @return array 환불 결과 {success, error_code, error_message, transaction_id}
-     */
+/**
+
+ * processRefund
+
+ *
+
+ * @param  array  $result
+
+ * @param  Order  $order
+
+ * @param  OrderPayment  $payment
+
+ * @param  float  $refundAmount
+
+ * @param  ?string  $reason
+
+ * @return array
+
+ */
+
     public function processRefund(
         array $result,
         Order $order,
@@ -72,15 +87,11 @@ class PaymentRefundListener implements HookListenerInterface
             $apiService = app(KgInicisApiService::class);
 
             $cancelMsg = $reason ?? __('sirsoft-pay_kginicis::messages.refund.default_reason');
-            // $refundAmount 는 코어가 결제 통화(order_currency)로 환산해 전달한 실환불액이다.
             $cancelAmt = (int) $refundAmount;
             $payMethod = $payment->payment_meta['pay_method'] ?? 'Card';
 
-            // 결제 통화 기준 누적·총액. paid_amount_local 과 mc_cancelled_amount[order_currency] 는
-            // 모두 결제 통화 단위이므로 base≠결제 통화에서도 부분취소 누적이 PG 실청구와 정합한다.
             $paidAmount = (int) $payment->paid_amount_local;
-            $cumulativeCancelled = (int) round((float) $this->cancelledLocalAmount($payment));
-            $previousCancelled = max(0, $cumulativeCancelled - $cancelAmt);
+            $previousCancelled = max(0, (int) $payment->cancelled_amount - $cancelAmt);
             $totalAmount = max($cancelAmt, $paidAmount - $previousCancelled);
             $isPartial = $previousCancelled > 0 || $cancelAmt < $paidAmount;
 
@@ -133,27 +144,6 @@ class PaymentRefundListener implements HookListenerInterface
                 'transaction_id' => null,
             ];
         }
-    }
-
-    /**
-     * 결제 통화(order_currency) 기준 누적 취소액을 반환합니다.
-     *
-     * 코어가 결제 통화로 누적한 mc_cancelled_amount[order_currency] 를 우선 사용하고,
-     * 없으면(레거시 결제) base 누적 cancelled_amount 로 폴백합니다.
-     *
-     * @param  OrderPayment  $payment  결제 레코드
-     * @return float 결제 통화 기준 누적 취소액
-     */
-    private function cancelledLocalAmount(OrderPayment $payment): float
-    {
-        $currency = $payment->currency;
-        $mc = $payment->mc_cancelled_amount ?? [];
-
-        if ($currency !== null && isset($mc[$currency])) {
-            return (float) $mc[$currency];
-        }
-
-        return (float) $payment->cancelled_amount;
     }
 
     private function isCbtPayment(OrderPayment $payment): bool
