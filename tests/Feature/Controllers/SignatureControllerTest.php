@@ -232,8 +232,8 @@ class SignatureControllerTest extends PluginTestCase
         $orderService->shouldReceive('findByOrderNumber')->with('ORD-SIGN-CUR')->andReturn($order);
 
         $apiService = Mockery::mock(KgInicisApiService::class);
-        // develop 의 표준결제 자격증명 가드(hasStandardPaymentCredentials)와 issue421 의 통화 환산
-        // 검증이 같은 흐름에 공존한다. 환산액 경로는 자격 검사까지 도달하므로 mock 이 필요하다.
+        // 표준결제 자격증명 가드(hasStandardPaymentCredentials)와 통화 환산 검증이 같은 흐름에
+        // 공존한다. 환산액 경로는 자격 검사까지 도달하므로 mock 이 필요하다.
         $apiService->shouldReceive('hasStandardPaymentCredentials')->andReturnTrue();
         $apiService->shouldReceive('generateSignature')->with('ORD-SIGN-CUR', 7058, Mockery::type('string'))->andReturn('sig');
         $apiService->shouldReceive('generateVerification')->with('ORD-SIGN-CUR', 7058, Mockery::type('string'))->andReturn('ver');
