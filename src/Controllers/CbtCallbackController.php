@@ -372,18 +372,40 @@ class CbtCallbackController
         }
     }
 
+    /**
+     * CBT 승인액을 확정합니다.
+     *
+     * KG 이니시스 일본 CBT 승인 응답(/cbtapprove)에는 신뢰할 금액 필드가 없다.
+     * 공식 매뉴얼(manual.inicis.com/jppay) 기준 승인 응답 파라미터는 결제수단별로
+     *  - 신용카드: cardCode/approve/payType/installMonth (금액 없음)
+     *  - 편의점(CVS): convenience/confNo/receiptNo/paymentTerm (금액 없음)
+     *  - PayPay(BOKU): bokuApplPrice/bokuApplCurrency (모두 "일본결제 미사용" → 항상 공란)
+     * 이며 amount/price 키 자체가 존재하지 않는다. 금액의 권위는 인증요청(cbtauth)
+     * 시 가맹점이 보낸 금액(= 주문 결제예정액)과 NOTI(입금통보)의 amount 뿐이다.
+     *
+     * 따라서 승인 응답에 금액 필드가 채워져 오면 그 값으로 위변조를 검증하고,
+     * 비어 있으면(일본 CBT 정상 동작) 주문 결제예정액(order_currency=JPY 환산액)을
+     * 승인액으로 신뢰한다.
+     *
+     * @param  array<string,mixed>  $pgResponse  CBT 승인 응답
+     * @param  Order  $order  결제 대상 주문
+     * @return int 확정된 승인 금액 (결제 통화 단위)
+     */
     private function resolveApprovedAmount(array $pgResponse, Order $order): int
     {
         // 결제 청구액 SSoT = 결제 통화(order_currency) 환산액 (buildPgPaymentData 와 동일 기준).
         // CBT 는 order_currency=JPY 강제이나 base 통화는 다를 수 있어(예: base KRW, 결제 JPY)
         // total_due_amount(base) 직접 비교 시 PG 승인액(JPY)과 단위가 어긋난다.
         $expectedAmount = app(CurrencyConversionService::class)->resolveOrderPaymentChargeAmount($order);
-        $pgAmount = $pgResponse['amount'] ?? $pgResponse['price'] ?? null;
+        $pgAmount = $this->firstNonEmptyString($pgResponse, ['amount', 'price', 'bokuApplPrice', 'bokuLocalApplPrice']);
 
-        if ($pgAmount === null || $pgAmount === '') {
-            throw new \RuntimeException('KG Inicis CBT approved amount missing.');
+        // 일본 CBT 승인 응답은 금액 필드가 비어 온다(매뉴얼상 미사용). 금액이 없으면
+        // 주문 결제예정액을 승인액으로 신뢰한다(승인 권위 = resultCode OK + tid).
+        if ($pgAmount === null) {
+            return $expectedAmount;
         }
 
+        // 라이브/타 결제수단에서 금액이 채워져 오면 위변조 검증을 유지한다.
         $approvedAmount = (int) $pgAmount;
         if ($approvedAmount !== $expectedAmount) {
             throw new \RuntimeException('KG Inicis CBT approved amount mismatch.');
