@@ -13,11 +13,10 @@ trait ValidatesCbtOrderContext
 {
     protected function expectedPaymentPrice(Order $order): int
     {
-        // PG 청구 금액 = base total_due_amount 를 주문 스냅샷 환율로 결제 통화 환산한
-        // 최소 화폐단위 정수. 모듈의 환산 SSoT(resolveSnapshotPaymentCharge)를 재사용해
-        // buildPgPaymentData(클라이언트가 보내는 price)와 검증 기준을 동일하게 맞춘다.
-        return app(CurrencyConversionService::class)
-            ->resolveSnapshotPaymentCharge((float) $order->total_due_amount, $order->currency_snapshot ?? [])['minor_unit_amount'];
+        // PG 청구 금액 = 결제 통화(order_currency) 환산 최소 화폐단위 정수. 모듈의 환산 SSoT
+        // (resolveOrderPaymentChargeAmount)를 재사용해 buildPgPaymentData(클라이언트가 보내는 price)·
+        // 코어 최종 승인 검증과 동일 기준으로 맞춘다.
+        return app(CurrencyConversionService::class)->resolveOrderPaymentChargeAmount($order);
     }
 
     protected function cbtExpectedPrice(Order $order): int
