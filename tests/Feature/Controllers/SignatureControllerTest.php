@@ -216,13 +216,57 @@ class SignatureControllerTest extends PluginTestCase
             ->assertJsonPath('message', 'KG Inicis mobile payment credentials are not configured.');
     }
 
-    private function makePendingOrder(string $orderNumber, int $amount, string $currency = 'KRW'): Order
+    public function test_pc_signature_expects_converted_price_for_non_base_order_currency(): void
     {
-        $order = new Order();
+        // base=USD, 결제통화=KRW. base $6 → KRW 7058 환산이 검증 기준(price)이어야 한다.
+        $order = $this->makePendingOrder('ORD-SIGN-CUR', 6, 'KRW', [
+            'base_currency' => 'USD',
+            'order_currency' => 'KRW',
+            'exchange_rates' => [
+                'KRW' => ['rate' => 1176470, 'rounding_unit' => '1', 'rounding_method' => 'floor', 'decimal_places' => 0],
+                'USD' => ['rate' => 1, 'rounding_unit' => '0.01', 'rounding_method' => 'round', 'decimal_places' => 2],
+            ],
+        ]);
+
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldReceive('findByOrderNumber')->with('ORD-SIGN-CUR')->andReturn($order);
+
+        $apiService = Mockery::mock(KgInicisApiService::class);
+        // develop 의 표준결제 자격증명 가드(hasStandardPaymentCredentials)와 issue421 의 통화 환산
+        // 검증이 같은 흐름에 공존한다. 환산액 경로는 자격 검사까지 도달하므로 mock 이 필요하다.
+        $apiService->shouldReceive('hasStandardPaymentCredentials')->andReturnTrue();
+        $apiService->shouldReceive('generateSignature')->with('ORD-SIGN-CUR', 7058, Mockery::type('string'))->andReturn('sig');
+        $apiService->shouldReceive('generateVerification')->with('ORD-SIGN-CUR', 7058, Mockery::type('string'))->andReturn('ver');
+        $apiService->shouldReceive('getMKey')->andReturn('mkey');
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+        $this->app->instance(KgInicisApiService::class, $apiService);
+
+        // 환산액(7058) 으로 보내면 통과
+        $ok = $this->postJson('/api/plugins/sirsoft-pay_kginicis/payment/signature', [
+            'oid' => 'ORD-SIGN-CUR',
+            'price' => 7058,
+            'timestamp' => $this->freshEpochMs(),
+        ]);
+        $ok->assertOk()->assertJsonPath('data.signature', 'sig');
+
+        // base 정수(6) 로 보내면 불일치 422 (옛 버그 회귀 차단)
+        $bad = $this->postJson('/api/plugins/sirsoft-pay_kginicis/payment/signature', [
+            'oid' => 'ORD-SIGN-CUR',
+            'price' => 6,
+            'timestamp' => $this->freshEpochMs(),
+        ]);
+        $bad->assertStatus(422);
+    }
+
+    private function makePendingOrder(string $orderNumber, int $amount, string $currency = 'KRW', array $currencySnapshot = []): Order
+    {
+        $order = new Order;
         $order->order_number = $orderNumber;
         $order->order_status = OrderStatusEnum::PENDING_ORDER;
         $order->currency = $currency;
         $order->total_due_amount = $amount;
+        $order->currency_snapshot = $currencySnapshot;
 
         return $order;
     }

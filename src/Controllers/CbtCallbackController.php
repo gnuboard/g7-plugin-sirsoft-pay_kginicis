@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
+use Modules\Sirsoft\Ecommerce\Services\CurrencyConversionService;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\IssuesReceiptCookie;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
@@ -108,10 +109,10 @@ class CbtCallbackController
     ) {}
 
     /**
-     * handle
+     * CBT(일본 엔화) 결제 인증 콜백을 받아 승인 처리 후 결과 페이지로 리다이렉트합니다.
      *
-     * @param  CbtCallbackRequest  $request
-     * @return RedirectResponse
+     * @param  CbtCallbackRequest  $request  CBT 인증 콜백 요청
+     * @return RedirectResponse 성공/실패 결과 페이지 리다이렉트
      */
     public function handle(CbtCallbackRequest $request): RedirectResponse
     {
@@ -220,8 +221,9 @@ class CbtCallbackController
             }
 
             $this->assertCbtApproveResponseMatchesOrder($order, $pgResponse, $request, $payMethod);
-            // PG 승인금액이 누락되어 검증 예외가 발생해도 자동환불 대사 레코드에는 주문금액을 남긴다.
-            $approvedAmount = (int) round((float) $order->total_due_amount);
+            // PG 승인금액이 누락되어 검증 예외가 발생해도 자동환불 대사 레코드에는 결제 통화 청구액을 남긴다
+            // (buildPgPaymentData 와 동일 SSoT — base≠결제 통화에서도 PG 청구 통화와 단위 일치).
+            $approvedAmount = app(CurrencyConversionService::class)->resolveOrderPaymentChargeAmount($order);
             $approvedAmount = $this->resolveApprovedAmount($pgResponse, $order);
             $authResponse = $this->sanitizePgResponse($request->except(['_token']), self::CBT_AUTH_RESPONSE_KEYS);
             $approveResponse = $this->sanitizePgResponse($pgResponse, self::CBT_APPROVE_RESPONSE_KEYS);
@@ -372,7 +374,10 @@ class CbtCallbackController
 
     private function resolveApprovedAmount(array $pgResponse, Order $order): int
     {
-        $expectedAmount = (int) round((float) $order->total_due_amount);
+        // 결제 청구액 SSoT = 결제 통화(order_currency) 환산액 (buildPgPaymentData 와 동일 기준).
+        // CBT 는 order_currency=JPY 강제이나 base 통화는 다를 수 있어(예: base KRW, 결제 JPY)
+        // total_due_amount(base) 직접 비교 시 PG 승인액(JPY)과 단위가 어긋난다.
+        $expectedAmount = app(CurrencyConversionService::class)->resolveOrderPaymentChargeAmount($order);
         $pgAmount = $pgResponse['amount'] ?? $pgResponse['price'] ?? null;
 
         if ($pgAmount === null || $pgAmount === '') {
@@ -417,8 +422,8 @@ class CbtCallbackController
     }
 
     /**
-     * @param array<string,mixed> $source
-     * @param array<int,string> $keys
+     * @param  array<string,mixed>  $source
+     * @param  array<int,string>  $keys
      */
     private function firstNonEmptyString(array $source, array $keys): ?string
     {
@@ -574,7 +579,7 @@ class CbtCallbackController
             $refundResult = $this->apiService->refundCbtPayment(
                 $tid,
                 null,
-                'CBT approved but local payment completion failed: ' . mb_substr($reason, 0, 80),
+                'CBT approved but local payment completion failed: '.mb_substr($reason, 0, 80),
             );
 
             $this->recordCbtReconciliationStatus($oid, [
@@ -622,8 +627,8 @@ class CbtCallbackController
         }
 
         Log::error('KG Inicis CBT: post-approve failure — MANUAL CANCEL REQUIRED on KG Inicis JP merchant admin', [
-            'tid'    => $tid,
-            'oid'    => $oid,
+            'tid' => $tid,
+            'oid' => $oid,
             'amount' => $amount,
             'reason' => $reason,
         ]);
@@ -672,7 +677,7 @@ class CbtCallbackController
         $query = http_build_query(array_filter($queryParams));
         $separator = str_contains($baseUrl, '?') ? '&' : '?';
 
-        return $baseUrl . $separator . $query;
+        return $baseUrl.$separator.$query;
     }
 
     /**
@@ -690,8 +695,8 @@ class CbtCallbackController
         }
 
         $base = rtrim((string) config('app.url'), '/');
-        $path = $url === '' ? '/' : ($url[0] === '/' ? $url : '/' . $url);
+        $path = $url === '' ? '/' : ($url[0] === '/' ? $url : '/'.$url);
 
-        return $base . $path;
+        return $base.$path;
     }
 }
