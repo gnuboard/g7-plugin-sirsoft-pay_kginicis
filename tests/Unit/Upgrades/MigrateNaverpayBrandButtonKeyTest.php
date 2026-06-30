@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Plugins\Sirsoft\PayKginicis\Tests\Unit\Upgrades;
 
 use App\Extension\UpgradeContext;
+use App\Upgrades\Data\Ext\Plugins\SirsoftPayKginicis\V1_0_0\Migrations\MigrateNaverpayBrandButtonKey;
 use Illuminate\Support\Facades\File;
-use Plugins\Sirsoft\PayKginicis\Upgrades\Upgrade_1_0_0_beta_6;
 use Tests\TestCase;
 
-require_once dirname(__DIR__, 3).'/upgrades/Upgrade_1_0_0_beta_6.php';
+require_once dirname(__DIR__, 3).'/upgrades/data/1.0.0/migrations/MigrateNaverpayBrandButtonKey.php';
 
-class Upgrade_1_0_0_beta_6_Test extends TestCase
+class MigrateNaverpayBrandButtonKeyTest extends TestCase
 {
     private string $settingsPath;
 
@@ -48,7 +48,7 @@ class Upgrade_1_0_0_beta_6_Test extends TestCase
             'easy_pay_naverpay' => true,
         ], JSON_THROW_ON_ERROR));
 
-        $this->runUpgrade();
+        $this->runMigration();
 
         $settings = json_decode(File::get($this->settingsPath), true, flags: JSON_THROW_ON_ERROR);
 
@@ -65,7 +65,7 @@ class Upgrade_1_0_0_beta_6_Test extends TestCase
             'easy_pay_show_brand_button' => false,
         ], JSON_THROW_ON_ERROR));
 
-        $this->runUpgrade();
+        $this->runMigration();
 
         $settings = json_decode(File::get($this->settingsPath), true, flags: JSON_THROW_ON_ERROR);
 
@@ -77,17 +77,17 @@ class Upgrade_1_0_0_beta_6_Test extends TestCase
     {
         File::delete($this->settingsPath);
 
-        $this->runUpgrade();
+        $this->runMigration();
 
         $this->assertFalse(File::exists($this->settingsPath));
     }
 
-    private function runUpgrade(): void
+    private function runMigration(): void
     {
-        (new Upgrade_1_0_0_beta_6)->run(new UpgradeContext(
-            fromVersion: '1.0.0-beta.5',
-            toVersion: '1.0.0-beta.6',
-            currentStep: '1.0.0-beta.6',
+        (new MigrateNaverpayBrandButtonKey)->run(new UpgradeContext(
+            fromVersion: '1.0.0-beta.6',
+            toVersion: '1.0.0',
+            currentStep: '1.0.0',
         ));
     }
 }
