@@ -7,6 +7,7 @@ namespace Plugins\Sirsoft\PayKginicis\Controllers;
 use App\Extension\HookManager;
 use App\Services\PluginSettingsService;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -15,6 +16,7 @@ use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Exceptions\PaymentAmountMismatchException;
 use Modules\Sirsoft\Ecommerce\Helpers\DeviceDetector;
 use Modules\Sirsoft\Ecommerce\Models\Order;
+use Modules\Sirsoft\Ecommerce\Services\CurrencyConversionService;
 use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Concerns\IssuesReceiptCookie;
 use Plugins\Sirsoft\PayKginicis\Concerns\PreventsReplayCallback;
@@ -125,12 +127,12 @@ class PaymentCallbackController
     ) {}
 
     /**
-     * authCallback
+     * KG 이니시스 표준결제 인증 콜백을 받아 서버 승인 후 결과 페이지로 리다이렉트합니다.
      *
-     * @param  AuthCallbackRequest  $request
-     * @return \Illuminate\Http\RedirectResponse
+     * @param  AuthCallbackRequest  $request  결제 인증 콜백 요청
+     * @return RedirectResponse 성공/실패 결과 페이지 리다이렉트
      */
-    public function authCallback(AuthCallbackRequest $request): \Illuminate\Http\RedirectResponse
+    public function authCallback(AuthCallbackRequest $request): RedirectResponse
     {
         $validated = $request->validated();
         $selectedEasyPayMethod = $this->resolveSelectedEasyPayMethod($request);
@@ -144,12 +146,12 @@ class PaymentCallbackController
         $totPrice = isset($validated['TotPrice']) ? (int) $validated['TotPrice'] : null;
 
         Log::info('KG Inicis: callback received', [
-            'moid'        => $moid,
+            'moid' => $moid,
             'result_code' => $resultCode,
-            'idc_name'    => $validated['idc_name'] ?? null,
-            'auth_url'    => $validated['authUrl'] ?? null,
-            'all_fields'  => array_keys($request->all()),
-            'easy_pay'    => $this->buildEasyPayLogContext($selectedEasyPayMethod),
+            'idc_name' => $validated['idc_name'] ?? null,
+            'auth_url' => $validated['authUrl'] ?? null,
+            'all_fields' => array_keys($request->all()),
+            'easy_pay' => $this->buildEasyPayLogContext($selectedEasyPayMethod),
         ]);
 
         if (! $moid) {
@@ -170,9 +172,9 @@ class PaymentCallbackController
                 || str_contains($resultMsg, '사용자');
 
             Log::info('KG Inicis: auth result non-success', [
-                'moid'           => $moid,
-                'result_code'    => $resultCode,
-                'result_msg'     => $resultMsg,
+                'moid' => $moid,
+                'result_code' => $resultCode,
+                'result_msg' => $resultMsg,
                 'is_user_cancel' => $isUserCancel,
             ]);
 
@@ -182,7 +184,7 @@ class PaymentCallbackController
             }
 
             return redirect($this->resolveFailUrl([
-                'error'   => $resultCode,
+                'error' => $resultCode,
                 'message' => $resultMsg,
                 'orderId' => $moid,
             ]));
@@ -197,9 +199,9 @@ class PaymentCallbackController
 
         if (! $authToken || ! $idcName || ! $receivedAuthUrl) {
             Log::error('KG Inicis: missing required fields on success callback', [
-                'moid'      => $moid,
-                'idc_name'  => $idcName,
-                'auth_url'  => $receivedAuthUrl,
+                'moid' => $moid,
+                'idc_name' => $idcName,
+                'auth_url' => $receivedAuthUrl,
                 'has_token' => (bool) $authToken,
             ]);
 
@@ -209,7 +211,7 @@ class PaymentCallbackController
         // idc_name + authUrl 화이트리스트 검증 (PC/모바일 URL 모두 허용, SSRF 방어)
         if (! $this->apiService->isValidIdcAuthUrl($idcName, $receivedAuthUrl)) {
             Log::error('KG Inicis: authUrl not in whitelist (possible SSRF attempt)', [
-                'moid'     => $moid,
+                'moid' => $moid,
                 'idc_name' => $idcName,
                 'received' => $receivedAuthUrl,
             ]);
@@ -354,24 +356,24 @@ class PaymentCallbackController
     }
 
     /**
-     * vbankNotify
+     * PC 가상계좌 입금통보를 받아 입금대기 주문을 결제완료로 전환합니다.
      *
-     * @param  VbankNotifyRequest  $request
-     * @return Response
+     * @param  VbankNotifyRequest  $request  가상계좌 입금통보 요청
+     * @return Response KG 이니시스에 반환할 통보 처리 결과 응답
      */
     public function vbankNotify(VbankNotifyRequest $request): Response
     {
         $validated = $request->validated();
 
-        $tid  = (string) $validated['no_tid'];
+        $tid = (string) $validated['no_tid'];
         $moid = (string) $validated['no_oid'];
-        $amt  = (int) $validated['amt_input'];
+        $amt = (int) $validated['amt_input'];
 
         Log::info('KG Inicis: PC vbank deposit notify received', [
-            'tid'      => $tid,
-            'moid'     => $moid,
-            'amt'      => $amt,
-            'bank'     => $validated['nm_inputbank'] ?? null,
+            'tid' => $tid,
+            'moid' => $moid,
+            'amt' => $amt,
+            'bank' => $validated['nm_inputbank'] ?? null,
         ]);
 
         try {
@@ -401,14 +403,14 @@ class PaymentCallbackController
 
             $this->orderService->completePayment($order, [
                 'transaction_id' => $tid,
-                'payment_meta'   => [
-                    'vbank_num'       => $validated['no_vacct'] ?? null,
-                    'vbank_name'      => $validated['nm_inputbank'] ?? null,
-                    'depositor_name'  => $validated['nm_input'] ?? null,
-                    'deposit_date'    => ($validated['dt_trans'] ?? '') . ($validated['tm_trans'] ?? ''),
-                    'bank_code'       => $validated['cd_bank'] ?? null,
-                    'mid'             => $this->apiService->getMid(),
-                    'is_test_mode'    => $this->apiService->isTestMode(),
+                'payment_meta' => [
+                    'vbank_num' => $validated['no_vacct'] ?? null,
+                    'vbank_name' => $validated['nm_inputbank'] ?? null,
+                    'depositor_name' => $validated['nm_input'] ?? null,
+                    'deposit_date' => ($validated['dt_trans'] ?? '').($validated['tm_trans'] ?? ''),
+                    'bank_code' => $validated['cd_bank'] ?? null,
+                    'mid' => $this->apiService->getMid(),
+                    'is_test_mode' => $this->apiService->isTestMode(),
                     'pg_response_sanitized' => true,
                     'pg_raw_response' => $this->sanitizePgResponse($validated, self::PC_VBANK_NOTIFY_RESPONSE_KEYS),
                 ],
@@ -422,8 +424,8 @@ class PaymentCallbackController
 
         } catch (\Exception $e) {
             Log::error('KG Inicis: PC vbank notify failed', [
-                'tid'   => $tid,
-                'moid'  => $moid,
+                'tid' => $tid,
+                'moid' => $moid,
                 'error' => $e->getMessage(),
             ]);
 
@@ -432,37 +434,37 @@ class PaymentCallbackController
     }
 
     /**
-     * mobileVbankNotify
+     * 모바일 가상계좌 입금통보를 받아 입금대기 주문을 결제완료로 전환합니다.
      *
-     * @param  MobileVbankNotifyRequest  $request
-     * @return Response
+     * @param  MobileVbankNotifyRequest  $request  모바일 가상계좌 입금통보 요청
+     * @return Response KG 이니시스에 반환할 통보 처리 결과 응답
      */
     public function mobileVbankNotify(MobileVbankNotifyRequest $request): Response
     {
         $validated = $request->validated();
 
         $pStatus = (string) $validated['P_STATUS'];
-        $pType   = (string) $validated['P_TYPE'];
-        $tid     = (string) $validated['P_TID'];
-        $moid    = (string) $validated['P_OID'];
-        $amt     = (int) $validated['P_AMT'];
+        $pType = (string) $validated['P_TYPE'];
+        $tid = (string) $validated['P_TID'];
+        $moid = (string) $validated['P_OID'];
+        $amt = (int) $validated['P_AMT'];
 
         // P_STATUS == "02" (입금통보) + P_TYPE == "VBANK" 만 처리
         if ($pStatus !== '02' || $pType !== 'VBANK') {
             Log::info('KG Inicis: mobile vbank notify - not a deposit, ignored', [
-                'tid'      => $tid,
+                'tid' => $tid,
                 'P_STATUS' => $pStatus,
-                'P_TYPE'   => $pType,
+                'P_TYPE' => $pType,
             ]);
 
             return response('OK', 200)->header('Content-Type', 'text/plain');
         }
 
         Log::info('KG Inicis: mobile vbank deposit notify received', [
-            'tid'      => $tid,
-            'moid'     => $moid,
-            'amt'      => $amt,
-            'bank'     => $validated['P_FN_NM'] ?? null,
+            'tid' => $tid,
+            'moid' => $moid,
+            'amt' => $amt,
+            'bank' => $validated['P_FN_NM'] ?? null,
         ]);
 
         try {
@@ -492,13 +494,13 @@ class PaymentCallbackController
 
             $this->orderService->completePayment($order, [
                 'transaction_id' => $tid,
-                'payment_meta'   => [
-                    'vbank_name'      => $validated['P_FN_NM'] ?? null,
-                    'depositor_name'  => $validated['P_UNAME'] ?? null,
-                    'deposit_date'    => $validated['P_AUTH_DT'] ?? null,
-                    'bank_code'       => $validated['P_FN_CD1'] ?? null,
-                    'mid'             => $this->apiService->getMid(),
-                    'is_test_mode'    => $this->apiService->isTestMode(),
+                'payment_meta' => [
+                    'vbank_name' => $validated['P_FN_NM'] ?? null,
+                    'depositor_name' => $validated['P_UNAME'] ?? null,
+                    'deposit_date' => $validated['P_AUTH_DT'] ?? null,
+                    'bank_code' => $validated['P_FN_CD1'] ?? null,
+                    'mid' => $this->apiService->getMid(),
+                    'is_test_mode' => $this->apiService->isTestMode(),
                     'pg_response_sanitized' => true,
                     'pg_raw_response' => $this->sanitizePgResponse($validated, self::MOBILE_VBANK_NOTIFY_RESPONSE_KEYS),
                 ],
@@ -513,8 +515,8 @@ class PaymentCallbackController
 
         } catch (\Exception $e) {
             Log::error('KG Inicis: mobile vbank notify failed', [
-                'tid'   => $tid,
-                'moid'  => $moid,
+                'tid' => $tid,
+                'moid' => $moid,
                 'error' => $e->getMessage(),
             ]);
 
@@ -595,7 +597,9 @@ class PaymentCallbackController
             return false;
         }
 
-        $expectedAmount = (int) round((float) $order->total_due_amount);
+        // 결제 청구액 SSoT = 결제 통화(order_currency) 환산액 (buildPgPaymentData 와 동일 기준).
+        // base≠결제 통화에서 PG 통보 금액(환산 통화)과 단위가 일치하도록 한다.
+        $expectedAmount = app(CurrencyConversionService::class)->resolveOrderPaymentChargeAmount($order);
         if ($expectedAmount > 0 && $notify['amount'] !== $expectedAmount) {
             Log::warning('KG Inicis: vbank notify rejected - amount mismatch', [
                 'source' => $source,
@@ -661,7 +665,7 @@ class PaymentCallbackController
         $query = http_build_query(array_filter($queryParams));
         $separator = str_contains($baseUrl, '?') ? '&' : '?';
 
-        return $baseUrl . $separator . $query;
+        return $baseUrl.$separator.$query;
     }
 
     /**
@@ -679,9 +683,9 @@ class PaymentCallbackController
         }
 
         $base = rtrim((string) config('app.url'), '/');
-        $path = $url === '' ? '/' : ($url[0] === '/' ? $url : '/' . $url);
+        $path = $url === '' ? '/' : ($url[0] === '/' ? $url : '/'.$url);
 
-        return $base . $path;
+        return $base.$path;
     }
 
     /**
@@ -698,41 +702,40 @@ class PaymentCallbackController
 
         if ($vactDate && strlen($vactDate) === 8) {
             try {
-                $vbankDueAt = Carbon::createFromFormat('YmdHis', $vactDate . $vactTime);
+                $vbankDueAt = Carbon::createFromFormat('YmdHis', $vactDate.$vactTime);
             } catch (\Exception) {
                 $vbankDueAt = null;
             }
         }
 
         $order->payment()->update(array_filter([
-            'pg_provider'     => 'kginicis',
-            'payment_status'  => PaymentStatusEnum::WAITING_DEPOSIT,
-            'transaction_id'  => $tid ?: null,
-            'vbank_code'      => $pgResponse['VACT_BankCode'] ?? null,  // KG 이니시스 은행코드 (e.g. 89=케이뱅크)
-            'vbank_name'      => $pgResponse['vactBankName'] ?? null,  // 입금은행명
-            'vbank_number'    => $pgResponse['VACT_Num'] ?? null,       // 가상계좌번호
-            'vbank_holder'    => $pgResponse['VACT_Name'] ?? null,      // 예금주명
-            'vbank_due_at'    => $vbankDueAt,
+            'pg_provider' => 'kginicis',
+            'payment_status' => PaymentStatusEnum::WAITING_DEPOSIT,
+            'transaction_id' => $tid ?: null,
+            'vbank_code' => $pgResponse['VACT_BankCode'] ?? null,  // KG 이니시스 은행코드 (e.g. 89=케이뱅크)
+            'vbank_name' => $pgResponse['vactBankName'] ?? null,  // 입금은행명
+            'vbank_number' => $pgResponse['VACT_Num'] ?? null,       // 가상계좌번호
+            'vbank_holder' => $pgResponse['VACT_Name'] ?? null,      // 예금주명
+            'vbank_due_at' => $vbankDueAt,
             'vbank_issued_at' => now(),
-            'payment_device'  => DeviceDetector::detect($request),
-            'payment_meta'    => [
-                'result_code'     => '0000',
-                'pay_method'      => 'VBank',
-                'auth_date'       => $pgResponse['applDate'] ?? null,
-                'mid'             => $this->apiService->getMid(),
-                'is_test_mode'    => $this->apiService->isTestMode(),
+            'payment_device' => DeviceDetector::detect($request),
+            'payment_meta' => [
+                'result_code' => '0000',
+                'pay_method' => 'VBank',
+                'auth_date' => $pgResponse['applDate'] ?? null,
+                'mid' => $this->apiService->getMid(),
+                'is_test_mode' => $this->apiService->isTestMode(),
                 'pg_response_sanitized' => true,
                 'pg_raw_response' => $this->sanitizePgResponse($pgResponse, self::PC_VBANK_ISSUE_RESPONSE_KEYS),
             ],
         ], fn ($v) => $v !== null));
 
         Log::info('KG Inicis: vbank account issued', [
-            'moid'         => $order->order_number,
-            'tid'          => $tid,
-            'vbank_name'   => $pgResponse['vactBankName'] ?? null,
+            'moid' => $order->order_number,
+            'tid' => $tid,
+            'vbank_name' => $pgResponse['vactBankName'] ?? null,
             'vbank_number' => $pgResponse['VACT_Num'] ?? null,
             'vbank_due_at' => $vbankDueAt?->toDateTimeString(),
         ]);
     }
-
 }
