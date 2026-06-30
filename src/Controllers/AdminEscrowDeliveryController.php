@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
 /**
@@ -20,6 +21,8 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
  */
 class AdminEscrowDeliveryController extends AdminBaseController
 {
+    use SanitizesPgResponse;
+
     /** 택배사 코드 → 택배사명 매핑 (KG 이니시스 공식 코드표) */
     private const COURIER_CODES = [
         'hanjin'   => '한진택배',
@@ -36,6 +39,20 @@ class AdminEscrowDeliveryController extends AdminBaseController
         'kunyoung'  => '건영택배',
         'gsilogis' => 'GSI Express',
         'etc'      => '기타',
+    ];
+
+    /** 에스크로 배송등록 PG 응답 저장 허용 필드 */
+    private const ESCROW_DELIVERY_RESPONSE_KEYS = [
+        'resultCode',
+        'resultMsg',
+        'tid',
+        'TID',
+        'oid',
+        'OID',
+        'mid',
+        'MID',
+        'type',
+        'report',
     ];
 
     public function __construct(
@@ -179,13 +196,14 @@ class AdminEscrowDeliveryController extends AdminBaseController
             ]);
 
             $resultCode = $pgResponse['resultCode'] ?? '';
+            $sanitizedPgResponse = $this->sanitizePgResponse($pgResponse, self::ESCROW_DELIVERY_RESPONSE_KEYS);
 
             if ($resultCode !== '00') {
                 Log::warning('KG Inicis: escrow delivery register failed', [
                     'order_number' => $orderNumber,
                     'result_code'  => $resultCode,
                     'result_msg'   => $pgResponse['resultMsg'] ?? '',
-                    'pg_response'  => $pgResponse,
+                    'pg_response'  => $sanitizedPgResponse,
                 ]);
 
                 return ResponseHelper::error('messages.failed', 502, [
@@ -195,6 +213,7 @@ class AdminEscrowDeliveryController extends AdminBaseController
 
             // payment_meta에 배송등록 정보 저장
             $meta = $payment->payment_meta ? json_decode($payment->payment_meta, true) : [];
+            $meta['pg_response_sanitized'] = true;
             $meta['escrow_delivery'] = [
                 'registered_at' => now()->toDateTimeString(),
                 'report'        => $report,
@@ -204,7 +223,7 @@ class AdminEscrowDeliveryController extends AdminBaseController
                 'charge'        => $charge,
                 'recv_name'     => $recvName,
                 'recv_addr'     => $recvAddr,
-                'pg_response'   => $pgResponse,
+                'pg_response'   => $sanitizedPgResponse,
             ];
 
             DB::table('ecommerce_order_payments')
