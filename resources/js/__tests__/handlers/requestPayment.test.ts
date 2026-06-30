@@ -552,8 +552,6 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
     let apiPost: ReturnType<typeof vi.fn>;
     let submitSpy: ReturnType<typeof vi.spyOn>;
     let originalUserAgent: PropertyDescriptor | undefined;
-    let originalPlatform: PropertyDescriptor | undefined;
-    let originalMaxTouchPoints: PropertyDescriptor | undefined;
 
     function getLastSubmittedFormFields(): Record<string, string> {
         const forms = document.body.querySelectorAll('form');
@@ -581,8 +579,6 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
 
         // 모바일 UA 강제 (isMobileUserAgent → true)
         originalUserAgent = Object.getOwnPropertyDescriptor(window.navigator, 'userAgent');
-        originalPlatform = Object.getOwnPropertyDescriptor(window.navigator, 'platform');
-        originalMaxTouchPoints = Object.getOwnPropertyDescriptor(window.navigator, 'maxTouchPoints');
         Object.defineProperty(window.navigator, 'userAgent', {
             value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
             configurable: true,
@@ -595,18 +591,6 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
         clearMobilePaymentReturnPending();
         if (originalUserAgent) {
             Object.defineProperty(window.navigator, 'userAgent', originalUserAgent);
-        } else {
-            delete (window.navigator as unknown as Record<string, unknown>).userAgent;
-        }
-        if (originalPlatform) {
-            Object.defineProperty(window.navigator, 'platform', originalPlatform);
-        } else {
-            delete (window.navigator as unknown as Record<string, unknown>).platform;
-        }
-        if (originalMaxTouchPoints) {
-            Object.defineProperty(window.navigator, 'maxTouchPoints', originalMaxTouchPoints);
-        } else {
-            delete (window.navigator as unknown as Record<string, unknown>).maxTouchPoints;
         }
         vi.restoreAllMocks();
     });
@@ -634,32 +618,6 @@ describe('requestPaymentHandler — 모바일 P_INI_PAYMENT 매핑', () => {
         const form = document.body.querySelector('form') as HTMLFormElement | null;
         expect(form?.id).toMatch(/^kginicis_pay_form_mobile_/);
         expect(consumeMobilePaymentReturnPending()).toBe(true);
-    });
-
-    it('iPadOS 데스크탑 UA도 모바일 결제 폼으로 분기한다', async () => {
-        Object.defineProperty(window.navigator, 'userAgent', {
-            value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 ' +
-                '(KHTML, like Gecko) Version/17.0 Safari/605.1.15',
-            configurable: true,
-        });
-        Object.defineProperty(window.navigator, 'platform', {
-            value: 'MacIntel',
-            configurable: true,
-        });
-        Object.defineProperty(window.navigator, 'maxTouchPoints', {
-            value: 5,
-            configurable: true,
-        });
-
-        await requestPaymentHandler({
-            params: { pgPaymentData: PG_PAYMENT, paymentMethod: 'card' },
-        });
-
-        expect(submitSpy).toHaveBeenCalledTimes(1);
-        const form = document.body.querySelector('form') as HTMLFormElement | null;
-        const fields = getLastSubmittedFormFields();
-        expect(form?.id).toMatch(/^kginicis_pay_form_mobile_/);
-        expect(fields.P_INI_PAYMENT).toBe('CARD');
     });
 
     it.each([

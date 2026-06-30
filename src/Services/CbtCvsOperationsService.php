@@ -107,18 +107,6 @@ class CbtCvsOperationsService
                 return $this->notifyResult('OK', 'ignored', 'non_success_status');
             }
 
-            $expectedTid = trim((string) $payment->transaction_id);
-            if ($expectedTid === '' || ! hash_equals($expectedTid, $tid)) {
-                $this->storeNotifyHistory($payment, $existingMeta, $payload, 'failed', 'tid_mismatch', $source, $remoteIp);
-                Log::warning('KG Inicis CBT CVS: tid mismatch', [
-                    'order_id' => $orderId,
-                    'received_tid' => $tid,
-                    'expected_tid' => $expectedTid,
-                ]);
-
-                return $this->notifyResult('FAIL', 'failed', 'tid_mismatch');
-            }
-
             if ($this->wasAlreadyPaid($tid)) {
                 $this->storeNotifyHistory($payment, $existingMeta, $payload, 'ignored', 'already_paid', $source, $remoteIp);
                 $this->logReplayDetected($tid, $orderId, 'CBT CVS notify');

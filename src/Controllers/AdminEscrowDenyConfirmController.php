@@ -10,7 +10,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
 /**
@@ -21,20 +20,6 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
  */
 class AdminEscrowDenyConfirmController extends AdminBaseController
 {
-    use SanitizesPgResponse;
-
-    /** 에스크로 구매거절확인 PG 응답 저장 허용 필드 */
-    private const ESCROW_DENY_CONFIRM_RESPONSE_KEYS = [
-        'resultCode',
-        'resultMsg',
-        'tid',
-        'TID',
-        'originalTid',
-        'mid',
-        'MID',
-        'type',
-    ];
-
     public function __construct(
         private readonly KgInicisApiService $apiService,
     ) {
@@ -81,14 +66,12 @@ class AdminEscrowDenyConfirmController extends AdminBaseController
             ]);
 
             $resultCode = $pgResponse['resultCode'] ?? '';
-            $sanitizedPgResponse = $this->sanitizePgResponse($pgResponse, self::ESCROW_DENY_CONFIRM_RESPONSE_KEYS);
 
             if ($resultCode !== '00') {
                 Log::warning('KG Inicis: escrow deny confirm failed', [
                     'order_number' => $orderNumber,
                     'result_code'  => $resultCode,
                     'result_msg'   => $pgResponse['resultMsg'] ?? '',
-                    'pg_response'  => $sanitizedPgResponse,
                 ]);
 
                 return ResponseHelper::error('messages.failed', 502, [
@@ -97,11 +80,10 @@ class AdminEscrowDenyConfirmController extends AdminBaseController
             }
 
             // payment_meta에 구매거절확인 이력 저장
-            $meta['pg_response_sanitized'] = true;
             $meta['escrow_deny_confirm'] = [
                 'confirmed_at' => now()->toDateTimeString(),
                 'dcnf_name'    => $dcnfName,
-                'pg_response'  => $sanitizedPgResponse,
+                'pg_response'  => $pgResponse,
             ];
 
             DB::table('ecommerce_order_payments')

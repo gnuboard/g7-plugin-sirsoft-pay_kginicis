@@ -10,7 +10,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
 /**
@@ -20,23 +19,6 @@ use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
  */
 class AdminCashReceiptController extends AdminBaseController
 {
-    use SanitizesPgResponse;
-
-    /** 현금영수증 발행 PG 응답 저장/반환 허용 필드 */
-    private const CASH_RECEIPT_RESPONSE_KEYS = [
-        'resultCode',
-        'resultMsg',
-        'tid',
-        'TID',
-        'cashReceiptNo',
-        'cashReceiptTid',
-        'applNum',
-        'applDate',
-        'applTime',
-        'mid',
-        'MID',
-    ];
-
     public function __construct(
         private readonly KgInicisApiService $apiService,
     ) {
@@ -150,8 +132,6 @@ class AdminCashReceiptController extends AdminBaseController
                 ]);
             }
 
-            $sanitizedPgResponse = $this->sanitizePgResponse($pgResponse, self::CASH_RECEIPT_RESPONSE_KEYS);
-
             // DB 업데이트
             DB::table('ecommerce_order_payments')
                 ->where('id', $payment->id)
@@ -172,7 +152,7 @@ class AdminCashReceiptController extends AdminBaseController
             return ResponseHelper::success('messages.success', [
                 'result_code' => $resultCode,
                 'result_msg'  => $pgResponse['resultMsg'] ?? 'OK',
-                'pg_response' => $sanitizedPgResponse,
+                'pg_response' => $pgResponse,
             ]);
 
         } catch (\Exception $e) {

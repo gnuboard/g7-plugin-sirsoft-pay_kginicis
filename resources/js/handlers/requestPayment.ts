@@ -101,34 +101,7 @@ declare global {
 }
 
 function isMobileUserAgent(): boolean {
-    if (typeof navigator === 'undefined') return false;
-
-    const nav = navigator as Navigator & {
-        userAgentData?: {
-            mobile?: boolean;
-            platform?: string;
-        };
-        maxTouchPoints?: number;
-    };
-
-    if (nav.userAgentData?.mobile !== undefined) {
-        return nav.userAgentData.mobile;
-    }
-
-    const ua = (nav.userAgent || '').toLowerCase();
-    const platform = ((nav.userAgentData?.platform ?? nav.platform) || '').toLowerCase();
-
-    if (/android|iphone|ipad|ipod|windows phone|iemobile|blackberry|opera mini|mobile safari/.test(ua)) {
-        return true;
-    }
-
-    if (/iphone|ipad|ipod|ios/.test(platform)) {
-        return true;
-    }
-
-    const touchPoints = nav.maxTouchPoints ?? 0;
-
-    return /macintosh|mac os x/.test(ua) && touchPoints > 1;
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
 function loadScript(src: string): Promise<void> {
@@ -471,7 +444,6 @@ async function requestKoreanPayment(
             buyer_email: pgPaymentData.customer_email ?? '',
             buyer_phone: pgPaymentData.customer_phone ?? '',
             payment_method: paymentMethod,
-            completionUrl: callbackUrl,
         });
     }
 

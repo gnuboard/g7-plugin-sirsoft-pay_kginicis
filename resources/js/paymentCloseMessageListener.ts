@@ -36,7 +36,6 @@ export interface StandardPaymentCloseReportContext {
     buyer_email?: string;
     buyer_phone?: string;
     payment_method?: string;
-    completionUrl?: string;
     reported?: boolean;
 }
 
@@ -82,42 +81,6 @@ function resolveApiUrl(url: string): string {
     return url;
 }
 
-function normalizedCompletionUrl(url: string): string {
-    const parsed = new URL(url, window.location.origin);
-
-    return `${parsed.origin}${parsed.pathname}`;
-}
-
-function isStandardPaymentCompletionUrl(
-    action: string | null | undefined,
-    context: StandardPaymentCloseReportContext,
-): boolean {
-    if (!action) {
-        return false;
-    }
-
-    try {
-        const normalizedAction = normalizedCompletionUrl(action);
-        if (context.completionUrl) {
-            return normalizedAction === normalizedCompletionUrl(context.completionUrl);
-        }
-
-        return normalizedAction.endsWith('/plugins/sirsoft-pay_kginicis/payment/callback');
-    } catch {
-        return false;
-    }
-}
-
-function hasStandardPaymentCompletionForm(
-    context: StandardPaymentCloseReportContext,
-): boolean {
-    return Array.from(document.querySelectorAll<HTMLFormElement>('form'))
-        .some((form) => isStandardPaymentCompletionUrl(
-            form.getAttribute('action') || form.action,
-            context,
-        ));
-}
-
 export function markStandardPaymentCloseReportContext(
     context: StandardPaymentCloseReportContext,
 ): void {
@@ -133,10 +96,6 @@ export function markStandardPaymentCloseReportContext(
 
 export function clearStandardPaymentCloseReportContext(): void {
     delete windowRecord()[ACTIVE_STANDARD_PAYMENT_CLOSE_CONTEXT_KEY];
-}
-
-export function markStandardPaymentCompletionStarted(): void {
-    clearStandardPaymentCloseReportContext();
 }
 
 export async function reportStandardPaymentWindowClosed(
@@ -286,11 +245,6 @@ export function monitorStandardPaymentWindowClose(
             return;
         }
 
-        if (hasStandardPaymentCompletionForm(context)) {
-            markStandardPaymentCompletionStarted();
-            return;
-        }
-
         const hasPaymentWindow = hasStandardPaymentWindowCandidate(baseline);
         if (hasPaymentWindow) {
             hasSeenPaymentWindow = true;
@@ -404,14 +358,6 @@ export function installPaymentCloseMessageListener(): void {
 
         void reportStandardPaymentWindowClosed(event.data.reason);
         resetCheckoutSubmittingState(event.data.reason);
-    });
-
-    window.addEventListener('pagehide', () => {
-        markStandardPaymentCompletionStarted();
-    });
-
-    window.addEventListener('beforeunload', () => {
-        markStandardPaymentCompletionStarted();
     });
 
     window.addEventListener('pageshow', (event: PageTransitionEvent) => {

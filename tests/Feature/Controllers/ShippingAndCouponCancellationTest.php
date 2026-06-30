@@ -399,38 +399,6 @@ class ShippingAndCouponCancellationTest extends PluginTestCase
             ])->assertOk()->assertJsonPath('success', true);
     }
 
-    public function test_standard_cancel_restores_payment_time_mid_and_mode_before_refund(): void
-    {
-        $paymentMid = 'SIRLIVE001';
-
-        $mock = $this->createMock(KgInicisApiService::class);
-        $mock->expects($this->once())
-            ->method('useStoredCredentials')
-            ->with(false, $paymentMid);
-        $mock->expects($this->once())
-            ->method('cancelPayment')
-            ->willReturn(self::CANCEL_SUCCESS);
-        $this->app->instance(KgInicisApiService::class, $mock);
-
-        $data = $this->createKgInicisOrderWithShipping(optionCount: 1, unitPrice: 20000, shippingFee: 3000);
-        $order = $data['order'];
-        $payment = $data['payment'];
-        $payment->update([
-            'payment_meta' => [
-                'pay_method' => 'Card',
-                'mid' => $paymentMid,
-                'is_test_mode' => false,
-            ],
-        ]);
-
-        $this->actingAs($this->adminUser)
-            ->postJson("/api/modules/sirsoft-ecommerce/admin/orders/{$order->order_number}/cancel", [
-                'type'      => 'full',
-                'reason'    => 'changed_mind',
-                'cancel_pg' => true,
-            ])->assertOk()->assertJsonPath('success', true);
-    }
-
     public function test_full_cancel_free_shipping_refunds_only_product_amount(): void
     {
         $this->stubKgInicisCancelSuccess();

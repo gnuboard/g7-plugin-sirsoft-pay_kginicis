@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Plugins\Sirsoft\PayKginicis\Services;
 
-use Plugins\Sirsoft\PayKginicis\Repositories\CbtReconciliationRepositoryInterface;
+use Illuminate\Support\Facades\DB;
 
 class CbtReconciliationService
 {
@@ -14,35 +14,36 @@ class CbtReconciliationService
 
     public const STATUS_MANUAL_REFUND_REQUIRED = 'manual_refund_required';
 
-    public const STATUS_REFUND_RETRYING = 'refund_retrying';
-
-    public function __construct(
-        private readonly CbtReconciliationRepositoryInterface $repository,
-    ) {}
-
-    /**
-     * 주문번호에 연결된 CBT 조정 레코드를 조회합니다.
-     *
-     * @param  string  $orderNumber  주문번호
-     * @return array<string, mixed>|null 정규화된 조정 레코드
-     */
     public function get(string $orderNumber): ?array
     {
-        $record = $this->repository->findRecord($orderNumber, self::META_KEY);
+        $order = DB::table('ecommerce_orders')
+            ->where('order_number', $orderNumber)
+            ->select(['order_meta'])
+            ->first();
+
+        if (! $order) {
+            return null;
+        }
+
+        $meta = $this->decodeJsonObject($order->order_meta);
+        $record = $meta[self::META_KEY] ?? null;
 
         return is_array($record) ? $this->normalize($record) : null;
     }
 
-    /**
-     * CBT 조정 레코드를 주문 메타에 병합 저장합니다.
-     *
-     * @param  string  $orderNumber  주문번호
-     * @param  array<string, mixed>  $attributes  저장할 조정 속성
-     * @return array<string, mixed>|null 정규화된 조정 레코드
-     */
     public function record(string $orderNumber, array $attributes): ?array
     {
-        $existing = $this->repository->findRecord($orderNumber, self::META_KEY) ?? [];
+        $order = DB::table('ecommerce_orders')
+            ->where('order_number', $orderNumber)
+            ->select(['id', 'order_meta'])
+            ->first();
+
+        if (! $order) {
+            return null;
+        }
+
+        $meta = $this->decodeJsonObject($order->order_meta);
+        $existing = $meta[self::META_KEY] ?? [];
         if (! is_array($existing)) {
             $existing = [];
         }
@@ -52,41 +53,16 @@ class CbtReconciliationService
             'created_at' => $existing['created_at'] ?? $now,
             'updated_at' => $now,
         ]);
+        $meta[self::META_KEY] = $record;
 
-        $saved = $this->repository->saveRecord($orderNumber, self::META_KEY, $record);
-
-        return is_array($saved) ? $this->normalize($saved) : null;
-    }
-
-    /**
-     * CBT 수동 환불 재시도 권한을 원자적으로 선점합니다.
-     *
-     * @param  string  $orderNumber  주문번호
-     * @return array<string, mixed>|null 선점된 조정 레코드
-     */
-    public function claimRefundRetry(string $orderNumber): ?array
-    {
-        $claimed = $this->repository->mutateRecordWithLock($orderNumber, self::META_KEY, function (array $existing): ?array {
-            $record = $this->normalize($existing);
-            if (! ($record['can_retry'] ?? false)) {
-                return null;
-            }
-
-            $now = now()->toIso8601String();
-            $claimed = array_merge($existing, [
-                'status' => self::STATUS_REFUND_RETRYING,
-                'manual_action_required' => false,
-                'last_retry_at' => $now,
-                'last_retry_error' => null,
-                'retry_count' => ((int) ($existing['retry_count'] ?? 0)) + 1,
-                'created_at' => $existing['created_at'] ?? $now,
-                'updated_at' => $now,
+        DB::table('ecommerce_orders')
+            ->where('id', $order->id)
+            ->update([
+                'order_meta' => json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'updated_at' => now(),
             ]);
 
-            return $claimed;
-        });
-
-        return is_array($claimed) ? $this->normalize($claimed) : null;
+        return $this->normalize($record);
     }
 
     private function normalize(array $record): array
@@ -105,4 +81,18 @@ class CbtReconciliationService
         return $record;
     }
 
+    private function decodeJsonObject(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
 }

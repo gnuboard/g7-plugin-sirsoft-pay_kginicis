@@ -6,8 +6,6 @@ namespace Plugins\Sirsoft\PayKginicis\Providers;
 
 use App\Extension\BasePluginServiceProvider;
 use Illuminate\Cookie\Middleware\EncryptCookies;
-use Plugins\Sirsoft\PayKginicis\Repositories\CbtReconciliationRepository;
-use Plugins\Sirsoft\PayKginicis\Repositories\CbtReconciliationRepositoryInterface;
 use Plugins\Sirsoft\PayKginicis\Repositories\CbtCvsOperationsRepository;
 use Plugins\Sirsoft\PayKginicis\Repositories\CbtCvsOperationsRepositoryInterface;
 
@@ -21,15 +19,9 @@ class PayKginicisServiceProvider extends BasePluginServiceProvider
      * @var array<class-string, class-string>
      */
     protected array $repositories = [
-        CbtReconciliationRepositoryInterface::class => CbtReconciliationRepository::class,
         CbtCvsOperationsRepositoryInterface::class => CbtCvsOperationsRepository::class,
     ];
 
-    /**
-     * KG 이니시스 플러그인 부팅 처리를 수행합니다.
-     *
-     * @return void
-     */
     public function boot(): void
     {
         parent::boot();
