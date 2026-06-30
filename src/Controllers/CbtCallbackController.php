@@ -267,8 +267,21 @@ class CbtCallbackController
         } catch (\Exception $e) {
             Log::error('KG Inicis CBT: callback exception', [
                 'oid' => $oid,
+                'tid' => $approvedTid,
                 'error' => $e->getMessage(),
             ]);
+
+            if ($this->wasAlreadyPaid($approvedTid)) {
+                Log::warning('KG Inicis CBT: local payment already completed, auto-refund skipped after exception', [
+                    'oid' => $oid,
+                    'tid' => $approvedTid,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $this->queueReceiptCookie($oid);
+
+                return redirect($this->resolveSuccessUrl($oid));
+            }
 
             $this->refundApprovedCbtPaymentOrFlagManualReconciliation(
                 $approvedTid,

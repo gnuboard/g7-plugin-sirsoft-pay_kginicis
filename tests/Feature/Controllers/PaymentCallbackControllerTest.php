@@ -11,6 +11,7 @@ use Modules\Sirsoft\Ecommerce\Enums\OrderStatusEnum;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentMethodEnum;
 use Modules\Sirsoft\Ecommerce\Enums\PaymentStatusEnum;
 use Modules\Sirsoft\Ecommerce\Models\Order;
+use Modules\Sirsoft\Ecommerce\Services\OrderProcessingService;
 use Plugins\Sirsoft\PayKginicis\Tests\PluginTestCase;
 
 class PaymentCallbackControllerTest extends PluginTestCase
@@ -298,6 +299,65 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $this->assertStringContainsString('error=authorize_failed', $response->headers->get('Location'));
     }
 
+    public function test_auth_callback_skips_net_cancel_when_local_payment_was_already_completed_before_exception(): void
+    {
+        $order = $this->createTestOrder(50000);
+        $this->mockPluginSettings();
+
+        $tid = 'TID_POST_COMMIT_' . uniqid();
+        $params = $this->makeCallbackParams($order->order_number, 50000);
+
+        $orderService = $this->createMock(OrderProcessingService::class);
+        $orderService->method('findByOrderNumber')
+            ->with($order->order_number)
+            ->willReturn($order);
+        $orderService->expects($this->once())
+            ->method('completePayment')
+            ->willReturnCallback(function (Order $callbackOrder, array $paymentData, ?int $paidAmount) use ($tid): void {
+                \Illuminate\Support\Facades\DB::transaction(function () use ($callbackOrder, $paymentData, $paidAmount, $tid): void {
+                    $callbackOrder->forceFill([
+                        'order_status' => OrderStatusEnum::PAYMENT_COMPLETE,
+                        'total_paid_amount' => $paidAmount,
+                        'total_due_amount' => 0,
+                        'paid_at' => now(),
+                    ])->save();
+
+                    $callbackOrder->payment()->update([
+                        'payment_status' => PaymentStatusEnum::PAID,
+                        'transaction_id' => $tid,
+                        'card_approval_number' => $paymentData['card_approval_number'] ?? null,
+                        'payment_meta' => $paymentData['payment_meta'] ?? [],
+                        'paid_amount_local' => $paidAmount,
+                        'paid_at' => now(),
+                    ]);
+                });
+
+                throw new \RuntimeException('post commit hook failed');
+            });
+        $this->app->instance(OrderProcessingService::class, $orderService);
+
+        Http::fake([
+            'fcstdpay.inicis.com/api/payAuth' => Http::response(
+                $this->makeAuthorizeResponse($tid, $order->order_number, 50000),
+                200
+            ),
+            'stginiapi.inicis.com/api/v1/netcancel' => Http::response('OK', 200),
+        ]);
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/callback', $params);
+
+        $response->assertRedirect("/shop/orders/{$order->order_number}/complete");
+
+        Http::assertNotSent(static fn ($request): bool => str_contains((string) $request->url(), 'netcancel'));
+
+        $order->refresh();
+        $this->assertEquals(OrderStatusEnum::PAYMENT_COMPLETE, $order->order_status);
+
+        $payment = $order->payment->fresh();
+        $this->assertEquals(PaymentStatusEnum::PAID, $payment->payment_status);
+        $this->assertSame($tid, $payment->transaction_id);
+    }
+
     public function test_auth_callback_redirects_to_fail_on_missing_params(): void
     {
         $this->mockPluginSettings();
@@ -491,6 +551,77 @@ class PaymentCallbackControllerTest extends PluginTestCase
         $this->assertArrayNotHasKey('P_UNAME', $meta['pg_raw_response']);
         $this->assertArrayNotHasKey('P_EMAIL', $meta['pg_raw_response']);
         $this->assertArrayNotHasKey('P_MOBILE', $meta['pg_raw_response']);
+    }
+
+    public function test_mobile_callback_skips_auto_cancel_when_local_payment_was_already_completed_before_exception(): void
+    {
+        $order = $this->createTestOrder(50000);
+        $this->mockPluginSettings();
+
+        $tid = 'MOBILE_TID_POST_COMMIT_' . uniqid();
+
+        $orderService = $this->createMock(OrderProcessingService::class);
+        $orderService->method('findByOrderNumber')
+            ->with($order->order_number)
+            ->willReturn($order);
+        $orderService->expects($this->once())
+            ->method('completePayment')
+            ->willReturnCallback(function (Order $callbackOrder, array $paymentData, ?int $paidAmount) use ($tid): void {
+                \Illuminate\Support\Facades\DB::transaction(function () use ($callbackOrder, $paymentData, $paidAmount, $tid): void {
+                    $callbackOrder->forceFill([
+                        'order_status' => OrderStatusEnum::PAYMENT_COMPLETE,
+                        'total_paid_amount' => $paidAmount,
+                        'total_due_amount' => 0,
+                        'paid_at' => now(),
+                    ])->save();
+
+                    $callbackOrder->payment()->update([
+                        'payment_status' => PaymentStatusEnum::PAID,
+                        'transaction_id' => $tid,
+                        'card_approval_number' => $paymentData['card_approval_number'] ?? null,
+                        'payment_meta' => $paymentData['payment_meta'] ?? [],
+                        'paid_amount_local' => $paidAmount,
+                        'paid_at' => now(),
+                    ]);
+                });
+
+                throw new \RuntimeException('mobile post commit hook failed');
+            });
+        $this->app->instance(OrderProcessingService::class, $orderService);
+
+        Http::fake([
+            'fcmobile.inicis.com/smart/payReq.ini' => Http::response(http_build_query([
+                'P_STATUS' => '00',
+                'P_RMESG1' => '성공',
+                'P_TID' => $tid,
+                'P_OID' => $order->order_number,
+                'P_AMT' => '50000',
+                'P_TYPE' => 'CARD',
+                'P_AUTH_DT' => now()->format('YmdHis'),
+                'P_APPL_NUM' => 'MAPP999',
+            ]), 200),
+            'stginiapi.inicis.com/api/v1/refund' => Http::response(['resultCode' => '00'], 200),
+        ]);
+
+        $response = $this->post('/plugins/sirsoft-pay_kginicis/payment/mobile/callback', [
+            'P_STATUS' => '00',
+            'P_TID' => $tid,
+            'P_REQ_URL' => 'https://fcmobile.inicis.com/smart/payReq.ini',
+            'P_AMT' => '50000',
+            'P_OID' => $order->order_number,
+            'idc_name' => 'fc',
+        ]);
+
+        $response->assertRedirect("/shop/orders/{$order->order_number}/complete");
+
+        Http::assertNotSent(static fn ($request): bool => str_contains((string) $request->url(), '/v2/pg/refund'));
+
+        $order->refresh();
+        $this->assertEquals(OrderStatusEnum::PAYMENT_COMPLETE, $order->order_status);
+
+        $payment = $order->payment->fresh();
+        $this->assertEquals(PaymentStatusEnum::PAID, $payment->payment_status);
+        $this->assertSame($tid, $payment->transaction_id);
     }
 
     public function test_mobile_vbank_notify_rejects_unissued_or_mismatched_account_context(): void

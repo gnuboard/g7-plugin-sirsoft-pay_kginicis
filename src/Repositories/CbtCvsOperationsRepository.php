@@ -40,6 +40,20 @@ class CbtCvsOperationsRepository implements CbtCvsOperationsRepositoryInterface
     }
 
     /**
+     * 결제 row 를 배타 잠금으로 다시 조회합니다.
+     *
+     * @param  OrderPayment  $payment  결제 row
+     * @return OrderPayment|null 잠금된 결제 row
+     */
+    public function lockPayment(OrderPayment $payment): ?OrderPayment
+    {
+        return OrderPayment::query()
+            ->whereKey($payment->getKey())
+            ->lockForUpdate()
+            ->first();
+    }
+
+    /**
      * 결제 row 속성을 갱신하고 최신 모델을 반환합니다.
      *
      * @param  OrderPayment  $payment  결제 row

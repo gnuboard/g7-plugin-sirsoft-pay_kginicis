@@ -275,8 +275,21 @@ class MobileCallbackController
         } catch (\Exception $e) {
             Log::error('KG Inicis mobile: approve exception', [
                 'P_OID' => $moid,
+                'P_TID' => $approvedTid,
                 'error' => $e->getMessage(),
             ]);
+
+            if ($this->wasAlreadyPaid($approvedTid)) {
+                Log::warning('KG Inicis mobile: local payment already completed, auto-cancel skipped after exception', [
+                    'P_OID' => $moid,
+                    'P_TID' => $approvedTid,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $this->queueReceiptCookie($moid);
+
+                return redirect($this->resolveSuccessUrl($moid));
+            }
 
             $this->autoCancelIfApproved($approvedTid, $moid, $approvedTotPrice, 'approve_failed');
 
