@@ -65,7 +65,16 @@ class PaymentCloseReportController
             ]);
         }
 
-        if ($price !== $this->expectedPaymentPrice($order)) {
+        $expectedPrice = $this->resolveExpectedPaymentPriceOrNull($order, 'close_report', [
+            'received_amount' => $price,
+        ]);
+        if ($expectedPrice === null) {
+            return ResponseHelper::error('messages.failed', 422, [
+                'message' => ['Payment currency is not chargeable.'],
+            ]);
+        }
+
+        if ($price !== $expectedPrice) {
             return ResponseHelper::error('messages.failed', 422, [
                 'message' => ['Payment amount does not match the order amount.'],
             ]);
