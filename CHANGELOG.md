@@ -4,6 +4,12 @@
 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)를 따르며,
 [Semantic Versioning](https://semver.org/lang/ko/)을 준수합니다.
 
+## [Unreleased]
+
+### Fixed
+
+- 이커머스 주문설정 화면에서 KG 이니시스 플러그인이 테스트 모드일 때 운영 전환 경고와 설정 이동 버튼을 표시하도록 보강했습니다.
+
 ## [1.0.0] - 2026-07-01
 
 ### Added
