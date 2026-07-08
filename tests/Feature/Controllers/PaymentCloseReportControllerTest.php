@@ -77,6 +77,30 @@ class PaymentCloseReportControllerTest extends PluginTestCase
             ->assertJsonPath('errors.message.0', 'Payment amount does not match the order amount.');
     }
 
+    public function test_close_report_rejects_unchargeable_payment_currency_without_server_error(): void
+    {
+        $order = $this->makeOrder('ORD-CLOSE-CURRENCY-001', 10000);
+        $order->currency_snapshot = self::unchargeableKrwCurrencySnapshot();
+
+        $orderService = Mockery::mock(OrderProcessingService::class);
+        $orderService->shouldReceive('findByOrderNumber')
+            ->once()
+            ->with('ORD-CLOSE-CURRENCY-001')
+            ->andReturn($order);
+        $orderService->shouldNotReceive('failPayment');
+        $orderService->shouldNotReceive('recordPaymentCancellation');
+
+        $this->app->instance(OrderProcessingService::class, $orderService);
+
+        $response = $this->postJson('/api/plugins/sirsoft-pay_kginicis/payment/close-report', [
+            'oid' => 'ORD-CLOSE-CURRENCY-001',
+            'price' => 10000,
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('errors.message.0', 'Payment currency is not chargeable.');
+    }
+
     public function test_close_report_rejects_non_krw_order_without_failing_payment(): void
     {
         $order = $this->makeOrder('ORD-CLOSE-USD-001', 10000, 'USD');
@@ -199,6 +223,7 @@ class PaymentCloseReportControllerTest extends PluginTestCase
             'order_number' => 'ORD-CLOSE-EASYPAY-001',
             'order_status' => OrderStatusEnum::PENDING_ORDER,
             'currency' => 'KRW',
+            'currency_snapshot' => self::krwCurrencySnapshot(),
             'subtotal_amount' => 10000,
             'total_amount' => 10000,
             'total_due_amount' => 10000,
@@ -246,6 +271,7 @@ class PaymentCloseReportControllerTest extends PluginTestCase
         $order->order_status = OrderStatusEnum::PENDING_ORDER;
         $order->currency = $currency;
         $order->total_due_amount = $amount;
+        $order->currency_snapshot = self::currencySnapshotFor($currency);
 
         return $order;
     }
