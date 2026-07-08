@@ -27,9 +27,21 @@
 
 _요청 파라미터 없음._
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/payment/cbt/checkout-token HTTP/1.1
+Host: api.example.com
+Accept: application/json
+```
+
 **응답 필드** (`data` 내부)
 
 <!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+
+**응답 예시**
+
+<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -52,9 +64,21 @@ _대표 에러 없음 (공개 조회). <!-- TODO: 도메인 특이 에러가 있
 
 _요청 파라미터 없음._
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/payment/cbt/hash-data HTTP/1.1
+Host: api.example.com
+Accept: application/json
+```
+
 **응답 필드** (`data` 내부)
 
 <!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+
+**응답 예시**
+
+<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -84,9 +108,31 @@ _대표 에러 없음 (공개 조회). <!-- TODO: 도메인 특이 에러가 있
 | payment_method | body | string | 아니오 | max 50 | 사용자가 결제창에서 선택했던 간편결제 등 결제수단 식별값. 결제 메타에 병합해 어떤 수단에서 창을 닫았는지 남긴다. |
 | reason | body | string | 아니오 | max 80 | 결제창 닫힘 사유 문자열. 실패/취소 이력에 참고 정보로 기록된다. |
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/payment/close-report HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Content-Type: application/json
+
+{
+    "oid": "예시값",
+    "price": 1,
+    "buyer_email": "user@example.com",
+    "buyer_phone": "010-1234-5678",
+    "payment_method": "예시값",
+    "reason": "예시값"
+}
+```
+
 **응답 필드** (`data` 내부)
 
 <!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+
+**응답 예시**
+
+<!-- 실측 제외: http-404 — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -117,9 +163,30 @@ PC 표준결제창(KRW)에서 사용자가 결제를 완료하지 않고 창을 
 | buyer_email | body | string | 아니오 | max 255 | 구매자 이메일. 제공 시 주문의 구매자 정보와 대조해 본인 결제 요청인지 확인하는 데 사용된다. |
 | buyer_phone | body | string | 아니오 | max 30 | 구매자 전화번호. 제공 시 주문의 구매자 정보와 대조해 본인 결제 요청인지 확인하는 데 사용된다. |
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/payment/mobile/signature HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Content-Type: application/json
+
+{
+    "oid": "예시값",
+    "price": 1,
+    "timestamp": "예시값",
+    "buyer_email": "user@example.com",
+    "buyer_phone": "010-1234-5678"
+}
+```
+
 **응답 필드** (`data` 내부)
 
 <!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+
+**응답 예시**
+
+<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -150,9 +217,30 @@ PC 표준결제창(KRW)에서 사용자가 결제를 완료하지 않고 창을 
 | buyer_email | body | string | 아니오 | max 255 | 구매자 이메일. 제공 시 주문의 구매자 정보와 대조해 본인 결제 요청인지 확인하는 데 사용된다. |
 | buyer_phone | body | string | 아니오 | max 30 | 구매자 전화번호. 제공 시 주문의 구매자 정보와 대조해 본인 결제 요청인지 확인하는 데 사용된다. |
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/payment/signature HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Content-Type: application/json
+
+{
+    "oid": "예시값",
+    "price": 1,
+    "timestamp": "예시값",
+    "buyer_email": "user@example.com",
+    "buyer_phone": "010-1234-5678"
+}
+```
+
 **응답 필드** (`data` 내부)
 
 <!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+
+**응답 예시**
+
+<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 

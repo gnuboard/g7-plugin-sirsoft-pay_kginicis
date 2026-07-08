@@ -27,6 +27,15 @@
 
 _요청 파라미터 없음._
 
+**요청 예시**
+
+```http
+GET /api/plugins/sirsoft-pay_kginicis/admin/cbt-connectivity-check HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
 _단건 응답: `data` 객체의 필드._
@@ -37,6 +46,42 @@ _단건 응답: `data` 객체의 필드._
 | server_ip | string | `127.0.0.1` | `$_SERVER['SERVER_ADDR']` 로 읽은 서버 내부 IP. egress IP와 대조해 NAT/프록시 여부를 가늠하는 참고값이다. |
 | hosts | array | `[{"name":"devcbt.inicis.com","env":"test","dns_resolved_i…` | 진단 대상 호스트별 결과 배열. 각 항목은 호스트명(`devcbt.inicis.com`), 환경(`test`), DNS 해석 IP(`dns_resolved_ip`), TCP 443 도달 여부(`tcp_443_reachable`)와 에러·응답지연(`tcp_443_error`, `tcp_443_latency_ms`)을 담는다. 운영계(`cbt.inicis.com`)는 화이트리스트 제약이 없어 제외된다. |
 | callback | object | `{"app_url":"https:\/\/test.example.com","callback_url":"h…` | 결제 콜백 URL 진단 정보. 앱 URL·콜백 URL과 각각의 HTTPS 여부(`app_url_https`, `callback_url_https`)·공인 호스트 여부(`app_url_public`, `callback_url_public`), 그리고 콜백 호스트가 앱 URL 호스트와 일치하는지(`host_matches_app_url`)를 담아 CBT 콜백 수신 가능 여부를 점검한다. |
+
+**응답 예시**
+
+```http
+HTTP/1.1 200
+```
+
+```json
+{
+    "success": true,
+    "message": "sirsoft-pay_kginicis::messages.cbt_connectivity.checked",
+    "data": {
+        "egress_ip": "59.10.38.149",
+        "server_ip": "127.0.0.1",
+        "hosts": [
+            {
+                "name": "devcbt.inicis.com",
+                "env": "test",
+                "dns_resolved_ip": "183.109.71.154",
+                "tcp_443_reachable": false,
+                "tcp_443_error": "A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond",
+                "tcp_443_latency_ms": 3008
+            }
+        ],
+        "callback": {
+            "app_url": "https://test.example.com",
+            "callback_url": "https://api.example.com/plugins/sirsoft-pay_kginicis/payment/cbt/callback",
+            "app_url_https": true,
+            "callback_url_https": true,
+            "app_url_public": true,
+            "callback_url_public": true,
+            "host_matches_app_url": false
+        }
+    }
+}
+```
 
 **에러 응답**
 
@@ -62,9 +107,44 @@ _단건 응답: `data` 객체의 필드._
 
 _요청 파라미터 없음._
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/admin/cbt-test-product HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+_단건 응답: `data` 객체의 필드._
+
+| 필드 | 타입 | 실측 예시값 | 용도/설명 |
+| --- | --- | --- | --- |
+| product_id | integer | `4` | product 식별자 (연관 리소스 참조) |
+| product_code | string | `CBT-TEST-20260708063238` | 생성된 테스트 상품의 상품코드. `CBT-TEST-` 접두사에 생성 시각(YmdHis)을 붙여 자동 부여되며, SKU는 여기에 `KGINICIS-` 접두사를 더해 만들어진다. |
+| admin_url | string | `/admin/ecommerce/products/4/edit` | admin URL |
+| shop_url | string | `/shop/products/4?locale=ja` | shop URL |
+
+**응답 예시**
+
+```http
+HTTP/1.1 200
+```
+
+```json
+{
+    "success": true,
+    "message": "messages.success",
+    "data": {
+        "product_id": 4,
+        "product_code": "CBT-TEST-20260708063238",
+        "admin_url": "/admin/ecommerce/products/4/edit",
+        "shop_url": "/shop/products/4?locale=ja"
+    }
+}
+```
 
 **에러 응답**
 

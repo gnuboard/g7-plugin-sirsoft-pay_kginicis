@@ -26,14 +26,39 @@
 
 _요청 파라미터 없음._
 
+**요청 예시**
+
+```http
+GET /api/plugins/sirsoft-pay_kginicis/admin/vbank-notify-url HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
 _단건 응답: `data` 객체의 필드._
 
 | 필드 | 타입 | 실측 예시값 | 용도/설명 |
 | --- | --- | --- | --- |
-| url | string | `https://g7_2.dev/plugins/sirsoft-pay_…` | PC 웹용 가상계좌 입금통보(NOTI) 수신 콜백 URL(`/plugins/sirsoft-pay_kginicis/payment/vbank-notify`)의 절대 주소. 운영자가 이 값을 KG 이니시스 가맹점 설정에 입금통보 URL로 등록하면, 구매자가 가상계좌에 실제 입금했을 때 KG 이니시스가 이 주소로 통보한다. |
-| mobile_url | string | `https://g7_2.dev/plugins/sirsoft-pay_…` | mobile URL |
+| url | string | `https://api.example.com/plugins/sirsoft-pay_…` | PC 웹용 가상계좌 입금통보(NOTI) 수신 콜백 URL(`/plugins/sirsoft-pay_kginicis/payment/vbank-notify`)의 절대 주소. 운영자가 이 값을 KG 이니시스 가맹점 설정에 입금통보 URL로 등록하면, 구매자가 가상계좌에 실제 입금했을 때 KG 이니시스가 이 주소로 통보한다. |
+| mobile_url | string | `https://api.example.com/plugins/sirsoft-pay_…` | mobile URL |
+
+**응답 예시**
+
+```http
+HTTP/1.1 200
+```
+
+```json
+{
+    "success": true,
+    "data": {
+        "url": "https://api.example.com/plugins/sirsoft-pay_kginicis/payment/vbank-notify",
+        "mobile_url": "https://api.example.com/plugins/sirsoft-pay_kginicis/payment/mobile/vbank-notify"
+    }
+}
+```
 
 **에러 응답**
 

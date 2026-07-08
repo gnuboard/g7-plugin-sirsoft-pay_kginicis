@@ -27,6 +27,15 @@
 
 _요청 파라미터 없음._
 
+**요청 예시**
+
+```http
+GET /api/plugins/sirsoft-pay_kginicis/admin/orders/test-mode-map HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
 _단건 응답: `data` 객체의 필드._
@@ -36,6 +45,22 @@ _단건 응답: `data` 객체의 필드._
 | 20260619-1358556131 | boolean | `true` | 응답 객체의 키가 곧 주문번호이며 값 `true`는 해당 주문이 KG 이니시스 테스트 모드 결제임을 뜻한다. 목록에 존재하는 주문번호만 테스트 결제로 간주하면 된다. |
 | 20260619-1425382147 | boolean | `true` | 위와 동일 — 키가 주문번호, 값 `true`는 테스트 모드 결제 주문임을 나타낸다. |
 | APIDOC-KGINICIS-000001 | boolean | `true` | 위와 동일 — 키가 주문번호, 값 `true`는 테스트 모드 결제 주문임을 나타낸다. |
+
+**응답 예시**
+
+```http
+HTTP/1.1 200
+```
+
+```json
+{
+    "success": true,
+    "message": "messages.success",
+    "data": {
+        "APIDOC-KGINICIS-000001": true
+    }
+}
+```
 
 **에러 응답**
 
@@ -62,9 +87,22 @@ _단건 응답: `data` 객체의 필드._
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cash-receipt HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
 <!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+
+**응답 예시**
+
+<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -91,6 +129,15 @@ _단건 응답: `data` 객체의 필드._
 | 이름 | 위치 | 타입 | 필수 | 허용값 | 용도 |
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
+
+**요청 예시**
+
+```http
+GET /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-cvs HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
 
 **응답 필드** (`data` 내부)
 
@@ -119,13 +166,56 @@ _단건 응답: `data` 객체의 필드._
 | last_notify_result | string | `` | 마지막 입금 통보(NOTI) 처리 결과. `confirmed`(입금확정)·`ignored`(무시)·`failed`(검증실패) 중 하나가 기록된다. |
 | last_notify_reason | string | `` | 마지막 통보 처리 결과의 상세 사유(예: `deposit_confirmed`, `tid_mismatch`, `amount_mismatch`, `already_paid` 등). |
 | notify_history | array | `[]` | 최근 입금 통보 이력 목록(최대 10건). 각 항목은 수신시각·발신IP·결과·사유와 통보 payload 요약(tid·금액·통화 등)을 담는다. |
-| notify_url | string | `https://g7_2.dev/plugins/sirsoft-pay_…` | notify URL |
+| notify_url | string | `https://api.example.com/plugins/sirsoft-pay_…` | notify URL |
 | can_simulate_notify | boolean | `false` | simulate notify 수행 가능 여부 (권한 기반) |
 | can_mark_expired | boolean | `false` | mark expired 수행 가능 여부 (권한 기반) |
 | last_recheck_at | string | `` | last recheck 일시 |
 | last_recheck_result | string | `` | 마지막 로컬 상태 재확인 결과. recheck 액션 실행 시 `local_status_checked` 로 기록되며, CBT 편의점 입금은 외부 PG 조회 대상이 아니라 로컬 확인 흔적만 남긴다. |
 | expired_at | string | `` | expired 일시 |
 | expiry_reason | string | `` | 만료 처리 사유. 입금 기한 경과로 만료된 경우 `payment_term_elapsed` 가 기록된다. |
+
+**응답 예시**
+
+```http
+HTTP/1.1 200
+```
+
+```json
+{
+    "success": true,
+    "message": "messages.success",
+    "data": {
+        "is_cbt_cvs": true,
+        "order_number": "APIDOC-KGINICIS-000001",
+        "order_status": "pending_payment",
+        "payment_status": "paid",
+        "tid": "INIJPGCARDapidocsmpl0000000001",
+        "amount": 5000,
+        "currency": "KRW",
+        "cbt_mid": "apidocmid1",
+        "cbt_sid": "apidocsid1",
+        "is_test_mode": true,
+        "convenience": "seven_eleven",
+        "conf_no": "1234567890",
+        "receipt_no": "0987654321",
+        "payment_term": "20260710235959",
+        "payment_term_formatted": "2026-07-10 23:59:59",
+        "is_expired_by_time": false,
+        "cvs_status": "waiting_deposit",
+        "last_notify_at": "",
+        "last_notify_result": "",
+        "last_notify_reason": "",
+        "notify_history": [],
+        "notify_url": "https://api.example.com/plugins/sirsoft-pay_kginicis/payment/cbt/cvs-notify",
+        "can_simulate_notify": false,
+        "can_mark_expired": false,
+        "last_recheck_at": "",
+        "last_recheck_result": "",
+        "expired_at": "",
+        "expiry_reason": ""
+    }
+}
+```
 
 **에러 응답**
 
@@ -153,9 +243,22 @@ _단건 응답: `data` 객체의 필드._
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-cvs/expire HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
 <!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+
+**응답 예시**
+
+<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -183,9 +286,92 @@ _단건 응답: `data` 객체의 필드._
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-cvs/recheck HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+_단건 응답: `data` 객체의 필드._
+
+| 필드 | 타입 | 실측 예시값 | 용도/설명 |
+| --- | --- | --- | --- |
+| is_cbt_cvs | boolean | `true` | cbt cvs 여부 |
+| order_number | string | `APIDOC-KGINICIS-000001` | 주문번호 |
+| order_status | string | `pending_payment` | 주문상태 (OrderStatusEnum) |
+| payment_status | string | `paid` | 결제 상태값(PaymentStatusEnum). CVS 입금 흐름에서는 `waiting_deposit`(입금대기) → `paid`(입금완료) 또는 `expired`(기한만료) 로 전이한다. |
+| tid | string | `INIJPGCARDapidocsmpl0000000001` | KG 이니시스 거래 ID(transaction_id). 결제 승인·통보를 식별하는 이니시스 측 거래번호다. |
+| amount | integer | `5000` | 청구 금액. 결제 메타의 `cvs_amount`(CVS 통보 기준 결제 통화 환산액)를 우선 사용하고, 없으면 결제 승인액 또는 주문 총 청구액으로 대체한다. |
+| currency | string | `KRW` | 결제 통화 (KRW, USD, EUR 등) |
+| cbt_mid | string | `apidocmid1` | CBT(일본결제)에 사용된 KG 이니시스 일본 가맹점 ID. 입금 통보(NOTI) 검증 시 통보의 mid와 대조하는 기준값이다. |
+| cbt_sid | string | `apidocsid1` | CBT 결제 세션/상점 식별자(SID). 입금 통보의 sid와 일치하는지 검증하는 데 사용된다. |
+| is_test_mode | boolean | `true` | test mode 여부 |
+| convenience | string | `seven_eleven` | 구매자가 선택한 일본 편의점 식별값. 어느 편의점에서 입금하는지를 나타낸다. |
+| conf_no | string | `1234567890` | 편의점 입금용 확인번호(수납확인번호). 구매자가 편의점 단말에서 입력·제시하는 번호다. |
+| receipt_no | string | `0987654321` | 편의점 입금용 접수번호(수납번호). 확인번호와 함께 편의점 결제 접수를 식별한다. |
+| payment_term | string | `20260710235959` | 편의점 입금 마감 일시(YmdHis 압축 문자열). 이 기한이 지나면 시간 경과 만료 대상이 된다. |
+| payment_term_formatted | string | `2026-07-10 23:59:59` | `payment_term` 값의 표시용 포맷 문자열 (통화/용량/일시 등 로케일·단위 포맷) |
+| is_expired_by_time | boolean | `false` | expired by time 여부 |
+| cvs_status | string | `waiting_deposit` | CVS 입금 상태(`payment_meta.cvs_status`). 입금대기(`waiting_deposit`)·입금완료(`paid`)·만료(`expired`) 등을 나타내며, 메타값이 없고 결제가 입금대기면 `waiting_deposit`로 채운다. |
+| last_notify_at | string | `` | last notify 일시 |
+| last_notify_result | string | `` | 마지막 입금 통보(NOTI) 처리 결과. `confirmed`(입금확정)·`ignored`(무시)·`failed`(검증실패) 중 하나가 기록된다. |
+| last_notify_reason | string | `` | 마지막 통보 처리 결과의 상세 사유(예: `deposit_confirmed`, `tid_mismatch`, `amount_mismatch`, `already_paid` 등). |
+| notify_history | array | `[]` | 최근 입금 통보 이력 목록(최대 10건). 각 항목은 수신시각·발신IP·결과·사유와 통보 payload 요약(tid·금액·통화 등)을 담는다. |
+| notify_url | string | `http://localhost/plugins/sirsoft-pay_…` | notify URL |
+| can_simulate_notify | boolean | `false` | simulate notify 수행 가능 여부 (권한 기반) |
+| can_mark_expired | boolean | `false` | mark expired 수행 가능 여부 (권한 기반) |
+| last_recheck_at | string | `2026-07-08T06:32:39+00:00` | last recheck 일시 |
+| last_recheck_result | string | `local_status_checked` | 마지막 로컬 상태 재확인 결과. recheck 액션 실행 시 `local_status_checked` 로 기록되며, CBT 편의점 입금은 외부 PG 조회 대상이 아니라 로컬 확인 흔적만 남긴다. |
+| expired_at | string | `` | expired 일시 |
+| expiry_reason | string | `` | 만료 처리 사유. 입금 기한 경과로 만료된 경우 `payment_term_elapsed` 가 기록된다. |
+
+**응답 예시**
+
+```http
+HTTP/1.1 200
+```
+
+```json
+{
+    "success": true,
+    "message": "sirsoft-pay_kginicis::messages.cbt_cvs.recheck_success",
+    "data": {
+        "is_cbt_cvs": true,
+        "order_number": "APIDOC-KGINICIS-000001",
+        "order_status": "pending_payment",
+        "payment_status": "paid",
+        "tid": "INIJPGCARDapidocsmpl0000000001",
+        "amount": 5000,
+        "currency": "KRW",
+        "cbt_mid": "apidocmid1",
+        "cbt_sid": "apidocsid1",
+        "is_test_mode": true,
+        "convenience": "seven_eleven",
+        "conf_no": "1234567890",
+        "receipt_no": "0987654321",
+        "payment_term": "20260710235959",
+        "payment_term_formatted": "2026-07-10 23:59:59",
+        "is_expired_by_time": false,
+        "cvs_status": "waiting_deposit",
+        "last_notify_at": "",
+        "last_notify_result": "",
+        "last_notify_reason": "",
+        "notify_history": [],
+        "notify_url": "http://localhost/plugins/sirsoft-pay_kginicis/payment/cbt/cvs-notify",
+        "can_simulate_notify": false,
+        "can_mark_expired": false,
+        "last_recheck_at": "2026-07-08T06:32:39+00:00",
+        "last_recheck_result": "local_status_checked",
+        "expired_at": "",
+        "expiry_reason": ""
+    }
+}
+```
 
 **에러 응답**
 
@@ -213,9 +399,22 @@ _단건 응답: `data` 객체의 필드._
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-cvs/simulate-notify HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
 <!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+
+**응답 예시**
+
+<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -243,11 +442,34 @@ _단건 응답: `data` 객체의 필드._
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
 
+**요청 예시**
+
+```http
+GET /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-reconciliation HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
 
 
 <!-- 실측 응답에 필드 없음(빈 목록 등) — 데이터가 있는 상태로 재실측하거나 사람이 작성. -->
+
+**응답 예시**
+
+```http
+HTTP/1.1 200
+```
+
+```json
+{
+    "success": true,
+    "message": "messages.success",
+    "data": null
+}
+```
 
 **에러 응답**
 
@@ -275,9 +497,22 @@ _단건 응답: `data` 객체의 필드._
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-reconciliation/refund-retry HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
 <!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+
+**응답 예시**
+
+<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -305,6 +540,15 @@ _단건 응답: `data` 객체의 필드._
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
 
+**요청 예시**
+
+```http
+GET /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/escrow-delivery HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
 _단건 응답: `data` 객체의 필드._
@@ -319,6 +563,49 @@ _단건 응답: `data` 객체의 필드._
 | registered_delivery | null | `null` | 이미 등록된 배송 이력(`payment_meta.escrow_delivery`). 미등록이면 `null`이며, 값이 있으면 운송장·택배사 등 중복 등록 방지 판단에 쓰인다. |
 | escrow_confirm | null | `null` | 구매확정 이력(`payment_meta.escrow_confirm`). 구매자 구매확정 처리 전이면 `null`이다. |
 | deny_confirmed | boolean | `false` | 판매자 구매거절 확인 이력(`payment_meta.escrow_deny_confirm`) 존재 여부. 이미 거절확인했으면 `true`가 되어 중복 처리를 막는다. |
+
+**응답 예시**
+
+```http
+HTTP/1.1 200
+```
+
+```json
+{
+    "success": true,
+    "message": "messages.success",
+    "data": {
+        "has_escrow_payment": true,
+        "tid": "INIJPGCARDapidocsmpl0000000001",
+        "price": 460829,
+        "courier_codes": {
+            "hanjin": "한진택배",
+            "cjgls": "CJ대한통운",
+            "loge": "롯데택배",
+            "epost": "우체국택배",
+            "lotte": "롯데글로벌로지스",
+            "kdexp": "경동택배",
+            "cvs": "편의점택배",
+            "ilyang": "일양로지스",
+            "chunil": "천일택배",
+            "cvsnet": "CVSnet편의점",
+            "daesin": "대신택배",
+            "kunyoung": "건영택배",
+            "gsilogis": "GSI Express",
+            "etc": "기타"
+        },
+        "prefill": {
+            "recvName": "API 문서 샘플 수령인",
+            "recvTel": "010-0000-0002",
+            "recvPost": "06134",
+            "recvAddr": "서울특별시 강남구 테헤란로 001 API 문서 샘플 빌딩 1층"
+        },
+        "registered_delivery": null,
+        "escrow_confirm": null,
+        "deny_confirmed": false
+    }
+}
+```
 
 **에러 응답**
 
@@ -346,9 +633,22 @@ _단건 응답: `data` 객체의 필드._
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/escrow-delivery HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
 <!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+
+**응답 예시**
+
+<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -376,9 +676,22 @@ _단건 응답: `data` 객체의 필드._
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
 
+**요청 예시**
+
+```http
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/escrow-deny-confirm HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
+
 **응답 필드** (`data` 내부)
 
 <!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+
+**응답 예시**
+
+<!-- 실측 제외: http-502 — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -405,6 +718,15 @@ _단건 응답: `data` 객체의 필드._
 | 이름 | 위치 | 타입 | 필수 | 허용값 | 용도 |
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
+
+**요청 예시**
+
+```http
+GET /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/transaction-status HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}
+```
 
 **응답 필드** (`data` 내부)
 
@@ -459,6 +781,77 @@ _단건 응답: `data` 객체의 필드._
 | _local_notice | string | `CBT 거래는 한국 INIAPI 거래조회 대상이 아니므로 저장된 승…` | CBT 로컬 확인 경로에서만 채워지는 안내 문구. 이 거래가 실시간 PG 조회가 아니라 저장된 승인/입금 정보로 표시됨을 관리자에게 알린다. |
 | _cbt_cvs | object | `{"status":"waiting_deposit","last_notify_at":"","last_not…` | CBT 편의점(CVS) 결제일 때만 채워지는 입금 운영 요약. 입금 상태·최근 통보/재확인 결과·만료 정보·최근 통보 이력(최대 10건)을 담으며, CVS가 아니면 `null`이다. |
 
+**응답 예시**
+
+```http
+HTTP/1.1 200
+```
+
+```json
+{
+    "success": true,
+    "message": "messages.success",
+    "data": {
+        "resultCode": "0000",
+        "resultMsg": "정상처리",
+        "tid": "INIJPGCARDapidocsmpl0000000001",
+        "_is_cbt": true,
+        "_is_local_confirmation": true,
+        "_is_test_mode": true,
+        "_local_is_escrow": true,
+        "_pay_method": "CVS",
+        "_base_pay_method_label": "일본 편의점결제",
+        "_embedded_pg_provider": null,
+        "_embedded_pg_provider_label": null,
+        "_pay_method_label": "일본 편의점결제",
+        "_auth_code": null,
+        "_auth_date": "2026-07-08 06:32:34",
+        "_total_price": "5000",
+        "_currency": "JPY",
+        "_moid": "APIDOC-KGINICIS-000001",
+        "_buyer_name": "API 문서 샘플 구매자",
+        "_buyer_email": "apidoc-sample-user@example.com",
+        "_buyer_tel": "010-0000-0001",
+        "_status": "waiting_deposit",
+        "_cancel_price": null,
+        "_cancel_date": null,
+        "_part_cancel_list": [],
+        "_card_name": "신한카드",
+        "_card_num": "2570-****-****-6458",
+        "_card_code": null,
+        "_card_quota": "일시불",
+        "_card_interest": null,
+        "_vbank_num": null,
+        "_vbank_bank_code": null,
+        "_vbank_bank_name": "CVS",
+        "_vbank_holder": null,
+        "_vbank_expire_date": "2026-07-10 23:59:59",
+        "_vbank_status": "waiting_deposit",
+        "_vbank_paid_at": null,
+        "_bank_code": null,
+        "_bank_name": null,
+        "_bank_acnt_num": null,
+        "_hpp_num": null,
+        "_hpp_corp": null,
+        "_escrow_status": null,
+        "_escrow_confirm": null,
+        "_inquiry_at": "2026-07-08 06:32:40",
+        "_local_notice": "CBT 거래는 한국 INIAPI 거래조회 대상이 아니므로 저장된 승인/입금 확인 정보로 표시됩니다.",
+        "_cbt_cvs": {
+            "status": "waiting_deposit",
+            "last_notify_at": "",
+            "last_notify_result": "",
+            "last_notify_reason": "",
+            "last_recheck_at": "",
+            "last_recheck_result": "",
+            "expired_at": "",
+            "expiry_reason": "",
+            "notify_history": []
+        }
+    }
+}
+```
+
 **에러 응답**
 
 | 상태코드 | 의미 | 발생 조건 |
@@ -485,11 +878,83 @@ _단건 응답: `data` 객체의 필드._
 | --- | --- | --- | --- | --- | --- |
 | orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
 
+**요청 예시**
+
+```http
+GET /api/plugins/sirsoft-pay_kginicis/user/orders/APIDOC-KGINICIS-000001/receipt HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer {YOUR_TOKEN}   (optional.sanctum: 비회원은 헤더 생략 가능)
+```
+
 **응답 필드** (`data` 내부)
 
 
 
 <!-- 실측 응답에 필드 없음(빈 목록 등) — 데이터가 있는 상태로 재실측하거나 사람이 작성. -->
+
+**응답 예시**
+
+```http
+HTTP/1.1 200
+```
+
+```json
+{
+    "receipt_type": "cbt_confirmation",
+    "receipt_url": null,
+    "receipt_label": "결제확인",
+    "receipt_view_label": "결제확인서 보기",
+    "receipt_title": "KG 이니시스 CBT 결제확인서",
+    "receipt_notice": "일본 CBT 결제는 한국 KG 이니시스 매출전표 조회와 별도로 결제 승인 정보를 표시합니다.",
+    "receipt_fields": [
+        {
+            "label": "주문번호",
+            "value": "APIDOC-KGINICIS-000001"
+        },
+        {
+            "label": "결제수단",
+            "value": "일본 편의점결제"
+        },
+        {
+            "label": "거래번호",
+            "value": "INIJPGCARDapidocsmpl0000000001"
+        },
+        {
+            "label": "결제금액",
+            "value": "5,000 KRW"
+        },
+        {
+            "label": "입금 상태",
+            "value": "입금완료"
+        },
+        {
+            "label": "편의점 코드",
+            "value": "seven_eleven"
+        },
+        {
+            "label": "편의점 확인번호",
+            "value": "1234567890"
+        },
+        {
+            "label": "편의점 접수번호",
+            "value": "0987654321"
+        },
+        {
+            "label": "입금 마감일시",
+            "value": "2026-07-10 23:59:59"
+        }
+    ],
+    "is_test_mode": true,
+    "payment_method_label": "일본 편의점결제",
+    "payment_method_display_label": "일본 편의점결제",
+    "cbt_pay_method": "CVS",
+    "payment_status": "paid",
+    "selected_payment_method": null,
+    "embedded_pg_provider": null,
+    "embedded_pg_provider_label": null
+}
+```
 
 **에러 응답**
 
