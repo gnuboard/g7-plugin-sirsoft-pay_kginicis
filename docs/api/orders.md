@@ -8,8 +8,8 @@
 
 ```text
 1. 이 문서는 실제 API 호출로 실측한 Orders 엔드포인트 레퍼런스입니다
-2. 각 엔드포인트: 메서드/URI/권한 + 요청 파라미터 표 + 실측 응답 필드 표
-3. 응답 필드의 예시값은 실제 호출 응답에서 관측된 값입니다
+2. 각 엔드포인트: 메서드/URI/권한 + 요청 파라미터 표 + 요청 예시(curl) + 실측 응답 필드 표 + 응답 예시(envelope)
+3. 응답 필드의 예시값·응답 예시 JSON 은 실제 호출 응답에서 관측된 값입니다
 4. 갱신: 코드 변경 후 php artisan api:docgen 재실행
 5. 설명(TODO) 칸은 사람이 채웁니다
 ```
@@ -75,49 +75,6 @@ HTTP/1.1 200
 `AdminOrderListController@testModeMap` 가 최근 6개월 이내 `pg_provider = kginicis` 결제 주문을 조회해 그중 테스트 모드 결제만 `{ "주문번호": true, ... }` 맵으로 반환한다. 테스트 판별은 `payment_meta.is_test_mode === true` → `pg_raw_response.mid` 가 KG 이니시스 Live MID 접두사(`SIR`)가 아님 → `transaction_id` 에 `Test` 포함 순으로 이루어진다. 어드민 주문 목록에서 결제수단 셀 하단에 "(테스트 결제)" 배지를 붙이는 용도이며, 응답 필드 키가 곧 주문번호이므로 특정 주문이 맵에 존재하면 테스트 결제로 간주하면 된다. `sirsoft-ecommerce.orders.read` 권한이 필요하고, 파라미터 없이 전체 맵을 한 번에 조회한다.
 
 
-### POST /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/cash-receipt
-<!-- @generated:start:api.plugins.sirsoft-pay_kginicis.admin.orders.cash-receipt.issue -->
-- **라우트명**: `api.plugins.sirsoft-pay_kginicis.admin.orders.cash-receipt.issue`
-- **컨트롤러**: `Plugins\Sirsoft\PayKginicis\Controllers\AdminCashReceiptController@issue`
-- **인증/권한**: `auth:sanctum` + `permission:sirsoft-ecommerce.orders.update`
-
-**요청 파라미터**
-
-| 이름 | 위치 | 타입 | 필수 | 허용값 | 용도 |
-| --- | --- | --- | --- | --- | --- |
-| orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
-
-**요청 예시**
-
-```http
-POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cash-receipt HTTP/1.1
-Host: api.example.com
-Accept: application/json
-Authorization: Bearer {YOUR_TOKEN}
-```
-
-**응답 필드** (`data` 내부)
-
-<!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
-
-**응답 예시**
-
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
-
-**에러 응답**
-
-| 상태코드 | 의미 | 발생 조건 |
-| --- | --- | --- |
-| 401 | Unauthenticated | 유효한 Bearer 토큰이 없거나 만료된 경우 |
-| 403 | Forbidden | 요구 권한(`sirsoft-ecommerce.orders.update`)이 없는 경우 |
-| 404 | Not Found | path 파라미터에 해당하는 리소스가 없는 경우 |
-
-<!-- @generated:end -->
-
-**설명**
-`AdminCashReceiptController@issue` 가 이미 승인 완료된 KG 이니시스 결제 건에 대해 현금영수증을 별도 발행한다. 요청의 `issue_type`(`0`=소득공제, `1`=지출증빙)과 `issue_number`(휴대폰/사업자번호 등 식별번호)를 검증한 뒤, `paid_amount_local` 기준 금액과 부가세(저장값 우선, 없으면 총액의 10/110)를 계산해 `KgInicisApiService::issueCashReceipt` 로 발행 요청을 보낸다. 발행 성공 시 `is_cash_receipt_issued`, `cash_receipt_type`, 마스킹된 식별번호(`cash_receipt_identifier`, 끝 4자리만 노출)를 저장하며, 식별번호 원문은 저장하지 않는다. `sirsoft-ecommerce.orders.update` 권한이 필요하고, 검증 실패 422 / 주문 미존재 404 / 이미 발행됨 409 / PG 발행 실패(resultCode≠`00`) 502 / 예외 500 으로 상태코드가 매핑된다.
-
-
 ### GET /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/cbt-cvs
 <!-- @generated:start:api.plugins.sirsoft-pay_kginicis.admin.orders.cbt-cvs.show -->
 - **라우트명**: `api.plugins.sirsoft-pay_kginicis.admin.orders.cbt-cvs.show`
@@ -133,7 +90,7 @@ Authorization: Bearer {YOUR_TOKEN}
 **요청 예시**
 
 ```http
-GET /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-cvs HTTP/1.1
+GET /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/cbt-cvs HTTP/1.1
 Host: api.example.com
 Accept: application/json
 Authorization: Bearer {YOUR_TOKEN}
@@ -246,7 +203,7 @@ HTTP/1.1 200
 **요청 예시**
 
 ```http
-POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-cvs/expire HTTP/1.1
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/cbt-cvs/expire HTTP/1.1
 Host: api.example.com
 Accept: application/json
 Authorization: Bearer {YOUR_TOKEN}
@@ -254,11 +211,11 @@ Authorization: Bearer {YOUR_TOKEN}
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+<!-- 실측 제외: unresolved-path-param — 응답 필드는 사람이 작성하세요. -->
 
 **응답 예시**
 
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
+<!-- 실측 제외: unresolved-path-param — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -289,7 +246,7 @@ Authorization: Bearer {YOUR_TOKEN}
 **요청 예시**
 
 ```http
-POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-cvs/recheck HTTP/1.1
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/cbt-cvs/recheck HTTP/1.1
 Host: api.example.com
 Accept: application/json
 Authorization: Bearer {YOUR_TOKEN}
@@ -402,7 +359,7 @@ HTTP/1.1 200
 **요청 예시**
 
 ```http
-POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-cvs/simulate-notify HTTP/1.1
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/cbt-cvs/simulate-notify HTTP/1.1
 Host: api.example.com
 Accept: application/json
 Authorization: Bearer {YOUR_TOKEN}
@@ -410,11 +367,11 @@ Authorization: Bearer {YOUR_TOKEN}
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+<!-- 실측 제외: unresolved-path-param — 응답 필드는 사람이 작성하세요. -->
 
 **응답 예시**
 
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
+<!-- 실측 제외: unresolved-path-param — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -445,7 +402,7 @@ Authorization: Bearer {YOUR_TOKEN}
 **요청 예시**
 
 ```http
-GET /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-reconciliation HTTP/1.1
+GET /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/cbt-reconciliation HTTP/1.1
 Host: api.example.com
 Accept: application/json
 Authorization: Bearer {YOUR_TOKEN}
@@ -453,9 +410,7 @@ Authorization: Bearer {YOUR_TOKEN}
 
 **응답 필드** (`data` 내부)
 
-
-
-<!-- 실측 응답에 필드 없음(빈 목록 등) — 데이터가 있는 상태로 재실측하거나 사람이 작성. -->
+<!-- 실측 제외: unresolved-path-param — 응답 필드는 사람이 작성하세요. -->
 
 **응답 예시**
 
@@ -500,7 +455,7 @@ HTTP/1.1 200
 **요청 예시**
 
 ```http
-POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/cbt-reconciliation/refund-retry HTTP/1.1
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/cbt-reconciliation/refund-retry HTTP/1.1
 Host: api.example.com
 Accept: application/json
 Authorization: Bearer {YOUR_TOKEN}
@@ -508,11 +463,11 @@ Authorization: Bearer {YOUR_TOKEN}
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+<!-- 실측 제외: unresolved-path-param — 응답 필드는 사람이 작성하세요. -->
 
 **응답 예시**
 
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
+<!-- 실측 제외: unresolved-path-param — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -543,7 +498,7 @@ Authorization: Bearer {YOUR_TOKEN}
 **요청 예시**
 
 ```http
-GET /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/escrow-delivery HTTP/1.1
+GET /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/escrow-delivery HTTP/1.1
 Host: api.example.com
 Accept: application/json
 Authorization: Bearer {YOUR_TOKEN}
@@ -636,7 +591,7 @@ HTTP/1.1 200
 **요청 예시**
 
 ```http
-POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/escrow-delivery HTTP/1.1
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/escrow-delivery HTTP/1.1
 Host: api.example.com
 Accept: application/json
 Authorization: Bearer {YOUR_TOKEN}
@@ -644,11 +599,11 @@ Authorization: Bearer {YOUR_TOKEN}
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+<!-- 실측 제외: unresolved-path-param — 응답 필드는 사람이 작성하세요. -->
 
 **응답 예시**
 
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
+<!-- 실측 제외: unresolved-path-param — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -679,7 +634,7 @@ Authorization: Bearer {YOUR_TOKEN}
 **요청 예시**
 
 ```http
-POST /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/escrow-deny-confirm HTTP/1.1
+POST /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/escrow-deny-confirm HTTP/1.1
 Host: api.example.com
 Accept: application/json
 Authorization: Bearer {YOUR_TOKEN}
@@ -687,11 +642,11 @@ Authorization: Bearer {YOUR_TOKEN}
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: write-method — 응답 필드는 사람이 작성하세요. -->
+<!-- 실측 제외: unresolved-path-param — 응답 필드는 사람이 작성하세요. -->
 
 **응답 예시**
 
-<!-- 실측 제외: http-502 — 응답 예시는 사람이 작성하세요. -->
+<!-- 실측 제외: unresolved-path-param — 응답 예시는 사람이 작성하세요. -->
 
 **에러 응답**
 
@@ -722,7 +677,7 @@ Authorization: Bearer {YOUR_TOKEN}
 **요청 예시**
 
 ```http
-GET /api/plugins/sirsoft-pay_kginicis/admin/orders/APIDOC-KGINICIS-000001/transaction-status HTTP/1.1
+GET /api/plugins/sirsoft-pay_kginicis/admin/orders/{orderNumber}/transaction-status HTTP/1.1
 Host: api.example.com
 Accept: application/json
 Authorization: Bearer {YOUR_TOKEN}
@@ -881,7 +836,7 @@ HTTP/1.1 200
 **요청 예시**
 
 ```http
-GET /api/plugins/sirsoft-pay_kginicis/user/orders/APIDOC-KGINICIS-000001/receipt HTTP/1.1
+GET /api/plugins/sirsoft-pay_kginicis/user/orders/{orderNumber}/receipt HTTP/1.1
 Host: api.example.com
 Accept: application/json
 Authorization: Bearer {YOUR_TOKEN}   (optional.sanctum: 비회원은 헤더 생략 가능)
@@ -889,9 +844,7 @@ Authorization: Bearer {YOUR_TOKEN}   (optional.sanctum: 비회원은 헤더 생�
 
 **응답 필드** (`data` 내부)
 
-
-
-<!-- 실측 응답에 필드 없음(빈 목록 등) — 데이터가 있는 상태로 재실측하거나 사람이 작성. -->
+<!-- 실측 제외: unresolved-path-param — 응답 필드는 사람이 작성하세요. -->
 
 **응답 예시**
 
