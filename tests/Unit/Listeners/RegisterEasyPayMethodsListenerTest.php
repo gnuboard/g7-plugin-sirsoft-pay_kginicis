@@ -164,6 +164,46 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
         }
     }
 
+    /**
+     * @scenario mark_form=svg, requires_ios=false, device=ipados_desktop_ua
+     *
+     * @effects brand_mark_flows_to_cached, svg_renders_inline_logo, shared_helpers_preserved
+     */
+    public function test_easy_pay_methods_carry_svg_brand_mark(): void
+    {
+        // 브랜드 SVG 로고를 카탈로그로 편입 — 과거 checkoutNaverpayBrandButton 이
+        // DOM 후처리로 주입하던 markSvg 를 등록 데이터(brand_mark.svg)로 이관.
+        $this->mockSettings([
+            'easy_pay_samsung_pay' => false,
+            'easy_pay_naverpay' => false,
+            'easy_pay_lpay' => false,
+            'easy_pay_kakaopay' => false,
+            'japan_enabled' => true,
+        ]);
+
+        $listener = new RegisterEasyPayMethodsListener;
+
+        $methods = collect($listener->injectEasyPayMethods([
+            ['id' => 'phone'],
+            ['id' => 'point'],
+        ]))->keyBy('id');
+
+        $naverpay = $methods->get('kginicis_naverpay');
+        $kakaopay = $methods->get('kginicis_kakaopay');
+
+        $this->assertIsArray($naverpay['brand_mark'] ?? null);
+        $this->assertArrayHasKey('svg', $naverpay['brand_mark']);
+        $this->assertStringContainsString('<svg', $naverpay['brand_mark']['svg']);
+        $this->assertStringContainsString('#03C75A', $naverpay['brand_mark']['svg']);
+
+        $this->assertStringContainsString('#FEE500', $kakaopay['brand_mark']['svg'] ?? '');
+
+        // KG 이니시스는 애플페이 수단이 없으므로 requires_ios 플래그도 없어야 한다.
+        foreach ($methods as $method) {
+            $this->assertArrayNotHasKey('requires_ios', $method);
+        }
+    }
+
     public function test_legacy_easy_pay_settings_are_used_as_default_active_state(): void
     {
         $this->mockSettings([

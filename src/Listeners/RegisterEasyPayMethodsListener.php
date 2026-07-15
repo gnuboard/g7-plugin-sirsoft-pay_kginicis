@@ -38,6 +38,25 @@ class RegisterEasyPayMethodsListener implements HookListenerInterface
     ];
 
     /**
+     * 결제수단별 브랜드 마크(인라인 SVG 로고).
+     *
+     * 코어 카탈로그가 `_cached_brand_mark` 로 전달하고, 체크아웃 레이아웃의 BrandMark
+     * 컴포넌트가 화이트리스트 sanitize 후 렌더한다. 과거에는 체크아웃 DOM 인젝터
+     * (checkoutNaverpayBrandButton.ts) 가 렌더 후 이 SVG 를 주입했으나, 시각정보를
+     * 카탈로그로 편입해 인젝터를 제거했다.
+     *
+     * @var array<string, string>
+     */
+    private const BRAND_MARK_SVG = [
+        'kginicis_naverpay' => '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="Naver Pay"><rect width="40" height="40" rx="8" fill="#03C75A"/><text x="20" y="17" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="12" font-weight="700">N</text><text x="20" y="29" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="9" font-weight="700">Pay</text></svg>',
+        'kginicis_samsung_pay' => '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="Samsung Pay"><rect width="40" height="40" rx="8" fill="#1428A0"/><text x="20" y="18" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="10" font-weight="700">S</text><text x="20" y="29" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="9" font-weight="700">Pay</text></svg>',
+        'kginicis_lpay' => '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="L.pay"><rect width="40" height="40" rx="8" fill="#D71920"/><text x="20" y="18" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="12" font-weight="700">L</text><text x="20" y="29" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="8" font-weight="700">pay</text></svg>',
+        'kginicis_kakaopay' => '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="Kakao Pay"><rect width="40" height="40" rx="8" fill="#FEE500"/><text x="20" y="18" text-anchor="middle" fill="#111111" font-family="Arial, sans-serif" font-size="9" font-weight="700">Kakao</text><text x="20" y="29" text-anchor="middle" fill="#111111" font-family="Arial, sans-serif" font-size="9" font-weight="700">Pay</text></svg>',
+        'kginicis_japan_paypay' => '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="PayPay"><rect width="40" height="40" rx="8" fill="#E60012"/><text x="20" y="18" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="8" font-weight="700">Pay</text><text x="20" y="29" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="8" font-weight="700">Pay</text></svg>',
+        'kginicis_japan_cvs' => '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 40 40" role="img" aria-label="Convenience Store"><rect width="40" height="40" rx="8" fill="#0072CE"/><text x="20" y="18" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="9" font-weight="700">CVS</text><text x="20" y="29" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="8" font-weight="700">JP</text></svg>',
+    ];
+
+    /**
      * 구독할 훅 매핑 반환.
      *
      * @return array<string, array<string, mixed>>
@@ -193,7 +212,7 @@ class RegisterEasyPayMethodsListener implements HookListenerInterface
      */
     private function buildEntry(string $id, string $nameKey, string $descriptionKey, string $icon, bool $isActive = false): array
     {
-        return [
+        $entry = [
             'id' => $id,
             'name' => [
                 'ko' => __($nameKey, [], 'ko'),
@@ -219,5 +238,13 @@ class RegisterEasyPayMethodsListener implements HookListenerInterface
                 'mileage_deduction_timing' => 'payment_complete',
             ],
         ];
+
+        // 브랜드 마크(SVG 로고)가 정의된 수단만 카탈로그에 실어 내린다.
+        // 레이아웃 BrandMark 컴포넌트가 svg 키를 화이트리스트 sanitize 후 렌더한다.
+        if (isset(self::BRAND_MARK_SVG[$id])) {
+            $entry['brand_mark'] = ['svg' => self::BRAND_MARK_SVG[$id]];
+        }
+
+        return $entry;
     }
 }
