@@ -37,11 +37,24 @@ Accept: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-422 — 응답 필드는 사람이 작성하세요. -->
+_단건 응답: `data` 객체의 필드._
+
+| 필드 | 타입 | 실측 예시값 | 용도/설명 |
+| --- | --- | --- | --- |
+| checkout_token | string | `eyJvaWQiOiJPUkQyMDI2MDcxNDAwMSIsInByaWNlIjoxMDAwMH0.5f1c…` | 후속 hash-data 요청에 그대로 실어 보내는 단기 체크아웃 토큰. 주문번호·금액·구매자(이메일/전화)·요청 IP·User-Agent 를 HMAC-SHA256 으로 봉인한 서명값이다. |
 
 **응답 예시**
 
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
+```json
+{
+    "success": true,
+    "data": {
+        "checkout_token": "eyJvaWQiOiJPUkQyMDI2MDcxNDAwMSIsInByaWNlIjoxMDAwMH0.5f1c…"
+    }
+}
+```
+
+_이 엔드포인트는 `ResponseHelper` 봉투를 쓰지 않고 `response()->json()` 으로 `success`·`data` 만 반환합니다 (`message` 없음)._
 
 **에러 응답**
 
@@ -79,11 +92,24 @@ Accept: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-422 — 응답 필드는 사람이 작성하세요. -->
+_단건 응답: `data` 객체의 필드._
+
+| 필드 | 타입 | 실측 예시값 | 용도/설명 |
+| --- | --- | --- | --- |
+| hash_data | string | `a1b2c3d4e5f6…` | 일본 CBT 결제창이 KG 이니시스에 전송할 위변조 방지 해시(P_HASHDATA). 일본 가맹점 MID·타임스탬프·금액·주문번호로 생성된다. |
 
 **응답 예시**
 
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
+```json
+{
+    "success": true,
+    "data": {
+        "hash_data": "a1b2c3d4e5f6…"
+    }
+}
+```
+
+_이 엔드포인트는 `ResponseHelper` 봉투를 쓰지 않고 `response()->json()` 으로 `success`·`data` 만 반환합니다 (`message` 없음)._
 
 **에러 응답**
 
@@ -138,17 +164,33 @@ Content-Type: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-404 — 응답 필드는 사람이 작성하세요. -->
+_단건 응답: `data` 객체의 필드._
+
+| 필드 | 타입 | 실측 예시값 | 용도/설명 |
+| --- | --- | --- | --- |
+| status | string | `recorded` \| `ignored` | 닫힘 보고 처리 결과. `recorded` = 주문을 `USER_CANCEL` 로 실패 처리하고 취소 이력을 남김. `ignored` = 결제 성공 콜백과의 경쟁 등으로 처리하지 않고 무시. |
+| reason | string | `order_not_payable` \| `payment_already_paid` | `status: ignored` 일 때만 포함되는 무시 사유. 주문이 이미 결제 가능 상태가 아니거나(`order_not_payable`), 결제가 이미 완료됨(`payment_already_paid`). |
 
 **응답 예시**
 
-<!-- 실측 제외: http-404 — 응답 예시는 사람이 작성하세요. -->
+```json
+{
+    "success": true,
+    "message": "성공적으로 처리되었습니다.",
+    "data": {
+        "status": "recorded"
+    }
+}
+```
 
 **에러 응답**
 
 | 상태코드 | 의미 | 발생 조건 |
 | --- | --- | --- |
-| 422 | Unprocessable Entity | 요청 파라미터가 검증 규칙을 위반한 경우 (`error.errors` 에 필드별 메시지) |
+| 403 | Forbidden | 요청의 구매자 정보(`buyer_email` / `buyer_phone`)가 주문의 구매자와 일치하지 않는 경우 |
+| 404 | Not Found | `oid` 에 해당하는 주문이 없는 경우 |
+| 422 | Unprocessable Entity | 요청 파라미터가 검증 규칙을 위반한 경우 (`error.errors` 에 필드별 메시지), 주문 통화가 KRW 가 아님, 금액이 주문 청구액과 불일치 |
+| 429 | Too Many Requests | 동일 IP·`oid` 조합에서 분당 20회를 초과해 요청한 경우 |
 
 <!-- @generated:end -->
 
@@ -192,17 +234,34 @@ Content-Type: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-422 — 응답 필드는 사람이 작성하세요. -->
+_단건 응답: `data` 객체의 필드._
+
+| 필드 | 타입 | 실측 예시값 | 용도/설명 |
+| --- | --- | --- | --- |
+| chkfake | string | `9f86d081884c7d65…` | 모바일 결제창이 KG 이니시스에 전송할 위변조 방지 해시(P_CHKFAKE). 주문번호·금액·타임스탬프로 생성된다. |
+| mobile_payment_url | string | `https://mobile.inicis.com/smart/payment/` | 모바일 결제창 진입 URL. 테스트/운영 모드 설정에 따라 달라진다. |
 
 **응답 예시**
 
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
+```json
+{
+    "data": {
+        "chkfake": "9f86d081884c7d65…",
+        "mobile_payment_url": "https://mobile.inicis.com/smart/payment/"
+    }
+}
+```
+
+_이 엔드포인트는 `ResponseHelper` 봉투를 쓰지 않고 `response()->json()` 으로 `data` 만 반환합니다 (성공 시 `success`·`message` 없음)._
 
 **에러 응답**
 
 | 상태코드 | 의미 | 발생 조건 |
 | --- | --- | --- |
-| 422 | Unprocessable Entity | 요청 파라미터가 검증 규칙을 위반한 경우 (`error.errors` 에 필드별 메시지) |
+| 403 | Forbidden | 요청의 구매자 정보(`buyer_email` / `buyer_phone`)가 주문의 구매자와 일치하지 않는 경우 |
+| 404 | Not Found | `oid` 에 해당하는 주문이 없는 경우 |
+| 422 | Unprocessable Entity | 요청 파라미터가 검증 규칙을 위반한 경우 (`error.errors` 에 필드별 메시지), 타임스탬프 만료·형식 오류, 주문이 결제 가능 상태가 아님, 주문 통화가 KRW 가 아님, 금액 불일치, 모바일 결제 자격증명 미설정 |
+| 429 | Too Many Requests | 동일 IP·`oid` 조합에서 분당 20회를 초과해 요청한 경우 |
 
 <!-- @generated:end -->
 
@@ -246,17 +305,36 @@ Content-Type: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-422 — 응답 필드는 사람이 작성하세요. -->
+_단건 응답: `data` 객체의 필드._
+
+| 필드 | 타입 | 실측 예시값 | 용도/설명 |
+| --- | --- | --- | --- |
+| signature | string | `4d2f8a9c1b7e…` | PC 표준결제창에 전달할 위변조 방지 서명. 주문번호·금액·타임스탬프로 생성된다. |
+| verification | string | `7c1a3e5b9d0f…` | 표준결제창 검증값. signature 와 함께 결제창 호출 파라미터로 전달된다. |
+| mKey | string | `e3b0c44298fc1c14…` | 가맹점 키 해시(mKey). KG 이니시스 표준결제창이 가맹점 식별에 사용한다. |
 
 **응답 예시**
 
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
+```json
+{
+    "data": {
+        "signature": "4d2f8a9c1b7e…",
+        "verification": "7c1a3e5b9d0f…",
+        "mKey": "e3b0c44298fc1c14…"
+    }
+}
+```
+
+_이 엔드포인트는 `ResponseHelper` 봉투를 쓰지 않고 `response()->json()` 으로 `data` 만 반환합니다 (성공 시 `success`·`message` 없음)._
 
 **에러 응답**
 
 | 상태코드 | 의미 | 발생 조건 |
 | --- | --- | --- |
-| 422 | Unprocessable Entity | 요청 파라미터가 검증 규칙을 위반한 경우 (`error.errors` 에 필드별 메시지) |
+| 403 | Forbidden | 요청의 구매자 정보(`buyer_email` / `buyer_phone`)가 주문의 구매자와 일치하지 않는 경우 |
+| 404 | Not Found | `oid` 에 해당하는 주문이 없는 경우 |
+| 422 | Unprocessable Entity | 요청 파라미터가 검증 규칙을 위반한 경우 (`error.errors` 에 필드별 메시지), 타임스탬프 만료·형식 오류, 주문이 결제 가능 상태가 아님, 주문 통화가 KRW 가 아님, 금액 불일치, 표준결제 자격증명 미설정 |
+| 429 | Too Many Requests | 동일 IP·`oid` 조합에서 분당 20회를 초과해 요청한 경우 |
 
 <!-- @generated:end -->
 
@@ -310,11 +388,27 @@ Content-Type: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-302 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON `data` 를 반환하지 않습니다. 브라우저 리다이렉트(302)로만 응답하며, 결과는 리다이렉트 URL 과 그 쿼리스트링으로 전달됩니다._
+
+| 리다이렉트 대상 | 조건 | 쿼리 파라미터 |
+| --- | --- | --- |
+| 성공 URL (`redirect_success_url`, 기본 `/shop/orders/{orderId}/complete`) | 서버 승인 성공(결제완료 또는 가상계좌 발급), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
+| 실패 URL (`redirect_fail_url`, 기본 `/shop/checkout`) | 인증 실패·검증 실패·승인 실패 | `error` (`invalid_params` \| `missing_fields` \| `auth_url_invalid` \| `order_not_found` \| `amount_mismatch` 등), `message` (PG 결과 메시지), `orderId` |
+| 실패 URL (쿼리 없음) | 사용자가 결제창을 닫은 취소(`2001` / `0021` / `0022` / 빈값, 또는 결과 메시지에 '취소'·'사용자' 포함) | 없음 (조용한 복귀) |
 
 **응답 예시**
 
-<!-- 실측 제외: http-302 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/shop/orders/ORD20260714001/complete
+```
+
+실패 시:
+
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/shop/checkout?error=amount_mismatch&orderId=ORD20260714001
+```
 
 **에러 응답**
 
@@ -334,7 +428,7 @@ PC 표준결제창(KRW)의 인증 결과를 브라우저 POST 로 수신해 서�
 
 
 ### GET /plugins/sirsoft-pay_kginicis/payment/cbt/callback
-<!-- @generated:start:web.plugins.sirsoft-pay_kginicis.payment.cbt.callback -->
+<!-- @generated:start:web.plugins.sirsoft-pay_kginicis.payment.cbt.callback::get -->
 - **라우트명**: `web.plugins.sirsoft-pay_kginicis.payment.cbt.callback`
 - **컨트롤러**: `Plugins\Sirsoft\PayKginicis\Controllers\CbtCallbackController@handle`
 - **인증/권한**: 공개 (인증 불필요)
@@ -363,11 +457,27 @@ Accept: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-200 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON `data` 를 반환하지 않습니다. 브라우저 리다이렉트(302)로만 응답하며, 결과는 리다이렉트 URL 과 그 쿼리스트링으로 전달됩니다._
+
+| 리다이렉트 대상 | 조건 | 쿼리 파라미터 |
+| --- | --- | --- |
+| 성공 URL (`redirect_success_url`, 기본 `/shop/orders/{orderId}/complete`) | CBT 서버 승인 성공(결제완료 또는 편의점 입금대기 등록), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
+| 실패 URL (`redirect_fail_url`, 기본 `/shop/checkout`) | 인증 실패·MID 불일치·검증 실패·승인 실패 | `error` (`invalid_params` \| `mid_mismatch` \| `order_not_found` \| `cbt_failed` 등), `message` (PG 결과 메시지), `orderId` |
+| 실패 URL (쿼리 없음) | 사용자 취소(취소 코드 또는 일본어·한국어 취소 문구) | 없음 (조용한 복귀) |
 
 **응답 예시**
 
-<!-- 실측 제외: http-200 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/shop/orders/ORD20260714001/complete
+```
+
+실패 시:
+
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/shop/checkout?error=mid_mismatch&orderId=ORD20260714001
+```
 
 **에러 응답**
 
@@ -387,7 +497,7 @@ Accept: application/json
 
 
 ### POST /plugins/sirsoft-pay_kginicis/payment/cbt/callback
-<!-- @generated:start:web.plugins.sirsoft-pay_kginicis.payment.cbt.callback -->
+<!-- @generated:start:web.plugins.sirsoft-pay_kginicis.payment.cbt.callback::post -->
 - **라우트명**: `web.plugins.sirsoft-pay_kginicis.payment.cbt.callback`
 - **컨트롤러**: `Plugins\Sirsoft\PayKginicis\Controllers\CbtCallbackController@handle`
 - **인증/권한**: 공개 (인증 불필요)
@@ -396,15 +506,15 @@ Accept: application/json
 
 | 이름 | 위치 | 타입 | 필수 | 허용값 | 용도 |
 | --- | --- | --- | --- | --- | --- |
-| sid | body | string | 아니오 | max 255 | <!-- TODO: 용도 --> |
-| resultCode | body | string | 아니오 | max 100 | 결제 인증 결과 코드 (`0000` = 성공). `2001`/`0021`/`0022`/빈값은 사용자 취소로 간주해 에러 없이 체크아웃으로 복귀한다. |
-| resultMsg | body | string | 아니오 | max 500 | 결제 인증 결과 메시지. 실패 시 실패 URL 의 `message` 파라미터로 전달되며 '취소'/'사용자' 포함 여부로 사용자 취소를 판별한다. |
-| orderID | body | string | 아니오 | max 100 | <!-- TODO: 용도 --> |
-| orderId | body | string | 아니오 | max 100 | <!-- TODO: 용도 --> |
-| oid | body | string | 아니오 | max 100 | 결제 대상 주문의 주문번호. 서버가 주문을 조회해 결제 가능 상태·통화·금액을 검증하고 이 값을 서명 생성 입력으로 사용한다. |
-| mid | body | string | 아니오 | max 30 | <!-- TODO: 용도 --> |
-| paymethod | body | string | 아니오 | max 50 | <!-- TODO: 용도 --> |
-| selectedPaymentMethod | body | string | 아니오 | max 50 | <!-- TODO: 용도 --> |
+| sid | body | string | 아니오 | max 255 | CBT 인증 세션 ID. 서버가 `/cbtapprove` 최종 승인 요청에 MID 와 함께 전송하는 승인 키이며, 결제 메타에 `cbt_sid` 로 저장된다. |
+| resultCode | body | string | 아니오 | max 100 | CBT 인증 결과 코드 (`OK`/`00`/`0000` = 성공). `2001`/`0021`/`0022` 또는 취소 문구 포함 시 사용자 취소로 간주한다. |
+| resultMsg | body | string | 아니오 | max 500 | CBT 인증 결과 메시지. 사용자 취소 판별(일본어/한국어 취소 문구)과 실패 리다이렉트 메시지에 사용된다. |
+| orderID | body | string | 아니오 | max 100 | 주문번호 (1순위 키). `orderId` → `oid` 순으로 폴백해 주문을 조회한다. |
+| orderId | body | string | 아니오 | max 100 | 주문번호 (2순위 폴백 키). |
+| oid | body | string | 아니오 | max 100 | 주문번호 (3순위 폴백 키). |
+| mid | body | string | 아니오 | max 30 | 일본 CBT 가맹점 MID. 설정된 일본 MID 와 불일치하면 결제를 중단한다(위조 콜백 차단). |
+| paymethod | body | string | 아니오 | max 50 | CBT 결제수단 (CARD / PAYPAY / CVS). 승인 응답의 결제수단과 대조하며, CVS 는 편의점 입금대기 처리로 분기한다. |
+| selectedPaymentMethod | body | string | 아니오 | max 50 | 체크아웃에서 사용자가 선택한 결제수단 식별값(`card` / `kginicis_japan_paypay` / `kginicis_japan_cvs`). 기대 결제수단 검증과 결제 메타 기록에 사용된다. |
 
 **요청 예시**
 
@@ -429,11 +539,27 @@ Content-Type: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-302 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON `data` 를 반환하지 않습니다. 브라우저 리다이렉트(302)로만 응답하며, 결과는 리다이렉트 URL 과 그 쿼리스트링으로 전달됩니다 (GET 경로와 동일)._
+
+| 리다이렉트 대상 | 조건 | 쿼리 파라미터 |
+| --- | --- | --- |
+| 성공 URL (`redirect_success_url`, 기본 `/shop/orders/{orderId}/complete`) | CBT 서버 승인 성공(결제완료 또는 편의점 입금대기 등록), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
+| 실패 URL (`redirect_fail_url`, 기본 `/shop/checkout`) | 인증 실패·MID 불일치·검증 실패·승인 실패 | `error` (`invalid_params` \| `mid_mismatch` \| `order_not_found` \| `cbt_failed` 등), `message` (PG 결과 메시지), `orderId` |
+| 실패 URL (쿼리 없음) | 사용자 취소(취소 코드 또는 일본어·한국어 취소 문구) | 없음 (조용한 복귀) |
 
 **응답 예시**
 
-<!-- 실측 제외: http-302 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/shop/orders/ORD20260714001/complete
+```
+
+실패 시:
+
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/shop/checkout?error=cbt_failed&orderId=ORD20260714001
+```
 
 **에러 응답**
 
@@ -507,16 +633,29 @@ Content-Type: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-200 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON 을 반환하지 않습니다 (`data` 없음). 응답은 `Content-Type: text/plain` 의 평문 본문 한 줄이며, HTTP 상태코드는 항상 200 입니다._
+
+| 본문 | 의미 | 발생 조건 |
+| --- | --- | --- |
+| `OK` | 통보 수신 확인 | 검증 통과 후 입금 처리 완료, 또는 처리 불필요(비-성공 `status` 통보 / 이미 결제완료된 중복 통보)로 무시 |
+| `FAIL` | 통보 거부 | 주문·결제행 미존재, TID/MID/SID 불일치, 통화가 `JPY` 아님, 금액 불일치, 결제 상태가 입금대기 아님, 결제수단이 CVS 아님 |
+
+`FAIL` 을 반환하면 KG 이니시스가 동일 통보를 재시도합니다.
 
 **응답 예시**
 
-<!-- 실측 제외: http-200 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 200 OK
+Content-Type: text/plain
+
+OK
+```
 
 **에러 응답**
 
 | 상태코드 | 의미 | 발생 조건 |
 | --- | --- | --- |
+| 403 | Forbidden | KG 이니시스 공식 발송 IP 화이트리스트에 없는 IP 에서 요청한 경우 (로컬·테스트 환경 제외) |
 | 422 | Unprocessable Entity | 요청 파라미터가 검증 규칙을 위반한 경우 (`error.errors` 에 필드별 메시지) |
 
 <!-- @generated:end -->
@@ -550,15 +689,30 @@ Accept: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-200 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON 을 반환하지 않습니다 (`data` 없음). 응답은 `Content-Type: text/html; charset=UTF-8` · `Cache-Control: no-store` 의 HTML 페이지(HTTP 200)이며, KG 이니시스 결제창 close 스크립트를 로드하고 부모/opener 창에 `{ source: 'sirsoft-pay_kginicis', type: 'payment-window-closed', reason: 'inicis-close-url' }` 를 `postMessage` 로 전달합니다. 로드되는 close 스크립트 주소는 플러그인 설정 `is_test_mode` 에 따라 `stgstdpay.inicis.com`(테스트) 또는 `stdpay.inicis.com`(운영) 으로 분기합니다._
 
 **응답 예시**
 
-<!-- 실측 제외: http-200 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=UTF-8
+Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>KG 이니시스 결제창 닫기</title>
+    <script>/* 부모·opener 창에 payment-window-closed postMessage 전송 */</script>
+    <script src="https://stgstdpay.inicis.com/stdjs/INIStdPay_close.js" charset="UTF-8"></script>
+</head>
+<body></body>
+</html>
+```
 
 **에러 응답**
 
-_대표 에러 없음 (공개 조회). <!-- TODO: 도메인 특이 에러가 있으면 보강 -->_
+_에러 응답이 정의되어 있지 않습니다. 인증·요청 파라미터 없이 정적 HTML(200)만 반환하므로 도메인 특이 에러가 발생하지 않습니다._
 
 <!-- @generated:end -->
 
@@ -589,15 +743,20 @@ Accept: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-401 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON 을 반환하지 않습니다 (`data` 없음). 응답은 `Content-Type: text/html; charset=UTF-8` 의 HTML(HTTP 200)이며, 본문은 팝업을 닫는 스크립트(`window.close()`) 한 줄뿐입니다. 결제나 구매결정 상태를 변경하지 않습니다._
 
 **응답 예시**
 
-<!-- 실측 제외: http-401 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=UTF-8
+
+<script>window.close();</script>
+```
 
 **에러 응답**
 
-_대표 에러 없음 (공개 조회). <!-- TODO: 도메인 특이 에러가 있으면 보강 -->_
+_에러 응답이 정의되어 있지 않습니다. 인증·요청 파라미터 없이 팝업 닫기 스크립트(HTML 200)만 반환하므로 도메인 특이 에러가 발생하지 않습니다._
 
 <!-- @generated:end -->
 
@@ -626,15 +785,25 @@ Accept: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-302 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON `data` 를 반환하지 않습니다. 브라우저 리다이렉트(302)로만 응답합니다._
+
+| 리다이렉트 대상 | 조건 |
+| --- | --- |
+| `/mypage/orders/{orderNumber}` | `P_ESCROW_TID` 로 KG 이니시스 에스크로 결제행을 찾아 구매결정 결과(`P_STATUS` `00` = 구매확정, 그 외 = 구매거절)를 결제 메타 `escrow_confirm` 에 기록한 경우 |
+| `/mypage/orders` | 거래번호가 비었거나 매칭되는 에스크로 결제가 없어 아무것도 기록하지 않은 경우 |
+
+_KG 이니시스가 POST 로 보내는 필드(라우트 FormRequest 로 선언되지 않아 요청 파라미터 표에는 나타나지 않음): `P_STATUS`(구매결정 결과 코드), `P_ESCROW_TID`(에스크로 거래번호), `P_CL_STATUS`(결제 상태 구분), `P_RMESG1`(결과 메시지)._
 
 **응답 예시**
 
-<!-- 실측 제외: http-302 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/mypage/orders/ORD20260714001
+```
 
 **에러 응답**
 
-_대표 에러 없음 (공개 조회). <!-- TODO: 도메인 특이 에러가 있으면 보강 -->_
+_에러 응답이 정의되어 있지 않습니다. 거래번호가 비었거나 매칭되는 에스크로 결제가 없어도 예외를 던지지 않고 주문 목록(`/mypage/orders`)으로 리다이렉트합니다._
 
 <!-- @generated:end -->
 
@@ -665,15 +834,22 @@ Accept: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-200 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON 을 반환하지 않습니다 (`data` 없음). 응답은 `Content-Type: text/html; charset=UTF-8` 의 HTML(HTTP 200)이며, 부모 창을 새로고침하고 팝업을 닫는 스크립트뿐입니다. 구매결정 결과(`ResultCode` `00` = 구매확정, 그 외 = 구매거절)와 확정·거절 일시, 거절 사유는 `tid` 로 찾은 에스크로 결제행의 결제 메타 `escrow_confirm` 에 기록됩니다._
+
+_KG 이니시스가 POST 로 보내는 필드(라우트 FormRequest 로 선언되지 않아 요청 파라미터 표에는 나타나지 않음): `ResultCode`(구매결정 결과 코드), `tid`(에스크로 거래번호), `CNF_Date`/`CNF_Time`(구매확정 일시), `DNY_Date`/`DNY_Time`(구매거절 일시), `DNY_DenyMsg`(구매거절 사유)._
 
 **응답 예시**
 
-<!-- 실측 제외: http-200 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=UTF-8
+
+<script>try{window.opener&&window.opener.location.reload();}catch(e){}window.close();</script>
+```
 
 **에러 응답**
 
-_대표 에러 없음 (공개 조회). <!-- TODO: 도메인 특이 에러가 있으면 보강 -->_
+_에러 응답이 정의되어 있지 않습니다. 거래번호가 비었거나 매칭되는 에스크로 결제가 없어도 기록만 생략하고 동일한 HTML(200)을 반환합니다._
 
 <!-- @generated:end -->
 
@@ -694,7 +870,7 @@ PC 에스크로 구매결정 결과를 KG 이니시스 팝업으로부터 수신
 
 | 이름 | 위치 | 타입 | 필수 | 허용값 | 용도 |
 | --- | --- | --- | --- | --- | --- |
-| orderNumber | path | string | 예 | — | 대상 order number의 식별자 |
+| orderNumber | path | string | 예 | — | 구매결정할 주문의 주문번호. 로그인 사용자 본인의 KG 이니시스 에스크로 결제(`is_escrow=true`, `transaction_id` 존재)를 찾는 키로 사용된다. |
 
 **요청 예시**
 
@@ -706,17 +882,50 @@ Accept: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: unresolved-path-param — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON 을 반환하지 않습니다 (`data` 없음). 응답은 `Content-Type: text/html; charset=UTF-8` 의 HTML 페이지(HTTP 200)이며, KG 이니시스 구매결정 창으로 자동 전송되는 폼을 담고 있습니다. 접속 기기의 User-Agent 로 PC/모바일을 판별해 다음과 같이 분기합니다._
+
+| 분기 | 반환 HTML | 폼 전송 대상 | 주요 hidden 필드 |
+| --- | --- | --- | --- |
+| PC | `INIStdPay_escrow_conf.js` 로드 후 `INIStdPay.pay('escrow_confirm_form')` 자동 실행 | KG 이니시스 PC 구매결정 팝업 (테스트: `stgstdpay.inicis.com`, 운영: `stdpay.inicis.com`) | `mid`, `tid`, `timestamp`, `mKey`, `currency=WON`, `returnUrl`(pc/return), `closeUrl`(escrow-confirm/close) |
+| 모바일 | 폼 자동 submit 스크립트 | `https://mobile.inicis.com/smart/payment/` (accept-charset: euc-kr) | `P_INI_PAYMENT=ESCROWCONFIRM`, `P_MID`, `P_ESCROW_TID`, `P_NEXT_URL`(mobile/return) |
 
 **응답 예시**
 
-<!-- 실측 제외: unresolved-path-param — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=UTF-8
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>에스크로 구매결정</title>
+    <script src="https://stgstdpay.inicis.com/stdjs/INIStdPay_escrow_conf.js" charset="UTF-8"></script>
+    <script>window.onload = function() { INIStdPay.pay('escrow_confirm_form'); };</script>
+</head>
+<body>
+    <p>에스크로 구매결정 창을 준비 중입니다...</p>
+    <form id="escrow_confirm_form" method="post">
+        <input type="hidden" name="version" value="1.0">
+        <input type="hidden" name="mid" value="INIpayTest">
+        <input type="hidden" name="tid" value="StdpayCARDINIpayTest20260714…">
+        <input type="hidden" name="timestamp" value="1768348800000">
+        <input type="hidden" name="mKey" value="e3b0c44298fc1c14…">
+        <input type="hidden" name="currency" value="WON">
+        <input type="hidden" name="returnUrl" value="https://example.com/plugins/sirsoft-pay_kginicis/payment/escrow-confirm/pc/return">
+        <input type="hidden" name="closeUrl" value="https://example.com/plugins/sirsoft-pay_kginicis/payment/escrow-confirm/close">
+        <input type="hidden" name="acceptmethod" value="">
+    </form>
+</body>
+</html>
+```
 
 **에러 응답**
 
 | 상태코드 | 의미 | 발생 조건 |
 | --- | --- | --- |
-| 404 | Not Found | path 파라미터에 해당하는 리소스가 없는 경우 |
+| 401 | Unauthorized | 비로그인 상태로 접근한 경우 (라우트에 `auth` 미들웨어 적용 — 요약의 "공개" 표기는 자동 생성 오차) |
+| 404 | Not Found | `orderNumber` 에 해당하는 주문이 접속 사용자 본인 소유가 아니거나, 해당 주문에 거래번호가 있는 KG 이니시스 에스크로 결제(`pg_provider=kginicis`, `is_escrow=true`)가 없는 경우 |
 
 <!-- @generated:end -->
 
@@ -728,7 +937,7 @@ Accept: application/json
 
 
 ### GET /plugins/sirsoft-pay_kginicis/payment/mobile/callback
-<!-- @generated:start:web.plugins.sirsoft-pay_kginicis.payment.mobile.callback -->
+<!-- @generated:start:web.plugins.sirsoft-pay_kginicis.payment.mobile.callback::get -->
 - **라우트명**: `web.plugins.sirsoft-pay_kginicis.payment.mobile.callback`
 - **컨트롤러**: `Plugins\Sirsoft\PayKginicis\Controllers\MobileCallbackController@handle`
 - **인증/권한**: 공개 (인증 불필요)
@@ -755,11 +964,27 @@ Accept: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-422 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON `data` 를 반환하지 않습니다. 브라우저 리다이렉트(302)로만 응답하며, 결과는 리다이렉트 URL 과 그 쿼리스트링으로 전달됩니다._
+
+| 리다이렉트 대상 | 조건 | 쿼리 파라미터 |
+| --- | --- | --- |
+| 성공 URL (`redirect_success_url`, 기본 `/shop/orders/{orderId}/complete`) | 서버 승인 성공(결제완료 또는 가상계좌 발급), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
+| 실패 URL (`redirect_fail_url`, 기본 `/shop/checkout`) | 인증 실패·검증 실패·승인 실패 | `error` (`order_id_missing` \| `missing_fields` \| `req_url_invalid` \| `order_not_found` \| `amount_mismatch` 등), `message` (`P_RMESG1` 결과 메시지), `orderId` |
+| 실패 URL (쿼리 없음) | 사용자가 결제창을 닫은 취소(`P_RMESG1` 에 '사용자가 결제를 취소' 등 취소 문구 포함) | 없음 (조용한 복귀) |
 
 **응답 예시**
 
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/shop/orders/ORD20260714001/complete
+```
+
+실패 시:
+
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/shop/checkout?error=req_url_invalid&orderId=ORD20260714001
+```
 
 **에러 응답**
 
@@ -779,7 +1004,7 @@ Accept: application/json
 
 
 ### POST /plugins/sirsoft-pay_kginicis/payment/mobile/callback
-<!-- @generated:start:web.plugins.sirsoft-pay_kginicis.payment.mobile.callback -->
+<!-- @generated:start:web.plugins.sirsoft-pay_kginicis.payment.mobile.callback::post -->
 - **라우트명**: `web.plugins.sirsoft-pay_kginicis.payment.mobile.callback`
 - **컨트롤러**: `Plugins\Sirsoft\PayKginicis\Controllers\MobileCallbackController@handle`
 - **인증/권한**: 공개 (인증 불필요)
@@ -788,12 +1013,12 @@ Accept: application/json
 
 | 이름 | 위치 | 타입 | 필수 | 허용값 | 용도 |
 | --- | --- | --- | --- | --- | --- |
-| P_STATUS | body | string | 예 | — | <!-- TODO: 용도 --> |
-| P_RMESG1 | body | string | 아니오 | — | <!-- TODO: 용도 --> |
-| P_TID | body | string | 아니오 | — | <!-- TODO: 용도 --> |
-| P_REQ_URL | body | string | 아니오 | — | <!-- TODO: 용도 --> |
-| P_AMT | body | string | 아니오 | — | <!-- TODO: 용도 --> |
-| P_OID | body | string | 아니오 | — | <!-- TODO: 용도 --> |
+| P_STATUS | body | string | 예 | — | 모바일 결제 인증 결과 코드 (`00` = 성공). 그 외 값은 실패이며 `P_RMESG1` 문구로 사용자 취소 여부를 분기한다. |
+| P_RMESG1 | body | string | 아니오 | — | 모바일 결제 인증 결과 메시지. '사용자가 결제를 취소' 등 취소 문구 포함 시 오류 없이 체크아웃으로 복귀한다. |
+| P_TID | body | string | 아니오 | — | KG 이니시스 거래번호. 서버 승인 요청(`P_REQ_URL`)에 MID 와 함께 전송된다. |
+| P_REQ_URL | body | string | 아니오 | — | 서버 승인 API 요청 URL. `idc_name` 과 함께 화이트리스트 검증(SSRF 방어)을 통과해야 호출된다. |
+| P_AMT | body | string | 아니오 | — | 결제 금액. 서버 승인 응답의 `P_AMT` 가 없을 때 결제 완료 금액의 폴백으로 사용된다. |
+| P_OID | body | string | 아니오 | — | 주문번호. 없으면 콜백 URL 쿼리스트링의 `orderId` 를 폴백으로 사용한다. |
 | idc_name | body | string | 아니오 | — | KG 이니시스 IDC 센터 코드(fc/ks/stg). 승인/망취소 URL 화이트리스트 검증의 기준값. |
 
 **요청 예시**
@@ -817,11 +1042,27 @@ Content-Type: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-302 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON `data` 를 반환하지 않습니다. 브라우저 리다이렉트(302)로만 응답하며, 결과는 리다이렉트 URL 과 그 쿼리스트링으로 전달됩니다 (GET 경로와 동일)._
+
+| 리다이렉트 대상 | 조건 | 쿼리 파라미터 |
+| --- | --- | --- |
+| 성공 URL (`redirect_success_url`, 기본 `/shop/orders/{orderId}/complete`) | 서버 승인 성공(결제완료 또는 가상계좌 발급), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
+| 실패 URL (`redirect_fail_url`, 기본 `/shop/checkout`) | 인증 실패·검증 실패·승인 실패 | `error` (`order_id_missing` \| `missing_fields` \| `req_url_invalid` \| `order_not_found` \| `amount_mismatch` 등), `message` (`P_RMESG1` 결과 메시지), `orderId` |
+| 실패 URL (쿼리 없음) | 사용자가 결제창을 닫은 취소(`P_RMESG1` 에 취소 문구 포함) | 없음 (조용한 복귀) |
 
 **응답 예시**
 
-<!-- 실측 제외: http-302 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/shop/orders/ORD20260714001/complete
+```
+
+실패 시:
+
+```http
+HTTP/1.1 302 Found
+Location: https://example.com/shop/checkout?error=amount_mismatch&orderId=ORD20260714001
+```
 
 **에러 응답**
 
@@ -903,16 +1144,29 @@ Content-Type: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-422 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON 을 반환하지 않습니다 (`data` 없음). 응답은 `Content-Type: text/plain` 의 평문 본문 한 줄이며, HTTP 상태코드는 항상 200 입니다._
+
+| 본문 | 의미 | 발생 조건 |
+| --- | --- | --- |
+| `OK` | 통보 수신 확인 | 검증 통과 후 입금 처리 완료, 또는 처리 불필요(`P_STATUS` 가 `02` 가 아니거나 `P_TYPE` 이 `VBANK` 가 아닌 통보 / 이미 결제완료된 중복 통보)로 무시 |
+| `FAIL` | 통보 거부 | 주문 미존재, 거래번호(TID)·MID·가상계좌번호 불일치, 금액이 결제 통화 기준 청구액과 불일치, 결제가 가상계좌·입금대기 상태가 아님, 처리 중 예외 발생 |
+
+`FAIL` 을 반환하면 KG 이니시스가 동일 통보를 재시도합니다.
 
 **응답 예시**
 
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 200 OK
+Content-Type: text/plain
+
+OK
+```
 
 **에러 응답**
 
 | 상태코드 | 의미 | 발생 조건 |
 | --- | --- | --- |
+| 403 | Forbidden | KG 이니시스 공식 발송 IP 화이트리스트에 없는 IP 에서 요청한 경우 (로컬·테스트 환경 제외) |
 | 422 | Unprocessable Entity | 요청 파라미터가 검증 규칙을 위반한 경우 (`error.errors` 에 필드별 메시지) |
 
 <!-- @generated:end -->
@@ -1007,16 +1261,29 @@ Content-Type: application/json
 
 **응답 필드** (`data` 내부)
 
-<!-- 실측 제외: http-422 — 응답 필드는 사람이 작성하세요. -->
+_이 엔드포인트는 JSON 을 반환하지 않습니다 (`data` 없음). 응답은 `Content-Type: text/plain` 의 평문 본문 한 줄이며, HTTP 상태코드는 항상 200 입니다._
+
+| 본문 | 의미 | 발생 조건 |
+| --- | --- | --- |
+| `OK` | 통보 수신 확인 | 검증 통과 후 입금 처리 완료, 또는 이미 결제완료된 거래번호의 중복 통보로 무시 |
+| `FAIL` | 통보 거부 | 주문(`no_oid`) 미존재, 거래번호(`no_tid`)·MID(`id_merchant`)·가상계좌번호(`no_vacct`) 불일치, 입금 금액(`amt_input`)이 결제 통화 기준 청구액과 불일치, 결제가 가상계좌·입금대기 상태가 아님, 처리 중 예외 발생 |
+
+`FAIL` 을 반환하면 KG 이니시스가 동일 통보를 최대 10회까지 재시도합니다.
 
 **응답 예시**
 
-<!-- 실측 제외: http-422 — 응답 예시는 사람이 작성하세요. -->
+```http
+HTTP/1.1 200 OK
+Content-Type: text/plain
+
+OK
+```
 
 **에러 응답**
 
 | 상태코드 | 의미 | 발생 조건 |
 | --- | --- | --- |
+| 403 | Forbidden | KG 이니시스 공식 발송 IP 화이트리스트에 없는 IP 에서 요청한 경우 (로컬·테스트 환경 제외) |
 | 422 | Unprocessable Entity | 요청 파라미터가 검증 규칙을 위반한 경우 (`error.errors` 에 필드별 메시지) |
 
 <!-- @generated:end -->

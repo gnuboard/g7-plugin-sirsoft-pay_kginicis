@@ -136,7 +136,7 @@ HTTP/1.1 200
 ```json
 {
     "success": true,
-    "message": "messages.success",
+    "message": "성공적으로 처리되었습니다.",
     "data": {
         "product_id": 4,
         "product_code": "CBT-TEST-20260708063238",
