@@ -20,7 +20,7 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
             'japan_enabled' => true,
         ]);
 
-        $listener = new RegisterEasyPayMethodsListener();
+        $listener = new RegisterEasyPayMethodsListener;
 
         $methods = $listener->injectEasyPayMethods([
             ['id' => 'card'],
@@ -43,7 +43,7 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
         ], array_column($methods, 'id'));
     }
 
-    public function test_easy_pay_methods_do_not_require_pg_provider_in_saved_defaults(): void
+    public function test_easy_pay_methods_are_locked_to_own_pg_provider(): void
     {
         $this->mockSettings([
             'easy_pay_samsung_pay' => false,
@@ -53,7 +53,7 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
             'japan_enabled' => true,
         ]);
 
-        $listener = new RegisterEasyPayMethodsListener();
+        $listener = new RegisterEasyPayMethodsListener;
 
         $methods = $listener->injectEasyPayMethods([
             ['id' => 'phone'],
@@ -67,10 +67,23 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
 
         $this->assertCount(6, $easyPayMethods);
 
+        // 간편결제는 KG 이니시스 결제창을 통해서만 처리되므로 PG 를 자기 자신으로 고정 선언한다.
+        //
+        // 과거에는 pg_provider 를 null 로 두었고(= "PG 없는 결제수단"), 그 결과 서버가
+        // 간편결제 주문을 PG 결제가 아닌 주문으로 오인해 (a) 결제 실패했는데 관리자에게
+        // 신규주문 알림이 발송되고 (b) 임시주문이 즉시 삭제되어 재결제가 불가능해졌다(#475).
         foreach ($easyPayMethods as $method) {
             $this->assertArrayHasKey('defaults', $method);
-            $this->assertNull($method['defaults']['pg_provider'] ?? null);
+
+            // PG 고정 — null 이면 코어가 PG 없는 주문으로 오인한다.
+            $this->assertSame('kginicis', $method['defaults']['pg_provider'] ?? null);
+            $this->assertTrue($method['defaults']['pg_locked'] ?? false);
+            $this->assertTrue($method['defaults']['needs_pg'] ?? false);
+            $this->assertSame('pg', $method['defaults']['refund_method'] ?? null);
+
             $this->assertFalse($method['defaults']['is_active'] ?? true);
+            $this->assertSame('payment_complete', $method['defaults']['stock_deduction_timing'] ?? null);
+            $this->assertSame('payment_complete', $method['defaults']['mileage_deduction_timing'] ?? null);
         }
     }
 
@@ -83,7 +96,7 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
 
         // 테스트처럼 플러그인 설정이 아직 주입되지 않은 fallback 환경에서는
         // 기존 긴 설명을 유지한다. 브랜드 버튼 설정이 켜진 경우는 아래 테스트에서 별도 검증.
-        $listener = new RegisterEasyPayMethodsListener();
+        $listener = new RegisterEasyPayMethodsListener;
 
         $methods = $listener->injectEasyPayMethods([
             ['id' => 'phone'],
@@ -103,7 +116,7 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
             'easy_pay_show_brand_button' => true,
         ]);
 
-        $listener = new RegisterEasyPayMethodsListener();
+        $listener = new RegisterEasyPayMethodsListener;
 
         $methods = $listener->injectEasyPayMethods([
             ['id' => 'phone'],
@@ -128,7 +141,7 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
             'japan_enabled' => false,
         ]);
 
-        $listener = new RegisterEasyPayMethodsListener();
+        $listener = new RegisterEasyPayMethodsListener;
 
         $methods = $listener->injectEasyPayMethods([
             ['id' => 'phone'],
@@ -161,7 +174,7 @@ class RegisterEasyPayMethodsListenerTest extends PluginTestCase
             'japan_enabled' => false,
         ]);
 
-        $listener = new RegisterEasyPayMethodsListener();
+        $listener = new RegisterEasyPayMethodsListener;
 
         $methods = collect($listener->injectEasyPayMethods([
             ['id' => 'phone'],
