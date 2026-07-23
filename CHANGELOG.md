@@ -4,6 +4,12 @@
 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)를 따르며,
 [Semantic Versioning](https://semver.org/lang/ko/)을 준수합니다.
 
+## [1.0.2] - 2026-07-22
+
+### Fixed
+
+- 해외결제(CBT) 연결 진단을 실행했을 때 결과 안내가 실제 문장 대신 내부 식별자로 표시되던 문제를 수정했습니다.
+
 ## [1.0.1] - 2026-07-16
 
 ### Fixed
