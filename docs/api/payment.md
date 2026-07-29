@@ -212,7 +212,7 @@ Content-Type: application/json
 | 이름 | 위치 | 타입 | 필수 | 허용값 | 용도 |
 | --- | --- | --- | --- | --- | --- |
 | oid | body | string | 예 | max 40 | 결제 대상 주문의 주문번호. 서버가 주문을 조회해 결제 가능 상태·통화·금액을 검증하고 이 값을 서명 생성 입력으로 사용한다. |
-| price | body | integer | 예 | min 100 | PC 표준결제창 결제 금액(최소 100원). 저장된 주문 청구액과 일치하는지 검증한 뒤 signature 생성에 반영한다. |
+| price | body | integer | 예 | min 1 | PC 표준결제창 결제 금액. 저장된 주문 청구액과 일치하는지 검증한 뒤 signature 생성에 반영한다. 하한은 모바일 요청과 동일하며(`PaymentLimits::MIN_PRICE`), 실제 청구 가능 최소 금액은 PG 계약에 따른다. |
 | timestamp | body | string | 예 | max 20 | 결제창이 생성한 요청 타임스탬프. 재생 공격 방지를 위해 신선도(만료 여부)를 확인하고 서명 계산에 함께 사용한다. |
 | buyer_email | body | string | 아니오 | max 255 | 구매자 이메일. 제공 시 주문의 구매자 정보와 대조해 본인 결제 요청인지 확인하는 데 사용된다. |
 | buyer_phone | body | string | 아니오 | max 30 | 구매자 전화번호. 제공 시 주문의 구매자 정보와 대조해 본인 결제 요청인지 확인하는 데 사용된다. |
