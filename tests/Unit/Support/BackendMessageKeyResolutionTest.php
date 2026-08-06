@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Plugins\Sirsoft\PayKginicis\Tests\Unit\Support;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Plugins\Sirsoft\PayKginicis\Tests\PluginTestCase;
 
 /**
@@ -66,9 +67,8 @@ class BackendMessageKeyResolutionTest extends PluginTestCase
 
     /**
      * 백엔드가 내보내는 모든 메시지 키가 각 로케일에서 해석되어야 합니다.
-     *
-     * @dataProvider localeProvider
      */
+    #[DataProvider('localeProvider')]
     public function test_every_emitted_message_key_resolves(string $locale): void
     {
         $emitted = $this->emittedMessageKeys();
