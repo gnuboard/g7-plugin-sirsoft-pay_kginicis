@@ -392,8 +392,8 @@ _이 엔드포인트는 JSON `data` 를 반환하지 않습니다. 브라우저 
 
 | 리다이렉트 대상 | 조건 | 쿼리 파라미터 |
 | --- | --- | --- |
-| 성공 URL (`redirect_success_url`, 기본 `/shop/orders/{orderId}/complete`) | 서버 승인 성공(결제완료 또는 가상계좌 발급), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
-| 실패 URL (`redirect_fail_url`, 기본 `/shop/checkout`) | 인증 실패·검증 실패·승인 실패 | `error` (`invalid_params` \| `missing_fields` \| `auth_url_invalid` \| `order_not_found` \| `amount_mismatch` 등), `message` (PG 결과 메시지), `orderId` |
+| 성공 URL (`redirect_success_url`, 기본 `{shopBase}/orders/{orderId}/complete`) | 서버 승인 성공(결제완료 또는 가상계좌 발급), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
+| 실패 URL (`redirect_fail_url`, 기본 `{shopBase}/checkout`) | 인증 실패·검증 실패·승인 실패 | `error` (`invalid_params` \| `missing_fields` \| `auth_url_invalid` \| `order_not_found` \| `amount_mismatch` 등), `message` (PG 결과 메시지), `orderId` |
 | 실패 URL (쿼리 없음) | 사용자가 결제창을 닫은 취소(`2001` / `0021` / `0022` / 빈값, 또는 결과 메시지에 '취소'·'사용자' 포함) | 없음 (조용한 복귀) |
 
 **응답 예시**
@@ -461,8 +461,8 @@ _이 엔드포인트는 JSON `data` 를 반환하지 않습니다. 브라우저 
 
 | 리다이렉트 대상 | 조건 | 쿼리 파라미터 |
 | --- | --- | --- |
-| 성공 URL (`redirect_success_url`, 기본 `/shop/orders/{orderId}/complete`) | CBT 서버 승인 성공(결제완료 또는 편의점 입금대기 등록), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
-| 실패 URL (`redirect_fail_url`, 기본 `/shop/checkout`) | 인증 실패·MID 불일치·검증 실패·승인 실패 | `error` (`invalid_params` \| `mid_mismatch` \| `order_not_found` \| `cbt_failed` 등), `message` (PG 결과 메시지), `orderId` |
+| 성공 URL (`redirect_success_url`, 기본 `{shopBase}/orders/{orderId}/complete`) | CBT 서버 승인 성공(결제완료 또는 편의점 입금대기 등록), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
+| 실패 URL (`redirect_fail_url`, 기본 `{shopBase}/checkout`) | 인증 실패·MID 불일치·검증 실패·승인 실패 | `error` (`invalid_params` \| `mid_mismatch` \| `order_not_found` \| `cbt_failed` 등), `message` (PG 결과 메시지), `orderId` |
 | 실패 URL (쿼리 없음) | 사용자 취소(취소 코드 또는 일본어·한국어 취소 문구) | 없음 (조용한 복귀) |
 
 **응답 예시**
@@ -543,8 +543,8 @@ _이 엔드포인트는 JSON `data` 를 반환하지 않습니다. 브라우저 
 
 | 리다이렉트 대상 | 조건 | 쿼리 파라미터 |
 | --- | --- | --- |
-| 성공 URL (`redirect_success_url`, 기본 `/shop/orders/{orderId}/complete`) | CBT 서버 승인 성공(결제완료 또는 편의점 입금대기 등록), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
-| 실패 URL (`redirect_fail_url`, 기본 `/shop/checkout`) | 인증 실패·MID 불일치·검증 실패·승인 실패 | `error` (`invalid_params` \| `mid_mismatch` \| `order_not_found` \| `cbt_failed` 등), `message` (PG 결과 메시지), `orderId` |
+| 성공 URL (`redirect_success_url`, 기본 `{shopBase}/orders/{orderId}/complete`) | CBT 서버 승인 성공(결제완료 또는 편의점 입금대기 등록), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
+| 실패 URL (`redirect_fail_url`, 기본 `{shopBase}/checkout`) | 인증 실패·MID 불일치·검증 실패·승인 실패 | `error` (`invalid_params` \| `mid_mismatch` \| `order_not_found` \| `cbt_failed` 등), `message` (PG 결과 메시지), `orderId` |
 | 실패 URL (쿼리 없음) | 사용자 취소(취소 코드 또는 일본어·한국어 취소 문구) | 없음 (조용한 복귀) |
 
 **응답 예시**
@@ -968,8 +968,8 @@ _이 엔드포인트는 JSON `data` 를 반환하지 않습니다. 브라우저 
 
 | 리다이렉트 대상 | 조건 | 쿼리 파라미터 |
 | --- | --- | --- |
-| 성공 URL (`redirect_success_url`, 기본 `/shop/orders/{orderId}/complete`) | 서버 승인 성공(결제완료 또는 가상계좌 발급), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
-| 실패 URL (`redirect_fail_url`, 기본 `/shop/checkout`) | 인증 실패·검증 실패·승인 실패 | `error` (`order_id_missing` \| `missing_fields` \| `req_url_invalid` \| `order_not_found` \| `amount_mismatch` 등), `message` (`P_RMESG1` 결과 메시지), `orderId` |
+| 성공 URL (`redirect_success_url`, 기본 `{shopBase}/orders/{orderId}/complete`) | 서버 승인 성공(결제완료 또는 가상계좌 발급), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
+| 실패 URL (`redirect_fail_url`, 기본 `{shopBase}/checkout`) | 인증 실패·검증 실패·승인 실패 | `error` (`order_id_missing` \| `missing_fields` \| `req_url_invalid` \| `order_not_found` \| `amount_mismatch` 등), `message` (`P_RMESG1` 결과 메시지), `orderId` |
 | 실패 URL (쿼리 없음) | 사용자가 결제창을 닫은 취소(`P_RMESG1` 에 '사용자가 결제를 취소' 등 취소 문구 포함) | 없음 (조용한 복귀) |
 
 **응답 예시**
@@ -1046,8 +1046,8 @@ _이 엔드포인트는 JSON `data` 를 반환하지 않습니다. 브라우저 
 
 | 리다이렉트 대상 | 조건 | 쿼리 파라미터 |
 | --- | --- | --- |
-| 성공 URL (`redirect_success_url`, 기본 `/shop/orders/{orderId}/complete`) | 서버 승인 성공(결제완료 또는 가상계좌 발급), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
-| 실패 URL (`redirect_fail_url`, 기본 `/shop/checkout`) | 인증 실패·검증 실패·승인 실패 | `error` (`order_id_missing` \| `missing_fields` \| `req_url_invalid` \| `order_not_found` \| `amount_mismatch` 등), `message` (`P_RMESG1` 결과 메시지), `orderId` |
+| 성공 URL (`redirect_success_url`, 기본 `{shopBase}/orders/{orderId}/complete`) | 서버 승인 성공(결제완료 또는 가상계좌 발급), 이미 결제완료된 거래(재전송) | 없음 (주문번호는 경로에 치환) |
+| 실패 URL (`redirect_fail_url`, 기본 `{shopBase}/checkout`) | 인증 실패·검증 실패·승인 실패 | `error` (`order_id_missing` \| `missing_fields` \| `req_url_invalid` \| `order_not_found` \| `amount_mismatch` 등), `message` (`P_RMESG1` 결과 메시지), `orderId` |
 | 실패 URL (쿼리 없음) | 사용자가 결제창을 닫은 취소(`P_RMESG1` 에 취소 문구 포함) | 없음 (조용한 복귀) |
 
 **응답 예시**
