@@ -125,7 +125,7 @@ _단건 응답: `data` 객체의 필드._
 | product_id | integer | `114` | product 식별자 (연관 리소스 참조) |
 | product_code | string | `CBT-TEST-20260712085816` | 생성된 테스트 상품의 상품코드. `CBT-TEST-` 접두사에 생성 시각(YmdHis)을 붙여 자동 부여되며, SKU는 여기에 `KGINICIS-` 접두사를 더해 만들어진다. |
 | admin_url | string | `/admin/ecommerce/products/114/edit` | admin URL |
-| shop_url | string | `/shop/products/114?locale=ja` | shop URL |
+| shop_url | string | `/shop/products/114?locale=ja` | 생성된 테스트 상품의 상점 화면 주소. 앞부분은 상점 주소 설정을 따른다 — 기본은 `/shop`, 이커머스 모듈 설정 `basic_info.route_path` 를 바꾸면 그 값(`/store/...`), `basic_info.no_route` 를 켜면 세그먼트 없이 루트에 붙는다(`/products/114?locale=ja`). 예시는 기본 설정 기준. |
 
 **응답 예시**
 
