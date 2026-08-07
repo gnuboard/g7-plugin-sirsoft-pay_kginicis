@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Base\AdminBaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Modules\Sirsoft\Ecommerce\Services\ProductService;
+use Modules\Sirsoft\Ecommerce\Support\ShopPathResolver;
 
 /**
  * KG 이니시스 CBT (일본 결제) 테스트용 상품 자동 생성 컨트롤러
@@ -80,7 +81,8 @@ class AdminCbtTestProductController extends AdminBaseController
                 'product_id' => $product->id,
                 'product_code' => $product->product_code,
                 'admin_url' => '/admin/ecommerce/products/'.$product->id.'/edit',
-                'shop_url' => '/shop/products/'.$product->id.'?locale=ja',
+                // 상점 주소는 운영자 설정이라 리터럴로 두면 주소를 바꾼 상점에서 없는 페이지를 가리킨다.
+                'shop_url' => ShopPathResolver::path('products/'.$product->id).'?locale=ja',
             ]);
         } catch (\Throwable $e) {
             Log::error('KG Inicis CBT: test product creation failed', [
