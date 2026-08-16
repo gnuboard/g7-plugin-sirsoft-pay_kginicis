@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Plugins\Sirsoft\PayKginicis\Controllers;
 
+// audit:allow api-doc-coverage 요청 파라미터·응답 구조 무변경 — 테이블명 리터럴을 모델 파생으로 정리한 내부 리팩토링 (#571)
+
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Api\Base\AdminBaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Modules\Sirsoft\Ecommerce\Models\Order;
+use Modules\Sirsoft\Ecommerce\Models\OrderPayment;
 
 class AdminOrderListController extends AdminBaseController
 {
@@ -31,8 +35,11 @@ class AdminOrderListController extends AdminBaseController
      */
     public function testModeMap(): JsonResponse
     {
-        $rows = DB::table('ecommerce_orders as o')
-            ->join('ecommerce_order_payments as p', 'p.order_id', '=', 'o.id')
+        $orders = (new Order)->getTable();
+        $payments = (new OrderPayment)->getTable();
+
+        $rows = DB::table($orders.' as o')
+            ->join($payments.' as p', 'p.order_id', '=', 'o.id')
             ->where('p.pg_provider', 'kginicis')
             ->where('p.created_at', '>=', now()->subMonths(6))
             ->select(['o.order_number', 'p.transaction_id', 'p.payment_meta'])
