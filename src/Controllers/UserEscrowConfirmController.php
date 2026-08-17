@@ -66,7 +66,7 @@ class UserEscrowConfirmController extends Controller
      * @param  Request  $request
      * @return Response
      */
-    // audit:allow controller-base-request-injection reason: PG(이니시스)가 POST 하는 콜백 표면 — 필드 구성이 PG 소유라 계약을 닫을 수 없고, 값은 문자열 캐스팅 후 대조에만 사용
+    // audit:allow controller-base-request-injection reason: PG(이니시스)가 POST 하는 콜백 표면 — 필드 구성이 PG 소유라 계약을 닫을 수 없다. 값은 문자열 캐스팅 후 tid 대조를 거쳐 payment_meta 에 영속된다(서명 검증 없는 무인증 콜백이라 기록 위조 여지가 있는 사전 상태 — 표시용 메타이며 금액·상태 전이에는 미사용)
     public function pcReturn(Request $request): Response
     {
         $resultCode = (string) $request->input('ResultCode', '');
@@ -109,7 +109,7 @@ class UserEscrowConfirmController extends Controller
      * @param  Request  $request
      * @return RedirectResponse
      */
-    // audit:allow controller-base-request-injection reason: PG(이니시스 모바일)가 POST 하는 콜백 표면 — 필드 구성이 PG 소유라 계약을 닫을 수 없고, 값은 문자열 캐스팅 후 대조에만 사용
+    // audit:allow controller-base-request-injection reason: PG(이니시스 모바일)가 POST 하는 콜백 표면 — 필드 구성이 PG 소유라 계약을 닫을 수 없다. 값은 문자열 캐스팅 후 tid 대조를 거쳐 payment_meta 에 영속된다(서명 검증 없는 무인증 콜백이라 기록 위조 여지가 있는 사전 상태 — 표시용 메타이며 금액·상태 전이에는 미사용)
     public function mobileReturn(Request $request): RedirectResponse
     {
         $status = (string) $request->input('P_STATUS', '');

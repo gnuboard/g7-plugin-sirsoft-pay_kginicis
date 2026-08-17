@@ -1,5 +1,7 @@
 <?php
 
+// audit:allow api-doc-coverage reason: docblock 서술 정정만 수행 — 검증 규칙/요청·응답 계약 무변경
+
 declare(strict_types=1);
 
 namespace Plugins\Sirsoft\PayKginicis\Http\Requests;
@@ -13,7 +15,9 @@ use Plugins\Sirsoft\PayKginicis\Support\PaymentLimits;
  * 국내 짝(SignatureRequest)과 동일 강도 + timestamp/checkout_token.
  *
  * 계약 변경: 종전에는 checkout_token 이 비어 있으면 토큰 검증 단계에서 403 이었으나,
- * 필수 검증으로 승격되어 422 가 된다. 클라이언트는 `.ok` 만 검사하므로 안전(실측).
+ * 필수 검증으로 승격되어 422 가 된다. CBT 클라이언트(requestPayment.ts)는
+ * `G7Core.api.post` 경유라 403/422 모두 실패 분기로 동일 취급되어 안전(실측 —
+ * raw fetch `.ok` 검사는 nicepayments signData 쪽 클라이언트의 방식).
  */
 class CbtHashDataRequest extends FormRequest
 {
