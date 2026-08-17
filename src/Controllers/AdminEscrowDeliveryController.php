@@ -9,13 +9,13 @@ namespace Plugins\Sirsoft\PayKginicis\Controllers;
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Api\Base\AdminBaseController;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Models\OrderAddress;
 use Modules\Sirsoft\Ecommerce\Models\OrderPayment;
 use Plugins\Sirsoft\PayKginicis\Concerns\SanitizesPgResponse;
+use Plugins\Sirsoft\PayKginicis\Http\Requests\EscrowDeliveryRegisterRequest;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
 /**
@@ -28,8 +28,8 @@ class AdminEscrowDeliveryController extends AdminBaseController
 {
     use SanitizesPgResponse;
 
-    /** 택배사 코드 → 택배사명 매핑 (KG 이니시스 공식 코드표) */
-    private const COURIER_CODES = [
+    /** 택배사 코드 → 택배사명 매핑 (KG 이니시스 공식 코드표 — EscrowDeliveryRegisterRequest 의 허용값 SSoT) */
+    public const COURIER_CODES = [
         'hanjin' => '한진택배',
         'cjgls' => 'CJ대한통운',
         'loge' => '롯데택배',
@@ -80,6 +80,7 @@ class AdminEscrowDeliveryController extends AdminBaseController
             return ResponseHelper::success('common.success', null);
         }
 
+        // audit:allow controller-direct-data-access reason: PG 플러그인의 결제 레코드 직접 조회/기록 — ecommerce Repository 의존 시 모듈 버전 제약 연쇄(PaymentLimits 선례). Service/Repository 이관은 후속 백로그
         $address = DB::table((new OrderAddress)->getTable().' as a')
             ->join((new Order)->getTable().' as o', 'o.id', '=', 'a.order_id')
             ->where('o.order_number', $orderNumber)
@@ -119,22 +120,17 @@ class AdminEscrowDeliveryController extends AdminBaseController
     /**
      * register
      *
-     * @param  Request  $request
-     * @param  string  $orderNumber
+     * 형식·길이·택배사 코드 검증은 EscrowDeliveryRegisterRequest 가 담당한다
+     * (종전 인라인 한글 하드코딩 메시지를 다국어 키로 이관).
+     *
+     * @param  EscrowDeliveryRegisterRequest  $request  배송 등록 폼
+     * @param  string  $orderNumber  주문번호
      * @return JsonResponse
      */
-    public function register(Request $request, string $orderNumber): JsonResponse
+    public function register(EscrowDeliveryRegisterRequest $request, string $orderNumber): JsonResponse
     {
-        $invoice = trim((string) $request->input('invoice', ''));
-        $exCode = trim((string) $request->input('ex_code', ''));
-
-        if ($invoice === '') {
-            return ResponseHelper::error('common.failed', 422, ['invoice' => ['운송장번호를 입력해주세요.']]);
-        }
-
-        if ($exCode === '' || ! array_key_exists($exCode, self::COURIER_CODES)) {
-            return ResponseHelper::error('common.failed', 422, ['ex_code' => ['택배사를 선택해주세요.']]);
-        }
+        $invoice = trim((string) $request->validated('invoice'));
+        $exCode = trim((string) $request->validated('ex_code'));
 
         $payment = $this->findEscrowPayment($orderNumber);
 
@@ -142,18 +138,19 @@ class AdminEscrowDeliveryController extends AdminBaseController
             return ResponseHelper::error('common.failed', 404, null);
         }
 
-        $report = in_array($request->input('report'), ['I', 'U'], true) ? $request->input('report') : 'I';
-        $charge = in_array($request->input('charge'), ['SH', 'BH'], true) ? $request->input('charge') : 'SH';
+        $report = $request->validated('report') ?? 'I';
+        $charge = $request->validated('charge') ?? 'SH';
         $price = (int) round((float) $payment->paid_amount_local);
         $exName = self::COURIER_CODES[$exCode];
 
         // 수신자 주소: 요청 우선, 없으면 DB 조회
-        $recvName = trim((string) $request->input('recv_name', ''));
-        $recvTel = trim((string) $request->input('recv_tel', ''));
-        $recvPost = trim((string) $request->input('recv_post', ''));
-        $recvAddr = trim((string) $request->input('recv_addr', ''));
+        $recvName = trim((string) ($request->validated('recv_name') ?? ''));
+        $recvTel = trim((string) ($request->validated('recv_tel') ?? ''));
+        $recvPost = trim((string) ($request->validated('recv_post') ?? ''));
+        $recvAddr = trim((string) ($request->validated('recv_addr') ?? ''));
 
         if ($recvName === '' || $recvTel === '' || $recvAddr === '') {
+            // audit:allow controller-direct-data-access reason: PG 플러그인의 결제 레코드 직접 조회/기록 — ecommerce Repository 의존 시 모듈 버전 제약 연쇄(PaymentLimits 선례). Service/Repository 이관은 후속 백로그
             $address = DB::table((new OrderAddress)->getTable().' as a')
                 ->join((new Order)->getTable().' as o', 'o.id', '=', 'a.order_id')
                 ->where('o.order_number', $orderNumber)
@@ -185,15 +182,15 @@ class AdminEscrowDeliveryController extends AdminBaseController
                 'price' => $price,
                 'report' => $report,
                 'invoice' => $invoice,
-                'registName' => trim((string) $request->input('regist_name', '')),
+                'registName' => trim((string) ($request->validated('regist_name') ?? '')),
                 'exCode' => $exCode,
                 'exName' => $exName,
                 'charge' => $charge,
                 'invoiceDay' => date('Y-m-d H:i:s'),
-                'sendName' => trim((string) $request->input('send_name', '')),
-                'sendTel' => trim((string) $request->input('send_tel', '')),
-                'sendPost' => trim((string) $request->input('send_post', '')),
-                'sendAddr1' => trim((string) $request->input('send_addr', '')),
+                'sendName' => trim((string) ($request->validated('send_name') ?? '')),
+                'sendTel' => trim((string) ($request->validated('send_tel') ?? '')),
+                'sendPost' => trim((string) ($request->validated('send_post') ?? '')),
+                'sendAddr1' => trim((string) ($request->validated('send_addr') ?? '')),
                 'recvName' => $recvName,
                 'recvTel' => $recvTel,
                 'recvPost' => $recvPost,
@@ -231,6 +228,7 @@ class AdminEscrowDeliveryController extends AdminBaseController
                 'pg_response' => $sanitizedPgResponse,
             ];
 
+            // audit:allow controller-direct-data-access reason: PG 플러그인의 결제 레코드 직접 조회/기록 — ecommerce Repository 의존 시 모듈 버전 제약 연쇄(PaymentLimits 선례). Service/Repository 이관은 후속 백로그
             DB::table((new OrderPayment)->getTable())
                 ->where('id', $payment->id)
                 ->update([
@@ -266,6 +264,7 @@ class AdminEscrowDeliveryController extends AdminBaseController
 
     private function findEscrowPayment(string $orderNumber): ?object
     {
+        // audit:allow controller-direct-data-access reason: PG 플러그인의 결제 레코드 직접 조회/기록 — ecommerce Repository 의존 시 모듈 버전 제약 연쇄(PaymentLimits 선례). Service/Repository 이관은 후속 백로그
         return DB::table((new OrderPayment)->getTable().' as p')
             ->join((new Order)->getTable().' as o', 'o.id', '=', 'p.order_id')
             ->where('o.order_number', $orderNumber)
