@@ -10,11 +10,11 @@ use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Api\Base\AdminBaseController;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Sirsoft\Ecommerce\Models\Order;
 use Modules\Sirsoft\Ecommerce\Models\OrderPayment;
+use Plugins\Sirsoft\PayKginicis\Http\Requests\TransactionQueryRequest;
 use Plugins\Sirsoft\PayKginicis\Services\KgInicisApiService;
 
 class AdminTransactionController extends AdminBaseController
@@ -28,18 +28,12 @@ class AdminTransactionController extends AdminBaseController
     /**
      * TID 직접 조회
      *
-     * @param  Request  $request
+     * @param  TransactionQueryRequest  $request  tid 입력 폼
      * @return JsonResponse
      */
-    public function query(Request $request): JsonResponse
+    public function query(TransactionQueryRequest $request): JsonResponse
     {
-        $tid = trim((string) $request->input('tid', ''));
-
-        if ($tid === '') {
-            return ResponseHelper::error('common.failed', 422, ['tid' => ['TID를 입력하세요.']]);
-        }
-
-        return $this->queryByTid($tid);
+        return $this->queryByTid(trim((string) $request->validated('tid')));
     }
 
     /**
@@ -53,6 +47,7 @@ class AdminTransactionController extends AdminBaseController
         $orders = (new Order)->getTable();
         $payments = (new OrderPayment)->getTable();
 
+        // audit:allow controller-direct-data-access reason: PG 플러그인의 결제 레코드 직접 조회/기록 — ecommerce Repository 의존 시 모듈 버전 제약 연쇄(PaymentLimits 선례). Service/Repository 이관은 후속 백로그
         $payment = DB::table($payments.' as p')
             ->join($orders.' as o', 'o.id', '=', 'p.order_id')
             ->where('o.order_number', $orderNumber)
@@ -75,6 +70,7 @@ class AdminTransactionController extends AdminBaseController
             $orders = (new Order)->getTable();
             $payments = (new OrderPayment)->getTable();
 
+            // audit:allow controller-direct-data-access reason: PG 플러그인의 결제 레코드 직접 조회/기록 — ecommerce Repository 의존 시 모듈 버전 제약 연쇄(PaymentLimits 선례). Service/Repository 이관은 후속 백로그
             $localPayment = DB::table($payments.' as p')
                 ->leftJoin($orders.' as o', 'o.id', '=', 'p.order_id')
                 ->where('p.transaction_id', $tid)

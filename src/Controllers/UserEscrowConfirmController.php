@@ -42,6 +42,7 @@ class UserEscrowConfirmController extends Controller
      * @param  string  $orderNumber
      * @return Response
      */
+    // audit:allow controller-base-request-injection reason: 본문 입력을 읽지 않음 — 에스크로 확인 HTML 화면 렌더 (검증 대상 필드 없음)
     public function show(Request $request, string $orderNumber): Response
     {
         $payment = $this->findEscrowPayment($orderNumber, (int) Auth::id());
@@ -65,6 +66,7 @@ class UserEscrowConfirmController extends Controller
      * @param  Request  $request
      * @return Response
      */
+    // audit:allow controller-base-request-injection reason: PG(이니시스)가 POST 하는 콜백 표면 — 필드 구성이 PG 소유라 계약을 닫을 수 없고, 값은 문자열 캐스팅 후 대조에만 사용
     public function pcReturn(Request $request): Response
     {
         $resultCode = (string) $request->input('ResultCode', '');
@@ -107,6 +109,7 @@ class UserEscrowConfirmController extends Controller
      * @param  Request  $request
      * @return RedirectResponse
      */
+    // audit:allow controller-base-request-injection reason: PG(이니시스 모바일)가 POST 하는 콜백 표면 — 필드 구성이 PG 소유라 계약을 닫을 수 없고, 값은 문자열 캐스팅 후 대조에만 사용
     public function mobileReturn(Request $request): RedirectResponse
     {
         $status = (string) $request->input('P_STATUS', '');
@@ -228,6 +231,7 @@ class UserEscrowConfirmController extends Controller
             return null;
         }
 
+        // audit:allow controller-direct-data-access reason: PG 플러그인의 결제 레코드 직접 조회/기록 — ecommerce Repository 의존 시 모듈 버전 제약 연쇄(PaymentLimits 선례). Service/Repository 이관은 후속 백로그
         $row = DB::table((new OrderPayment)->getTable().' as p')
             ->join((new Order)->getTable().' as o', 'o.id', '=', 'p.order_id')
             ->where('p.transaction_id', $tid)
@@ -248,6 +252,7 @@ class UserEscrowConfirmController extends Controller
             $data,
         );
 
+        // audit:allow controller-direct-data-access reason: PG 플러그인의 결제 레코드 직접 조회/기록 — ecommerce Repository 의존 시 모듈 버전 제약 연쇄(PaymentLimits 선례). Service/Repository 이관은 후속 백로그
         DB::table((new OrderPayment)->getTable())
             ->where('id', $row->id)
             ->update([
@@ -266,6 +271,7 @@ class UserEscrowConfirmController extends Controller
 
     private function findEscrowPayment(string $orderNumber, int $userId): ?object
     {
+        // audit:allow controller-direct-data-access reason: PG 플러그인의 결제 레코드 직접 조회/기록 — ecommerce Repository 의존 시 모듈 버전 제약 연쇄(PaymentLimits 선례). Service/Repository 이관은 후속 백로그
         return DB::table((new OrderPayment)->getTable().' as p')
             ->join((new Order)->getTable().' as o', 'o.id', '=', 'p.order_id')
             ->where('o.order_number', $orderNumber)

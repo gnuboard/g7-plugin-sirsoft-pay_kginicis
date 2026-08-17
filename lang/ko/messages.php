@@ -12,6 +12,11 @@ return [
     'cash_receipt' => [
         'provider_name' => 'KG이니시스',
     ],
+    'escrow' => [
+        'invoice_required' => '운송장번호를 입력해주세요.',
+        'courier_required' => '택배사를 선택해주세요.',
+        'default_confirmer' => '관리자',
+    ],
     'refund' => [
         'missing_tid' => '거래 ID(TID)가 없어 환불을 진행할 수 없습니다.',
         'default_reason' => '구매자 환불 요청',

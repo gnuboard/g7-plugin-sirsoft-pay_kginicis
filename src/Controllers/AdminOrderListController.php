@@ -38,6 +38,7 @@ class AdminOrderListController extends AdminBaseController
         $orders = (new Order)->getTable();
         $payments = (new OrderPayment)->getTable();
 
+        // audit:allow controller-direct-data-access reason: PG 플러그인의 결제 레코드 직접 조회/기록 — ecommerce Repository 의존 시 모듈 버전 제약 연쇄(PaymentLimits 선례). Service/Repository 이관은 후속 백로그
         $rows = DB::table($orders.' as o')
             ->join($payments.' as p', 'p.order_id', '=', 'o.id')
             ->where('p.pg_provider', 'kginicis')

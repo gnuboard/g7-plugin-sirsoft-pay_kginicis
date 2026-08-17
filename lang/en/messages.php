@@ -12,6 +12,11 @@ return [
     'cash_receipt' => [
         'provider_name' => 'KG Inicis',
     ],
+    'escrow' => [
+        'invoice_required' => 'Please enter the tracking number.',
+        'courier_required' => 'Please select a courier.',
+        'default_confirmer' => 'Administrator',
+    ],
     'refund' => [
         'missing_tid' => 'Cannot process refund: transaction ID (TID) is missing.',
         'default_reason' => 'Buyer refund request',
