@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Upgrades\Data\Ext\Plugins\SirsoftPayKginicis\V1_1_3\Migrations;
+namespace App\Upgrades\Data\Ext\Plugins\SirsoftPayKginicis\V1_2_0\Migrations;
 
 use App\Extension\Upgrade\DataMigration;
 use App\Extension\UpgradeContext;
